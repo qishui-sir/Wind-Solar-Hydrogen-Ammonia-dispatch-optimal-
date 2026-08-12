@@ -1,5 +1,4 @@
 function par = AEL(config, scenario_id)
-%AEL Zhou S2 scheduling parameters with Qi AEL stack-model parameters.
 
 if nargin == 1 && (ischar(config) || (isstring(config) && isscalar(config)))
     scenario_id = config;
@@ -18,106 +17,97 @@ end
 
 scenario_id = lower(strtrim(scenario_id));
 
-par.source.paper = 'Qi 2023 Applied Energy'; % AEL electrochemical/thermal source
+par.source.paper = 'Qi 2023 Applied Energy';
 par.source.note = 'Qi Tables B.8/B.9 for a 500 Nm3/h stack; Zhou Tables 2/4 for system scheduling.'; % Parameter scope
 
-par.F = 96485.33212; % Faraday constant, C/mol
-par.faraday_constant_c_mol = par.F; % Faraday constant, C/mol
-par.eta_F = 1.0; % Faraday efficiency, fraction
-par.faraday_efficiency = par.eta_F; % Faraday efficiency, fraction
-par.h2_molar_mass_kg_mol = 2.01588e-3; % Hydrogen molar mass, kg/mol
+par.far_const = 96485.33212;    % Faraday constant, C/mol
+par.far_eff = 1.0;              % Faraday efficiency, fraction
+par.h2_molar_mass = 2.01588e-3; % Hydrogen molar mass, kg/mol
 
-par.N_cell = 298; % Qi 500 Nm3/h cell number
-par.cell_count = par.N_cell; % Qi 500 Nm3/h cell number
-par.A_m2 = 2.0; % Qi 500 Nm3/h cell area, m2
-par.cell_area_m2 = par.A_m2; % Qi 500 Nm3/h cell area, m2
+par.cell_num = 298;
+par.cell_area = 2.0;            % 500 Nm3/h
 
-par.r1 = 1.71e-4;
-par.r2 = -1.96e-7;
-par.s = 0.16;
-par.t1 = -0.24;
-par.t2 = 26.23;
-par.t3 = 139.88;
-par.thermal_neutral_voltage_v = 1.48; % Qi thermal-neutral voltage, V
-par.degradation_voltage_v = 0; % Initial degradation voltage rise, V
+par.r1 = 1.71e-4;               % Qi U-I ohmic coefficient
+par.r2 = -1.96e-7;              % Qi U-I temperature coefficient
+par.s = 0.16;                   % Qi U-I activation coefficient
+par.t1 = -0.24;                 % Qi U-I activation coefficient
+par.t2 = 26.23;                 % Qi U-I activation coefficient
+par.t3 = 139.88;                % Qi U-I activation coefficient
+par.tn_voltage = 1.48;          % Qi thermal-neutral voltage, V
+par.deg_voltage = 0;            % Initial degradation voltage rise, V
 
-par.T_C = 90.0;     %Centigrade
-par.T_K = par.T_C + 273.15; % Kelvin
-par.temperature_celsius = par.T_C; % Initial stack/separator temperature, degC
-par.temperature_kelvin = par.T_K; % Initial reversible-voltage temperature, K
-par.stack_temperature_celsius = par.T_C; % After-stack temperature, degC
-par.separator_temperature_celsius = par.T_C; % Before-stack temperature, degC
-par.temperature_upper_limit_celsius = 95.0; % Qi MW-scale upper temperature limit, degC
-par.pid_temperature_setpoint_celsius = 88.78; % Qi large-system PID set point, degC
-par.pid_i_temperature_setpoint_celsius = 89.57; % Qi large-system PID-I set point, degC
-par.mpc_temperature_setpoint_celsius = 93.23; % Qi large-system MPC set point, degC
+par.stack_temp = 90.0;          % After-stack temperature, degC
+par.sep_temp = 90.0;            % Before-stack temperature, degC
+par.temp_limit = 95.0;          % Qi MW-scale upper temperature limit, degC
+par.pid_set = 88.78;            % Qi large-system PID set point, degC
+par.pid_i_set = 89.57;          % Qi large-system PID-I set point, degC
+par.mpc_set = 93.23;            % Qi large-system MPC set point, degC
 
-par.qi_stack_h2_nm3_h = 500; % Qi large-stack rated H2 output, Nm3/h
-par.qi_stack_current_density_a_m2 = 2000; % Qi nominal current density used for first-pass stack checks, A/m2
-par.zhou_cluster_h2_nm3_h = 1000; % Zhou electrolyzer-cluster rated H2 output, Nm3/h
-par.module_h2_nm3_h = par.zhou_cluster_h2_nm3_h; % Scheduling module H2 output, Nm3/h
-par.specific_energy_kwh_nm3 = 5.0; % Zhou original AEL energy use, kWh/Nm3
-par.specific_energy = par.specific_energy_kwh_nm3; % Scheduling energy-use alias, kWh/Nm3
-par.min_load_fraction = 0.20; % Zhou AEL minimum load, fraction
-par.max_load_fraction = 1.00; % Zhou AEL maximum load, fraction
-par.min_stable_time_min = 60; % Zhou AEL minimum stable time, min
-par.startup_electricity_load_fraction_per_hour = 0.15; % Zhou startup electricity, load fraction/h
-par.water_t_per_t_h2 = 28; % Zhou AEL water use, t/t-H2
-par.segment_count = 12; % Zhou piecewise segment count
+par.stack_h2 = 500;             % Qi large-stack rated H2 output, Nm3/h
+par.cur_density = 2000;         % Qi nominal current density, A/m2
+par.module_h2 = 1000;           % Zhou scheduling module H2 output, Nm3/h
+par.spec_energy = 5.0;          % Zhou original AEL energy use, kWh/Nm3
+par.min_load = 0.20;            % Zhou AEL minimum load, fraction
+par.max_load = 1.00;            % Zhou AEL maximum load, fraction
+par.min_stable = 60;            % Zhou AEL minimum stable time, min
+par.startup_elec = 0.15;        % Zhou startup electricity, load fraction/h
+par.water_use = 28;             % Zhou AEL water use, t/t-H2
+par.seg_num = 12;               % Zhou piecewise segment count
 
-par.cell_diameter_m = 1.6; % Qi 500 Nm3/h cell diameter, m
-par.stack_diameter_m = 2.04; % Qi 500 Nm3/h stack diameter, m
-par.stack_length_m = 5.4; % Qi 500 Nm3/h stack length, m
-par.stack_surface_area_m2 = 41; % Qi 500 Nm3/h stack surface area, m2
-par.stack_free_volume_m3 = 8; % Qi 500 Nm3/h free stack volume, m3
-par.stack_void_fraction_at_rated = 0.5; % Qi stack void fraction at rated load
-par.stack_emissivity = 0.8; % Qi stack surface blackness
-par.separator_volume_m3 = 2.2; % Qi 500 Nm3/h separator volume, m3
-par.separator_liquid_level_m = 0.1095; % Qi separator liquid level, m
-par.electrolyte_type = 'KOH'; % Qi electrolyte type
-par.electrolyte_koh_mass_fraction = 0.312; % Qi KOH mass fraction
-par.electrolyte_flow_m3_h = 25.2; % Qi 500 Nm3/h electrolyte flow, m3/h
-par.cooling_coil_heat_transfer_w_k = 8820; % Qi cooling-coil heat transfer coefficient, W/K
-par.separator_thermal_resistance_k_w = 0.004; % Qi separator thermal resistance, K/W
-par.stack_heat_capacity_j_k = 55e6; % Qi stack heat capacity, J/K
-par.separator_heat_capacity_j_k = 4.26e6; % Qi separator heat capacity, J/K
-par.cooling_coil_heat_capacity_j_k = 1.15e6; % Qi cooling-coil heat capacity, J/K
-par.stack_time_delay_s = 6 * 60; % Qi stack time delay, s
-par.cooling_coil_time_delay_s = 4 * 60; % Qi cooling-coil time delay, s
-par.stefan_boltzmann_w_m2_k4 = 5.670374419e-8; % Radiation constant for Qi heat-loss Eq. (7), W/(m2 K4)
+par.cell_diam = 1.6;            % Qi 500 Nm3/h cell diameter, m
+par.stack_diam = 2.04;          % Qi 500 Nm3/h stack diameter, m
+par.stack_len = 5.4;            % Qi 500 Nm3/h stack length, m
+par.stack_area = 41;            % Qi 500 Nm3/h stack surface area, m2
+par.stack_volume = 8;           % Qi 500 Nm3/h free stack volume, m3
+par.stack_void = 0.5;           % Qi stack void fraction at rated load
+par.stack_emiss = 0.8;          % Qi stack surface blackness
+par.sep_volume = 2.2;           % Qi 500 Nm3/h separator volume, m3
+par.sep_level = 0.1095;         % Qi separator liquid level, m
+par.elec_type = 'KOH';          % Qi electrolyte type
+par.elec_koh = 0.312;           % Qi KOH mass fraction
+par.elec_flow = 25.2;           % Qi 500 Nm3/h electrolyte flow, m3/h
+par.coil_htc = 8820;            % Qi cooling-coil heat transfer coefficient, W/K
+par.sep_resist = 0.004;         % Qi separator thermal resistance, K/W
+par.stack_heat = 55e6;          % Qi stack heat capacity, J/K
+par.sep_heat = 4.26e6;          % Qi separator heat capacity, J/K
+par.coil_heat = 1.15e6;         % Qi cooling-coil heat capacity, J/K
+par.stack_delay = 6 * 60;       % Qi stack time delay, s
+par.coil_delay = 4 * 60;        % Qi cooling-coil time delay, s
+par.sb_const = 5.670374419e-8;  % Radiation constant for Qi heat-loss Eq. (7), W/(m2 K4)
 
 switch scenario_id
     case 's1'
-        par.enable_start_energy = false; % Enable AEL startup electricity
-        par.capacity_mw = 140; % Zhou S1 AEL capacity, MW
+        par.startup = false;    % Enable AEL startup electricity
+        par.capacity = 140;     % S1 AEL capacity, MW
     case 's2'
-        par.enable_start_energy = false; % Enable AEL startup electricity
-        par.capacity_mw = 130; % Zhou S2 AEL capacity, MW
+        par.startup = false;    
+        par.capacity = 130;     % S2 AEL capacity, MW
     case 's3'
-        par.enable_start_energy = true; % Enable AEL startup electricity
-        par.capacity_mw = 130; % Zhou S3 AEL capacity, MW
+        par.startup = true;     
+        par.capacity = 130;     % S3 AEL capacity, MW
     otherwise
         error('AEL:bad_case', 'scenario_id must be s1, s2, or s3.');
 end
 
-h2_kg_per_nm3 = 0.08988;
-kw_per_mw = 1000;
+h2_density = 0.08988;
+power_scale = 1000;
 if isfield(config, 'unit')
-    if isfield(config.unit, 'h2_kg_per_nm3')
-        h2_kg_per_nm3 = config.unit.h2_kg_per_nm3;
+    if isfield(config.unit, 'h2_density')
+        h2_density = config.unit.h2_density;
     end
-    if isfield(config.unit, 'kw_per_mw')
-        kw_per_mw = config.unit.kw_per_mw;
+    if isfield(config.unit, 'power_scale')
+        power_scale = config.unit.power_scale;
     end
 end
 
-par.max_power_kw = par.capacity_mw * kw_per_mw; % AEL rated power, kW
-par.min_power_kw = par.max_power_kw * par.min_load_fraction; % AEL minimum power, kW
-par.module_power_kw = par.module_h2_nm3_h * par.specific_energy_kwh_nm3; % Zhou scheduling module power, kW
-par.module_count = ceil(par.max_power_kw / par.module_power_kw); % Zhou scheduling module count
-par.qi_stack_count = ceil(par.max_power_kw / (par.qi_stack_h2_nm3_h * par.specific_energy_kwh_nm3)); % Qi-equivalent stack count
-par.qi_stack_count_per_module = par.module_h2_nm3_h / par.qi_stack_h2_nm3_h; % Qi stacks per Zhou scheduling module
-par.h2_output_nm3_h = par.max_power_kw / par.specific_energy_kwh_nm3; % Zhou AEL H2 output, Nm3/h
-par.h2_output_kg_h = par.h2_output_nm3_h * h2_kg_per_nm3; % Zhou AEL H2 output, kg/h
-par.specific_energy_kwh_kg = par.specific_energy_kwh_nm3 / h2_kg_per_nm3; % Derived Zhou AEL energy use, kWh/kg
+par.max_power = par.capacity * power_scale;                 % AEL rated power, kW
+par.min_power = par.max_power * par.min_load;               % AEL minimum power, kW
+par.module_power = par.module_h2 * par.spec_energy;         % Zhou scheduling module power, kW
+par.module_num = ceil(par.max_power / par.module_power);    % Zhou scheduling module count
+par.stack_num = ceil(par.max_power / ...
+    (par.stack_h2 * par.spec_energy));                      % Qi-equivalent stack count
+par.stack_per_module = par.module_h2 / par.stack_h2;        % Qi stacks per Zhou module
+par.h2_output = par.max_power / par.spec_energy;            % Zhou AEL H2 output, Nm3/h
+par.h2_mass = par.h2_output * h2_density;                   % Zhou AEL H2 output, kg/h
+par.mass_spec_energy = par.spec_energy / h2_density;        % Derived Zhou AEL energy use, kWh/kg
 end

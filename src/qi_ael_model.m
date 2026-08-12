@@ -1,5 +1,4 @@
-function out = qi_ael_model(current_density_a_m2, degradation_voltage_v, par, ...
-        stack_temperature_celsius, separator_temperature_celsius)
+function out = qi_ael_model(cur_density, deg_voltage, par, stack_temp, sep_temp)
     if nargin < 3 || isempty(par)
         params_dir = fullfile(fileparts(mfilename('fullpath')), 'params');
         old_path = path;
@@ -7,79 +6,62 @@ function out = qi_ael_model(current_density_a_m2, degradation_voltage_v, par, ..
         addpath(params_dir, '-begin');
         par = AEL();
     end
-    if nargin < 2 || isempty(degradation_voltage_v)
-        degradation_voltage_v = par.degradation_voltage_v;
+    if nargin < 2 || isempty(deg_voltage)
+        deg_voltage = par.deg_voltage;
     end
-    if nargin < 4 || isempty(stack_temperature_celsius)
-        stack_temperature_celsius = par.stack_temperature_celsius;
+    if nargin < 4 || isempty(stack_temp)
+        stack_temp = par.stack_temp;
     end
-    if nargin < 5 || isempty(separator_temperature_celsius)
-        separator_temperature_celsius = stack_temperature_celsius;
+    if nargin < 5 || isempty(sep_temp)
+        sep_temp = stack_temp;
     end
 
-    average_temperature_celsius = ...
-        (stack_temperature_celsius + separator_temperature_celsius) ./ 2;
-    average_temperature_kelvin = average_temperature_celsius + 273.15;
+    avg_temp = (stack_temp + sep_temp) ./ 2; % degC
+    rev_temp = avg_temp + 273.15; % K
 
-    reversible_voltage_v = 1.5184 - 1.5421e-3 .* average_temperature_kelvin + ...
-        9.523e-5 .* average_temperature_kelvin .* log(average_temperature_kelvin) + ...
-        9.84e-8 .* (average_temperature_kelvin .^ 2);
-    area_specific_resistance_ohm_m2 = ...
-        par.r1 + par.r2 .* average_temperature_celsius;
-    ohmic_voltage_v = area_specific_resistance_ohm_m2 .* current_density_a_m2;
-    activation_factor_m2_a = ...
-        par.t1 + par.t2 ./ average_temperature_celsius + ...
-        par.t3 ./ (average_temperature_celsius .^ 2);
-    activation_argument = 1 + activation_factor_m2_a .* current_density_a_m2;
-    if any(activation_argument(:) <= 0)
+    rev_voltage = 1.5184 - 1.5421e-3 .* rev_temp + ...
+        9.523e-5 .* rev_temp .* log(rev_temp) + ...
+        9.84e-8 .* (rev_temp .^ 2);
+    are_resistance = par.r1 + par.r2 .* avg_temp; % ohm m2
+    ohm_voltage = are_resistance .* cur_density;
+    act_factor = par.t1 + par.t2 ./ avg_temp + ...
+        par.t3 ./ (avg_temp .^ 2); % m2/A
+    act_argument = 1 + act_factor .* cur_density;
+    if any(act_argument(:) <= 0)
         error('qi_ael_model:bad_activation_argument', ...
             'Qi U-I activation logarithm argument must be positive.');
     end
-    activation_voltage_v = par.s .* log(activation_argument);
-    cell_voltage_v = reversible_voltage_v + ohmic_voltage_v + ...
-        activation_voltage_v + degradation_voltage_v;
+    act_voltage = par.s .* log(act_argument);
+    cel_voltage = rev_voltage + ohm_voltage + act_voltage + deg_voltage;
 
-    cell_current_a = current_density_a_m2 .* par.cell_area_m2;
-    power_w = cell_voltage_v .* cell_current_a .* par.cell_count;
-    electrolysis_heat_w = ...
-        (cell_voltage_v - par.thermal_neutral_voltage_v) .* ...
-        cell_current_a .* par.cell_count;
-    hydrogen_energy_w = par.thermal_neutral_voltage_v .* ...
-        cell_current_a .* par.cell_count;
-    h2_mol_s = par.faraday_efficiency .* par.cell_count .* ...
-        cell_current_a ./ (2 .* par.faraday_constant_c_mol);
-    h2_kg_h = h2_mol_s .* par.h2_molar_mass_kg_mol .* 3600;
-    h2_nm3_h = h2_kg_h ./ 0.08988;
+    cell_current = cur_density .* par.cell_area; % A
+    power_w = cel_voltage .* cell_current .* par.cell_num;
+    hea_power_w = (cel_voltage - par.tn_voltage) .* ...
+        cell_current .* par.cell_num;
+    hyd_power_w = par.tn_voltage .* cell_current .* par.cell_num;
+    h2_mol_flow = par.far_eff .* par.cell_num .* ...
+        cell_current ./ (2 .* par.far_const); % mol/s
+    h2_mass_flow = h2_mol_flow .* par.h2_molar_mass .* 3600; % kg/h
+    h2_flow = h2_mass_flow ./ 0.08988; % Nm3/h
 
-    out.current_density_a_m2 = current_density_a_m2;
-    out.cell_current_a = cell_current_a;
-    out.degradation_voltage_v = degradation_voltage_v;
-    out.stack_temperature_celsius = stack_temperature_celsius;
-    out.separator_temperature_celsius = separator_temperature_celsius;
-    out.average_temperature_celsius = average_temperature_celsius;
-    out.average_temperature_kelvin = average_temperature_kelvin;
-    out.reversible_voltage_v = reversible_voltage_v;
-    out.area_specific_resistance_ohm_m2 = area_specific_resistance_ohm_m2;
-    out.ohmic_voltage_v = ohmic_voltage_v;
-    out.activation_factor_m2_a = activation_factor_m2_a;
-    out.activation_voltage_v = activation_voltage_v;
-    out.cell_voltage_v = cell_voltage_v;
-    out.power_w = power_w;
-    out.power_mw = power_w ./ 1e6;
-    out.electrolysis_heat_w = electrolysis_heat_w;
-    out.heat_power_mw = electrolysis_heat_w ./ 1e6;
-    out.hydrogen_energy_w = hydrogen_energy_w;
-    out.hydrogen_power_mw = hydrogen_energy_w ./ 1e6;
-    out.h2_mol_s = h2_mol_s;
-    out.h2_kg_h = h2_kg_h;
-    out.h2_nm3_h = h2_nm3_h;
-    out.efficiency_hhv = hydrogen_energy_w ./ power_w;
-
-    out.U_deg = degradation_voltage_v;
-    out.rev = reversible_voltage_v;
-    out.ohm = ohmic_voltage_v;
-    out.U_act = activation_voltage_v;
-    out.U_cell = cell_voltage_v;
-    out.P_AEL = out.power_mw;
-    out.n_H2 = h2_mol_s;
+    out.cur_density = cur_density; % A/m2
+    out.cell_current = cell_current; % A
+    out.deg_voltage = deg_voltage; % V
+    out.stack_temp = stack_temp; % degC
+    out.sep_temp = sep_temp; % degC
+    out.avg_temp = avg_temp; % degC
+    out.rev_temp = rev_temp; % K
+    out.rev_voltage = rev_voltage; % V
+    out.are_resistance = are_resistance; % ohm m2
+    out.ohm_voltage = ohm_voltage; % V
+    out.act_factor = act_factor; % m2/A
+    out.act_voltage = act_voltage; % V
+    out.cel_voltage = cel_voltage; % V
+    out.power = power_w ./ 1e6; % MW
+    out.hea_power = hea_power_w ./ 1e6; % MW
+    out.hyd_power = hyd_power_w ./ 1e6; % MW
+    out.h2_mol_flow = h2_mol_flow; % mol/s
+    out.h2_mass_flow = h2_mass_flow; % kg/h
+    out.h2_flow = h2_flow; % Nm3/h
+    out.hhv_efficiency = hyd_power_w ./ power_w; % fraction
 end

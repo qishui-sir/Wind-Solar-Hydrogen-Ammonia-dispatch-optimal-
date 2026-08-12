@@ -41,35 +41,33 @@ config = default(scenario_id);
 config.AEL = AEL(config, scenario_id);
 config.HB = HB(config, scenario_id);
 
-config.converter.capacity_mw = config.AEL.capacity_mw; % Converter capacity, MW
-config.ref.ael_capacity_mw = config.AEL.capacity_mw; % Zhou AEL capacity, MW
-config.ref.h2_storage_capacity_nm3 = config.h2_storage.capacity_nm3; % Zhou H2 storage capacity, Nm3
-config.ref.transformer_capacity_mw = config.transformer.capacity_mw; % Zhou transformer capacity, MW
+config.converter.capacity = config.AEL.capacity; % Converter capacity, MW
+config.ref.ael_capacity = config.AEL.capacity; % Zhou AEL capacity, MW
+config.ref.h2_storage = config.h2_storage.capacity; % Zhou H2 storage capacity, Nm3
+config.ref.transformer = config.transformer.capacity; % Zhou transformer capacity, MW
 
-config.audit.literature_h2_n2_sum = ...
-    config.HB.literature_h2_t_per_t_nh3 + ...
-    config.HB.literature_n2_t_per_t_nh3; % Zhou rounded H2+N2 mass sum
-config.audit.active_h2_n2_sum = ...
-    config.HB.active_h2_t_per_t_nh3 + ...
-    config.HB.active_n2_t_per_t_nh3; % Active stoichiometric mass sum
+config.audit.lit_sum = ...
+    config.HB.lit_h2 + config.HB.lit_n2; % Zhou rounded H2+N2 mass sum
+config.audit.act_sum = ...
+    config.HB.act_h2 + config.HB.act_n2; % Active stoichiometric mass sum
 config.audit.note = ['Zhou H2=0.18 and N2=0.84 are retained; ', ...
     'dispatch mass balance uses exact 6/34 and 28/34.']; % Mass-balance note
 
-if abs(config.renewable.pv_capacity_kw + ...
-        config.renewable.pw_capacity_kw - ...
-        config.renewable.total_capacity_kw) > 1e-6
+if abs(config.renewable.PV_capacity + ...
+        config.renewable.PW_capacity - ...
+        config.renewable.total_capacity) > 1e-6
     error('my_system:bad_res', 'PV plus PW must equal total renewable capacity.');
 end
 
-if config.AEL.min_power_kw > config.AEL.max_power_kw
+if config.AEL.min_power > config.AEL.max_power
     error('my_system:bad_ael', 'AEL min power exceeds max power.');
 end
 
-if config.HB.min_load_fraction > config.HB.max_load_fraction
+if config.HB.min_load > config.HB.max_load
     error('my_system:bad_hb', 'HB min load exceeds max load.');
 end
 
-if config.h2_storage.capacity_kg <= 0 || config.transformer.capacity_mw <= 0
+if config.h2_storage.mass <= 0 || config.transformer.capacity <= 0
     error('my_system:bad_cap', 'Main capacities must be positive.');
 end
 end
