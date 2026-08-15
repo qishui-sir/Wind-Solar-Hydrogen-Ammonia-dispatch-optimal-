@@ -41,8 +41,9 @@ config = default(scenario_id);
 config.AEL = AEL(config, scenario_id);
 config.HB = HB(config, scenario_id);
 
-config.converter.capacity = config.AEL.capacity; % Converter capacity, MW
-config.ref.ael_capacity = config.AEL.capacity; % Zhou AEL capacity, MW
+ael_common = config.AEL.common;
+config.converter.capacity = ael_common.capacity; % Converter capacity, MW
+config.ref.ael_capacity = ael_common.capacity; % Zhou AEL capacity, MW
 config.ref.h2_storage = config.h2_storage.capacity; % Zhou H2 storage capacity, Nm3
 config.ref.transformer = config.transformer.capacity; % Zhou transformer capacity, MW
 
@@ -59,7 +60,7 @@ if abs(config.renewable.PV_capacity + ...
     error('my_system:bad_res', 'PV plus PW must equal total renewable capacity.');
 end
 
-if config.AEL.min_power > config.AEL.max_power
+if ael_common.min_power > ael_common.max_power
     error('my_system:bad_ael', 'AEL min power exceeds max power.');
 end
 

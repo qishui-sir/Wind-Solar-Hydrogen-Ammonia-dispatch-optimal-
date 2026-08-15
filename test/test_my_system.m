@@ -7,6 +7,7 @@ test_dir = fileparts(mfilename('fullpath'));
 project_dir = fileparts(test_dir);
 addpath(fullfile(project_dir, 'src'));
 addpath(fullfile(project_dir, 'src', 'params'));
+addpath(fullfile(project_dir, 'src', 'results'));
 end
 
 function testDefaultScenarioIsS2(test_case)
@@ -14,7 +15,7 @@ case_config = my_system();
 
 verifyEqual(test_case, case_config.scenario.id, 's2');
 verifyEqual(test_case, case_config.scenario.mode, 'continuous_flexible');
-verifyEqual(test_case, case_config.AEL.capacity, 130);
+verifyEqual(test_case, case_config.AEL.common.capacity, 130);
 verifyEqual(test_case, case_config.h2_storage.capacity, 11.0e4);
 verifyEqual(test_case, case_config.ref.lcoa, 464);
 end
@@ -34,12 +35,64 @@ ael_parameters = AEL(default_config, 's2');
 hb_parameters = HB(default_config, 's2');
 
 verifyEqual(test_case, default_config.ref.lcoa, 464);
-verifyEqual(test_case, ael_parameters.far_const, 96485.33212);
-verifyEqual(test_case, ael_parameters.capacity, 130);
-verifyEqual(test_case, ael_parameters.stack_h2, 500);
-verifyEqual(test_case, ael_parameters.module_h2, 1000);
+verifyEqual(test_case, ael_parameters.detail.far_const, 96485.33212);
+verifyEqual(test_case, ael_parameters.common.capacity, 130);
+verifyEqual(test_case, ael_parameters.detail.stack_h2, 500);
+verifyEqual(test_case, ael_parameters.common.module_h2, 1000);
 verifyEqual(test_case, hb_parameters.act_h2, 6 / 34);
 verifyEqual(test_case, hb_parameters.max_load, 1.00);
+end
+
+function testAelParametersUseCommonDetailSections(test_case)
+ael_parameters = AEL();
+
+verifyEqual(test_case, fieldnames(ael_parameters), {'common'; 'detail'});
+verifyTrue(test_case, all(isfield(ael_parameters.common, ...
+    {'capacity', 'max_power', 'min_power', 'spec_energy'})));
+verifyTrue(test_case, all(isfield(ael_parameters.detail, ...
+    {'far_const', 'stack_temp', 'stack_h2'})));
+end
+
+function testResultsBuilderCreatesBaselineSummary(test_case)
+params = my_system('s2');
+dt = 1;
+
+sol = struct();
+sol.P_AEL = [50; 60];
+sol.HB_load = [0; 0];
+sol.storage_H2 = [10; 10.8988; 11.97736];
+sol.p_purchase = [0; 0];
+sol.p_sell = [50; 140];
+sol.p_curt = [0; 0];
+sol.u_purchase = [0; 0];
+
+renewable_data = struct();
+renewable_data.time_count = 2;
+renewable_data.time = [1; 2];
+
+context = struct();
+context.T = 2;
+context.dt = dt;
+context.P_total = [100; 200];
+context.AEL_spec_energy = params.AEL.common.spec_energy;
+context.H2_density = params.unit.h2_density;
+context.NH3_rate = params.HB.nh3_output;
+context.HB_power_kw = params.HB.nom_power * 1000;
+context.C_curt = 0.01;
+context.C_purchase = params.grid.buy_price;
+context.C_sell = params.grid.sell_price;
+context.ael_common = params.AEL.common;
+
+built = feval('results', params, renewable_data, sol, -1, 1, ...
+    struct('message', 'ok'), context);
+
+verifyEqual(test_case, built.dispatch.P_AEL, sol.P_AEL);
+verifyEqual(test_case, built.summary.H2_prod_kg, ...
+    sum(sol.P_AEL) * dt / context.AEL_spec_energy * context.H2_density, ...
+    'AbsTol', 1e-12);
+verifyEqual(test_case, built.check.max_power_residual_kw, 0, ...
+    'AbsTol', 1e-12);
+verifyEqual(test_case, built.time, renewable_data.time);
 end
 
 function testAelParametersDoNotExposeDuplicateAliases(test_case)
@@ -155,10 +208,10 @@ verifyEqual(test_case, case_config.finance.crf, expected_crf, 'AbsTol', 1e-12);
 verifyEqual(test_case, case_config.h2_storage.mass, ...
     case_config.h2_storage.capacity * case_config.unit.h2_density, ...
     'AbsTol', 1e-12);
-verifyEqual(test_case, case_config.AEL.max_power, ...
-    case_config.AEL.capacity * case_config.unit.power_scale);
-verifyEqual(test_case, case_config.AEL.mass_spec_energy, ...
-    case_config.AEL.spec_energy / case_config.unit.h2_density, ...
+verifyEqual(test_case, case_config.AEL.common.max_power, ...
+    case_config.AEL.common.capacity * case_config.unit.power_scale);
+verifyEqual(test_case, case_config.AEL.common.mass_spec_energy, ...
+    case_config.AEL.common.spec_energy / case_config.unit.h2_density, ...
     'AbsTol', 1e-12);
 verifyEqual(test_case, case_config.HB.nh3_output, ...
     case_config.HB.capacity * case_config.unit.mass_scale / ...
@@ -181,7 +234,7 @@ verifyEqual(test_case, s1_config.environment.co2_enabled, false);
 
 verifyEqual(test_case, s3_config.scenario.mode, 'multi_state_flexible');
 verifyEqual(test_case, s3_config.HB.max_load, 1.10);
-verifyEqual(test_case, s3_config.AEL.startup, true);
+verifyEqual(test_case, s3_config.AEL.common.startup, true);
 verifyEqual(test_case, s3_config.transformer.capacity, 189);
 end
 
@@ -190,23 +243,23 @@ case_config = my_system('s2');
 
 verifyEqual(test_case, case_config.renewable.total_capacity, ...
     case_config.renewable.PV_capacity + case_config.renewable.PW_capacity);
-verifyEqual(test_case, case_config.AEL.max_power, 130000);
-verifyEqual(test_case, case_config.AEL.module_num, 26);
-verifyEqual(test_case, case_config.AEL.stack_num, 52);
-verifyEqual(test_case, case_config.AEL.stack_per_module, 2);
+verifyEqual(test_case, case_config.AEL.common.max_power, 130000);
+verifyEqual(test_case, case_config.AEL.common.module_num, 26);
+verifyEqual(test_case, case_config.AEL.detail.stack_num, 52);
+verifyEqual(test_case, case_config.AEL.detail.stack_per_module, 2);
 verifyEqual(test_case, case_config.h2_storage.mass, 9886.8, 'AbsTol', 1e-9);
 verifyEqual(test_case, case_config.converter.capacity, ...
-    case_config.AEL.capacity);
+    case_config.AEL.common.capacity);
 end
 
 function testZhouEnergyUnitAndDerivedValues(test_case)
 case_config = my_system('s2');
 
-verifyEqual(test_case, case_config.AEL.spec_energy, 5.0);
-verifyEqual(test_case, case_config.AEL.mass_spec_energy, ...
+verifyEqual(test_case, case_config.AEL.common.spec_energy, 5.0);
+verifyEqual(test_case, case_config.AEL.common.mass_spec_energy, ...
     55.63, 'AbsTol', 5e-3);
-verifyEqual(test_case, case_config.AEL.h2_output, 26000);
-verifyEqual(test_case, case_config.AEL.h2_mass, ...
+verifyEqual(test_case, case_config.AEL.common.h2_output, 26000);
+verifyEqual(test_case, case_config.AEL.common.h2_mass, ...
     2336.88, 'AbsTol', 1e-9);
 end
 
@@ -227,16 +280,16 @@ end
 function testTemperatureAndStartupUnitNames(test_case)
 case_config = my_system('s2');
 
-verifyEqual(test_case, case_config.AEL.stack_temp, 90.0);
-verifyEqual(test_case, case_config.AEL.sep_temp, 90.0);
-verifyEqual(test_case, case_config.AEL.pid_i_set, 89.57);
-verifyEqual(test_case, case_config.AEL.mpc_set, 93.23);
-verifyEqual(test_case, case_config.AEL.startup_elec, 0.15);
+verifyEqual(test_case, case_config.AEL.detail.stack_temp, 90.0);
+verifyEqual(test_case, case_config.AEL.detail.sep_temp, 90.0);
+verifyEqual(test_case, case_config.AEL.detail.pid_i_set, 89.57);
+verifyEqual(test_case, case_config.AEL.detail.mpc_set, 93.23);
+verifyEqual(test_case, case_config.AEL.common.startup_elec, 0.15);
 end
 
 function testQiAelVoltageHeatAndHydrogenEquations(test_case)
 ael_parameters = AEL();
-model_output = qi_ael_model(2000, 0, ael_parameters);
+model_output = qi_ael_model(2000, 0, ael_parameters.detail);
 
 verifyEqual(test_case, model_output.avg_temp, 90.0);
 verifyEqual(test_case, model_output.rev_voltage, ...

@@ -6,6 +6,9 @@ function out = qi_ael_model(cur_density, deg_voltage, par, stack_temp, sep_temp)
         addpath(params_dir, '-begin');
         par = AEL();
     end
+    if isfield(par, 'detail')
+        par = par.detail;
+    end
     if nargin < 2 || isempty(deg_voltage)
         deg_voltage = par.deg_voltage;
     end
