@@ -13,6 +13,7 @@ data_cfg.pw_capacity_kw = 200000;
 renewable_data = load_res_year(data_cfg);
 
 params = my_system('s2');
+params.AEL.common.startup = true; % Use S3 startup electricity in the S2 case.
 ael_output = qi_ael_model(2000, 0, params.AEL.detail);
 
 results = baseline(params,renewable_data);

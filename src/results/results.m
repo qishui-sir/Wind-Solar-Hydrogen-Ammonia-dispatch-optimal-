@@ -16,6 +16,10 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     end
 
     P_AEL_opt = sol.P_AEL;
+    P_AEL_start_opt = zeros(T, 1);
+    if isfield(sol, 'P_AEL_start')
+        P_AEL_start_opt = sol.P_AEL_start;
+    end
     HB_load_opt = sol.HB_load;
     storage_H2_opt = sol.storage_H2;
     P_purchase_opt = sol.p_purchase;
@@ -61,6 +65,7 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.dispatch.time = time_opt;
     result.dispatch.P_total = P_total;
     result.dispatch.P_AEL = P_AEL_opt;
+    result.dispatch.P_AEL_start = P_AEL_start_opt;
     result.dispatch.HB_load = HB_load_opt;
     result.dispatch.storage_H2 = storage_H2_opt;
     result.dispatch.P_purchase = P_purchase_opt;
@@ -85,6 +90,7 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
 
     result.AEL = struct();
     result.AEL.P = P_AEL_opt;
+    result.AEL.start_power = P_AEL_start_opt;
     result.AEL.H2_prod = H2_prod_kg_opt;
     if has_N_AEL
         result.AEL.online_modules = N_AEL_opt;
@@ -120,6 +126,8 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.summary.NH3_prod_t_y = result.summary.NH3_prod_kg / 1000;
     result.summary.ael_equiv_hours = ...
         sum(P_AEL_opt) * dt / ael_common.max_power;
+    result.summary.AEL_start_energy_kwh = ...
+        sum(P_AEL_start_opt) * dt;
     if has_N_AEL
         result.summary.AEL_average_online_modules = mean(N_AEL_opt);
         AEL_module_change = diff([N_AEL_initial; N_AEL_opt(:)]);
@@ -159,7 +167,8 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.zhou_audit = build_zhou_audit(params, result.summary);
 
     power_residual = P_total + P_purchase_opt ...
-        - P_AEL_opt - P_HB_kw_opt - P_sell_opt - P_curt_opt;
+        - P_AEL_opt - P_AEL_start_opt - P_HB_kw_opt ...
+        - P_sell_opt - P_curt_opt;
     storage_residual = storage_H2_opt(2:end) - storage_H2_opt(1:end-1) ...
         - H2_prod_kg_opt + H2_use_kg_opt;
 
@@ -177,6 +186,10 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     fprintf('AEL等效利用小时：%.2f h/a\n', result.summary.ael_equiv_hours);
     if isfield(result.summary, 'AEL_startup_count')
         fprintf('AEL启动台次：%.0f 台次/a\n', result.summary.AEL_startup_count);
+    end
+    if result.summary.AEL_start_energy_kwh > 0
+        fprintf('AEL启动耗电：%.3f MWh/a\n', ...
+            result.summary.AEL_start_energy_kwh / 1000);
     end
     if result.summary.NH3_prod_t_y > 0
         fprintf('平准化制氨成本：%.2f $/t；系统年净利润：%.3f M$/a\n', ...

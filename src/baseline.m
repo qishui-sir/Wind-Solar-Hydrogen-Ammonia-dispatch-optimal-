@@ -21,6 +21,11 @@ function results = baseline(params,renewable_data)
 
     AEL_spec_energy = ael_common.spec_energy;
     AEL_module_power = ael_common.module_power;
+    AEL_start_power_per_module = 0;
+    if ael_common.startup
+        AEL_start_power_per_module = ...
+            ael_common.startup_elec * AEL_module_power;
+    end
     H2_density = params.unit.h2_density;
 
     storage_H2_max = params.h2_storage.mass;
@@ -44,6 +49,7 @@ function results = baseline(params,renewable_data)
     SU_AEL = optimvar('SU_AEL',T,'Type','integer','LowerBound',0,'UpperBound',Num_AEL);
     SD_AEL = optimvar('SD_AEL',T,'Type','integer','LowerBound',0,'UpperBound',Num_AEL);
     I_AEL_up = optimvar('I_AEL_up', T, 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1);
+    P_AEL_start = AEL_start_power_per_module * SU_AEL;
 
     %H2_short = optimvar('h2_short', T, 'LowerBound', 0);
     H2_prod_kg = P_AEL * dt / AEL_spec_energy * H2_density;
@@ -60,7 +66,8 @@ function results = baseline(params,renewable_data)
 
     % constraint condition
     prob.Constraints.power_balance = ...
-        P_total + P_purchase == P_AEL + P_HB_kw + P_sell + P_curt;
+        P_total + P_purchase == P_AEL + P_AEL_start + ...
+        P_HB_kw + P_sell + P_curt;
     prob.Constraints.H2_storage = ...
         storage_H2(2:end) == storage_H2(1:end-1) + H2_prod_kg ...
          - H2_use_kg;
@@ -145,13 +152,11 @@ function results = baseline(params,renewable_data)
             exitflag, output.message);
     end
 
-    [sol.n_ael_optimized, sol.ael_count_info] = ...
-        algorithm(sol.P_AEL, ael_common);
-    milp_module_change = diff([0; round(sol.n_ael(:))]);
-    fprintf(['AEL台数后处理：MILP启动台次 %.0f，', ...
-        '滑动窗口启动台次 %.0f。\n'], ...
-        sum(max(milp_module_change, 0)), ...
-        sol.ael_count_info.startup_count);
+    sol.P_AEL_start = AEL_start_power_per_module * sol.SU_AEL;
+    if ael_common.startup
+        fprintf('AEL启动耗电：%.3f MWh/a。\n', ...
+            sum(sol.P_AEL_start) * dt / 1000);
+    end
 
     disp(sol);
     disp(['最优运行目标值: ', num2str(fval)]);

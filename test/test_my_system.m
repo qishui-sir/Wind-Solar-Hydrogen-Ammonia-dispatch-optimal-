@@ -56,6 +56,15 @@ verifyError(test_case, @() algorithm(-1, ael_common), ...
     'algorithm:negative_power');
 end
 
+function testBaselineDoesNotInvokeSlidingWindowAlgorithm(test_case)
+test_dir = fileparts(mfilename('fullpath'));
+project_dir = fileparts(test_dir);
+baseline_source = fileread(fullfile(project_dir, 'src', 'baseline.m'));
+
+verifyEmpty(test_case, regexp(baseline_source, ...
+    '\<algorithm\s*\(', 'once'));
+end
+
 function testDefaultScenarioIsS2(test_case)
 case_config = my_system();
 
@@ -108,9 +117,10 @@ sol.P_AEL = [50; 60];
 sol.HB_load = [0; 0];
 sol.storage_H2 = [10; 10.8988; 11.97736];
 sol.p_purchase = [0; 0];
-sol.p_sell = [50; 140];
+sol.p_sell = [45; 140];
 sol.p_curt = [0; 0];
 sol.u_purchase = [0; 0];
+sol.P_AEL_start = [5; 0];
 sol.n_ael = [0; 2];
 sol.n_ael_optimized = [1; 1];
 sol.ael_count_info = struct('lower_bound', [1; 1], ...
@@ -138,6 +148,7 @@ built = feval('results', params, renewable_data, sol, -1, 1, ...
     struct('message', 'ok'), context);
 
 verifyEqual(test_case, built.dispatch.P_AEL, sol.P_AEL);
+verifyEqual(test_case, built.dispatch.P_AEL_start, sol.P_AEL_start);
 verifyEqual(test_case, built.dispatch.N_AEL, sol.n_ael_optimized);
 verifyEqual(test_case, built.dispatch.N_AEL_lower, [1; 1]);
 verifyEqual(test_case, built.dispatch.N_AEL_upper, [2; 2]);
@@ -146,6 +157,7 @@ verifyEqual(test_case, built.summary.H2_prod_kg, ...
     'AbsTol', 1e-12);
 verifyEqual(test_case, built.summary.AEL_average_online_modules, 1);
 verifyEqual(test_case, built.summary.AEL_startup_count, 1);
+verifyEqual(test_case, built.summary.AEL_start_energy_kwh, 5);
 verifyEqual(test_case, built.optimization.mode, ...
     'single_stage_with_count_postprocess');
 verifyEqual(test_case, built.check.max_AEL_lower_violation, 0);
