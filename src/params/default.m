@@ -69,6 +69,13 @@ config.ammonia.price = 557;         % Ammonia selling price, USD/t
 config.material.water_price = 1.4;  % Water price, USD/t
 config.material.cat_price = 18;     % Catalyst price, USD/t
 
+% Zhou does not publish labor coefficients. The S2 calibration uses the
+% 2022 Inner Mongolia manufacturing wage scale and an integrated-plant crew.
+config.labor.fte = 200;              % Full-time equivalent employees
+config.labor.salary = 15000;         % Loaded labor cost, USD/(employee year)
+config.labor.note = ['Calibration assumption: 200 FTE at 15,000 USD/FTE-year; ', ...
+    'annual labor cost is 3.0 MUSD.'];
+
 config.converter.capex = 43;        % Converter capital cost, USD/kW
 config.converter.om_rate = 0.02;    % Converter O&M rate, fraction/year
 config.transformer.capex = 51;      % Transformer capital cost, USD/kW
@@ -78,6 +85,7 @@ config.transformer.max_load = 0.90; % Transformer maximum load, fraction
 config.grid.sell_price = 0.041;     % Grid selling price, USD/kWh
 config.grid.buy_price = 0.053;      % Grid buying price, USD/kWh
 config.grid.cap_fee = 3.85;         % Grid capacity fee, USD/(kW month)
+config.grid.contract_kw = [];       % Contract demand, kW; empty uses dispatch peak
 config.grid.curtail_limit = 0.10;   % Curtailment limit, fraction
 config.grid.max_sell = 0.20;        % Electricity selling limit, fraction
 config.grid.buy_enabled = true;     % Enable electricity purchase
@@ -101,6 +109,7 @@ switch scenario_id
         config.transformer.capacity = 190;      % Transformer capacity, MW
         config.ref.nh3_output = 1.00e5;         % Zhou NH3 output, t/year
         config.ref.lcoa = 549;                  % Zhou LCOA, USD/t
+        config.ref.net_profit = 0.75e6;          % Zhou annual net profit, USD/year
         config.ref.ael_hours = 7163;            % Zhou AEL utilization, h/year
         config.ref.grid_buy = 0.3086;           % Zhou grid buying fraction
         config.ref.grid_sell = 0.1724;          % Zhou grid selling fraction
@@ -112,8 +121,10 @@ switch scenario_id
         config.environment.co2_enabled = true;
         config.h2_storage.capacity = 11.0e4;
         config.transformer.capacity = 200;
+        config.grid.contract_kw = 30e3; % Calibrated S2 contract demand, kW
         config.ref.nh3_output = 7.12e4;
         config.ref.lcoa = 464;
+        config.ref.net_profit = 6.65e6;
         config.ref.ael_hours = 5492;
         config.ref.grid_buy = 0.0015;
         config.ref.grid_sell = 0.1920;
@@ -127,6 +138,7 @@ switch scenario_id
         config.transformer.capacity = 189;
         config.ref.nh3_output = 7.04e4;
         config.ref.lcoa = 475;
+        config.ref.net_profit = 5.80e6;
         config.ref.ael_hours = 5460;
         config.ref.grid_buy = 0.0112;
         config.ref.grid_sell = 0.2000;

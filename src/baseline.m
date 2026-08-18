@@ -16,9 +16,11 @@ function results = baseline(params,renewable_data)
     annual_renewable = sum(P_total) * dt;
 
     ael_common = params.AEL.common;
+    Num_AEL = ael_common.module_num;
     P_AEL_max = ael_common.max_power;
-    P_AEL_min = ael_common.min_power;
+
     AEL_spec_energy = ael_common.spec_energy;
+    AEL_module_power = ael_common.module_power;
     H2_density = params.unit.h2_density;
 
     storage_H2_max = params.h2_storage.mass;
@@ -31,6 +33,7 @@ function results = baseline(params,renewable_data)
     NH3_rate = params.HB.nh3_output;
 
     % Define optimization variables
+    N_AEL = optimvar('n_ael',T,'Type','integer','LowerBound', 0 ,'UpperBound', Num_AEL);
     P_AEL = optimvar('P_AEL',T,'LowerBound',0,'UpperBound',P_AEL_max);
     HB_load = optimvar('HB_load',T,'LowerBound',HB_min_load,'UpperBound',HB_max_load);
     storage_H2 = optimvar('storage_H2',T+1,'LowerBound',0,'UpperBound',storage_H2_max);
@@ -38,12 +41,19 @@ function results = baseline(params,renewable_data)
     P_sell = optimvar('p_sell', T, 'LowerBound', 0, 'UpperBound', transformer_kw);
     P_curt = optimvar('p_curt', T, 'LowerBound', 0);
     u_purchase = optimvar('u_purchase', T, 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1);
-    %H2_short = optimvar('h2_short', T, 'LowerBound', 0);
+    SU_AEL = optimvar('SU_AEL',T,'Type','integer','LowerBound',0,'UpperBound',Num_AEL);
+    SD_AEL = optimvar('SD_AEL',T,'Type','integer','LowerBound',0,'UpperBound',Num_AEL);
+    I_AEL_up = optimvar('I_AEL_up', T, 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1);
 
+    %H2_short = optimvar('h2_short', T, 'LowerBound', 0);
     H2_prod_kg = P_AEL * dt / AEL_spec_energy * H2_density;
     NH3_prod_kg = HB_load * NH3_rate * dt;
     H2_use_kg = NH3_prod_kg * params.HB.lit_h2;
     P_HB_kw = HB_load * HB_power_kw;
+    H2_prod_t = H2_prod_kg / params.unit.mass_scale;
+    NH3_prod_t = NH3_prod_kg / params.unit.mass_scale;
+    water_use_t = params.AEL.common.water_use * H2_prod_t ...
+        + params.HB.water_use * NH3_prod_t;
 
     % create optimization problems
     prob = optimproblem('ObjectiveSense', 'minimize');
@@ -66,6 +76,35 @@ function results = baseline(params,renewable_data)
     prob.Constraints.curtail = P_curt <= P_total;
     prob.Constraints.curtail_rate = sum(P_curt) * dt <= ...
         params.grid.curtail_limit * annual_renewable;
+    prob.Constraints.AEL_module_lower = ...
+        ael_common.min_load * N_AEL * AEL_module_power <= P_AEL;
+    prob.Constraints.AEL_module_upper = ...
+        P_AEL <= ael_common.max_load * N_AEL * AEL_module_power;
+    N_AEL_initial = 0;
+    N_AEL_previous = [N_AEL_initial; N_AEL(1:end-1)];
+    prob.Constraints.AEL_transition = ...
+        N_AEL - N_AEL_previous == SU_AEL - SD_AEL;
+    prob.Constraints.AEL_start_available = SU_AEL <= Num_AEL - N_AEL_previous;
+    prob.Constraints.AEL_stop_available = SD_AEL <= N_AEL_previous;
+    prob.Constraints.AEL_start_indicator = SU_AEL <= Num_AEL * I_AEL_up;
+    prob.Constraints.AEL_stop_indicator = SD_AEL <= Num_AEL * (1 - I_AEL_up);
+    % min stable start time 
+    min_run_h = 1;   
+    L_run = ceil(min_run_h / dt);
+    AEL_min_run = optimconstr(T, 1);
+    for tau = 1:T
+        k1 = max(1, tau - L_run);
+        k2 = tau - 1;
+
+        if k1 <= k2
+            AEL_min_run(tau) = ...
+                N_AEL(tau) >= sum(SU_AEL(k1:k2));
+        else
+            AEL_min_run(tau) = ...
+                N_AEL(tau) >= 0;
+        end
+    end
+    prob.Constraints.AEL_min_run = AEL_min_run;
 
     if params.environment.co2_enabled
         prob.Constraints.co2_limit = ...
@@ -79,13 +118,17 @@ function results = baseline(params,renewable_data)
     C_curt = 0.01;
     C_purchase = params.grid.buy_price;
     C_sell = params.grid.sell_price;
+    C_water = params.material.water_price;
+    C_catalyst = params.material.cat_price;
     %C_H2_short = 1e4;
 
     % objective function
     obj_formula = sum(C_curt .* P_curt * dt) + ...
         sum(C_purchase .* P_purchase * dt) - ...
         sum(C_sell .* P_sell * dt) - ...
-        NH3_income;
+        NH3_income + ...
+        C_water * sum(water_use_t) + ...
+        C_catalyst * sum(NH3_prod_t);
     prob.Objective = obj_formula;
 
     options = optimoptions('intlinprog', 'Display', 'iter',...
@@ -95,17 +138,17 @@ function results = baseline(params,renewable_data)
         'Solver', 'intlinprog', ...
         'Options', options);
 
-    disp(sol);
-    disp(['最优目标值: ', num2str(fval)]);
-    disp(['求解状态: ', num2str(exitflag)]);
-    disp(output);
-
     if exitflag <= 0 || isempty(sol.P_AEL)
         error('baseline:no_feasible_solution', ...
             ['Optimization did not return a feasible dispatch. ', ...
             'Exitflag: %d. Solver message: %s'], ...
             exitflag, output.message);
     end
+
+    disp(sol);
+    disp(['最优运行目标值: ', num2str(fval)]);
+    disp(['求解状态: ', num2str(exitflag)]);
+    disp(output);
 
     result_context = struct();
     result_context.T = T;
@@ -119,6 +162,7 @@ function results = baseline(params,renewable_data)
     result_context.C_purchase = C_purchase;
     result_context.C_sell = C_sell;
     result_context.ael_common = ael_common;
+    result_context.N_AEL_initial = N_AEL_initial;
 
     results = feval('results', params, renewable_data, sol, fval, ...
         exitflag, output, result_context);

@@ -65,6 +65,7 @@ sol.p_purchase = [0; 0];
 sol.p_sell = [50; 140];
 sol.p_curt = [0; 0];
 sol.u_purchase = [0; 0];
+sol.n_ael = [0; 2];
 
 renewable_data = struct();
 renewable_data.time_count = 2;
@@ -82,17 +83,135 @@ context.C_curt = 0.01;
 context.C_purchase = params.grid.buy_price;
 context.C_sell = params.grid.sell_price;
 context.ael_common = params.AEL.common;
+context.N_AEL_initial = 0;
 
 built = feval('results', params, renewable_data, sol, -1, 1, ...
     struct('message', 'ok'), context);
 
 verifyEqual(test_case, built.dispatch.P_AEL, sol.P_AEL);
+verifyEqual(test_case, built.dispatch.N_AEL, sol.n_ael);
 verifyEqual(test_case, built.summary.H2_prod_kg, ...
     sum(sol.P_AEL) * dt / context.AEL_spec_energy * context.H2_density, ...
+    'AbsTol', 1e-12);
+verifyEqual(test_case, built.summary.AEL_average_online_modules, 1);
+verifyEqual(test_case, built.summary.AEL_startup_count, 2);
+expected_water_cost = params.material.water_price * (...
+    params.AEL.common.water_use * built.summary.H2_prod_kg / 1000 + ...
+    params.HB.water_use * built.summary.NH3_prod_kg / 1000);
+expected_catalyst_cost = params.material.cat_price * ...
+    built.summary.NH3_prod_kg / 1000;
+verifyEqual(test_case, built.cost.water, expected_water_cost, ...
+    'AbsTol', 1e-12);
+verifyEqual(test_case, built.cost.catalyst, expected_catalyst_cost, ...
     'AbsTol', 1e-12);
 verifyEqual(test_case, built.check.max_power_residual_kw, 0, ...
     'AbsTol', 1e-12);
 verifyEqual(test_case, built.time, renewable_data.time);
+end
+
+function testResultLcoaUsesZhouCostBreakdown(test_case)
+params = my_system('s2');
+
+result = struct();
+result.summary = struct();
+result.summary.NH3_prod_t_y = 1000;
+result.summary.H2_prod_kg = 2000;
+result.summary.purchase_kwh = 5000;
+result.summary.sell_kwh = 2000;
+result.dispatch = struct();
+result.dispatch.P_purchase = [0; 300; 100];
+
+economics = result_LCOA(params, result);
+
+loan_crf = params.finance.loan_interest * ...
+    (1 + params.finance.loan_interest)^params.finance.loan_term / ...
+    ((1 + params.finance.loan_interest)^params.finance.loan_term - 1);
+investment = ...
+    params.pw.capex * params.renewable.PW_capacity + ...
+    params.pv.capex * params.renewable.PV_capacity + ...
+    params.AEL.common.capex * params.AEL.common.max_power + ...
+    params.h2_storage.capex * params.h2_storage.capacity + ...
+    params.converter.capex * params.converter.capacity * 1000 + ...
+    params.transformer.capex * params.transformer.capacity * 1000 + ...
+    params.HB.capex * params.HB.capacity;
+
+expected_IN = investment * params.finance.crf;
+expected_IC = investment * loan_crf;
+expected_CEC = (1 - params.finance.loan_ratio) * expected_IN ...
+    + params.finance.loan_ratio * expected_IC;
+expected_OM = ...
+    params.pw.capex * params.renewable.PW_capacity * params.pw.om_rate + ...
+    params.pv.capex * params.renewable.PV_capacity * params.pv.om_rate + ...
+    params.AEL.common.capex * params.AEL.common.max_power * params.AEL.common.om_rate + ...
+    params.h2_storage.capex * params.h2_storage.capacity * params.h2_storage.om_rate + ...
+    params.converter.capex * params.converter.capacity * 1000 * params.converter.om_rate + ...
+    params.transformer.capex * params.transformer.capacity * 1000 * params.transformer.om_rate + ...
+    params.HB.capex * params.HB.capacity * params.HB.om_rate;
+expected_water = params.material.water_price * ...
+    (params.AEL.common.water_use * 2 + params.HB.water_use * 1000);
+expected_RM = expected_water + params.material.cat_price * 1000 ...
+    + params.grid.buy_price * 5000 ...
+    + params.grid.cap_fee * params.grid.contract_kw * 12;
+expected_LC = params.labor.fte * params.labor.salary;
+expected_INC = params.ammonia.price * 1000 ...
+    + params.grid.sell_price * 2000;
+expected_total_cost = expected_CEC + expected_OM + expected_LC + expected_RM;
+expected_lcoa = ...
+    (expected_total_cost - params.grid.sell_price * 2000) / 1000;
+
+verifyEqual(test_case, economics.INC.total, expected_INC, 'AbsTol', 1e-8);
+verifyEqual(test_case, economics.IN.total, expected_IN, 'AbsTol', 1e-8);
+verifyEqual(test_case, economics.IC.total, expected_IC, 'AbsTol', 1e-8);
+verifyEqual(test_case, economics.CEC.total, expected_CEC, 'AbsTol', 1e-8);
+verifyEqual(test_case, economics.OM.total, expected_OM, 'AbsTol', 1e-8);
+verifyEqual(test_case, economics.LC.total, expected_LC, 'AbsTol', 1e-8);
+verifyEqual(test_case, economics.RM.total, expected_RM, 'AbsTol', 1e-8);
+verifyEqual(test_case, economics.total_cost, expected_total_cost, ...
+    'AbsTol', 1e-8);
+verifyEqual(test_case, economics.net_profit, ...
+    expected_INC - expected_total_cost, 'AbsTol', 1e-8);
+verifyEqual(test_case, economics.lcoa, expected_lcoa, 'AbsTol', 1e-8);
+end
+
+function testReferenceS2EconomicsMatchesZhouLcoa(test_case)
+params = my_system('s2');
+
+ael_kwh = params.ref.ael_hours * params.AEL.common.max_power;
+hb_kwh = params.ref.nh3_output * params.HB.spec_energy * 1000;
+renewable_kwh = (ael_kwh + hb_kwh) / ...
+    (1 + params.ref.grid_buy - params.ref.grid_sell - params.ref.curtailment);
+
+result = struct();
+result.summary = struct();
+result.summary.NH3_prod_t_y = params.ref.nh3_output;
+result.summary.H2_prod_kg = ...
+    ael_kwh / params.AEL.common.spec_energy * params.unit.h2_density;
+result.summary.purchase_kwh = renewable_kwh * params.ref.grid_buy;
+result.summary.sell_kwh = renewable_kwh * params.ref.grid_sell;
+result.dispatch = struct();
+result.dispatch.P_purchase = zeros(params.time.hour_year, 1);
+
+economics = result_LCOA(params, result);
+
+verifyEqual(test_case, economics.RM.water, 772234.482432, 'AbsTol', 1e-6);
+verifyEqual(test_case, economics.RM.catalyst, 1281600, 'AbsTol', 1e-6);
+verifyEqual(test_case, economics.RM.grid_capacity, 1386000, 'AbsTol', 1e-6);
+verifyEqual(test_case, economics.LC.total, 3000000, 'AbsTol', 1e-6);
+verifyEqual(test_case, economics.lcoa, 464.469881935871, 'AbsTol', 1e-9);
+verifyEqual(test_case, economics.unit_cost.labor, ...
+    economics.LC.total / params.ref.nh3_output, 'AbsTol', 1e-12);
+verifyEqual(test_case, economics.unit_cost.water, ...
+    economics.RM.water / params.ref.nh3_output, 'AbsTol', 1e-12);
+verifyEqual(test_case, economics.unit_cost.catalyst, ...
+    economics.RM.catalyst / params.ref.nh3_output, 'AbsTol', 1e-12);
+verifyEqual(test_case, economics.unit_cost.grid_capacity, ...
+    economics.RM.grid_capacity / params.ref.nh3_output, 'AbsTol', 1e-12);
+verifyEqual(test_case, economics.unit_cost.lcoa, economics.lcoa, 'AbsTol', 1e-12);
+verifyEqual(test_case, economics.net_profit_gap, ...
+    economics.net_profit - params.ref.net_profit, 'AbsTol', 1e-8);
+verifyLessThanOrEqual(test_case, abs(economics.lcoa - params.ref.lcoa), 0.5);
+verifyLessThanOrEqual(test_case, ...
+    abs(economics.net_profit - 6.65e6), 0.1e6);
 end
 
 function testAelParametersDoNotExposeDuplicateAliases(test_case)
@@ -174,6 +293,8 @@ verifyEqual(test_case, s2_config.pw.capex, 685);
 verifyEqual(test_case, s2_config.pw.om_rate, 0.02);
 verifyEqual(test_case, s2_config.pv.capex, 543);
 verifyEqual(test_case, s2_config.pv.om_rate, 0.01);
+verifyEqual(test_case, my_system('s2').AEL.common.capex, 285);
+verifyEqual(test_case, my_system('s2').AEL.common.om_rate, 0.02);
 verifyEqual(test_case, s2_config.h2_storage.capex, 50);
 verifyEqual(test_case, s2_config.h2_storage.module_cap, 22000);
 verifyEqual(test_case, s2_config.h2_storage.temperature, 30);
@@ -181,8 +302,11 @@ verifyEqual(test_case, s2_config.ammonia.price, 557);
 verifyEqual(test_case, s2_config.grid.sell_price, 0.041);
 verifyEqual(test_case, s2_config.grid.buy_price, 0.053);
 verifyEqual(test_case, s2_config.grid.cap_fee, 3.85);
+verifyEqual(test_case, s2_config.grid.contract_kw, 30e3);
 verifyEqual(test_case, s2_config.grid.curtail_limit, 0.10);
 verifyEqual(test_case, s2_config.grid.max_sell, 0.20);
+verifyEqual(test_case, s2_config.labor.fte, 200);
+verifyEqual(test_case, s2_config.labor.salary, 15000);
 verifyEqual(test_case, s2_config.environment.grid_co2, 0.5703);
 verifyEqual(test_case, s2_config.environment.co2_limit, 0.3);
 
@@ -192,6 +316,7 @@ verifyEqual(test_case, s3_config.h2_storage.capacity, 13.2e4);
 verifyEqual(test_case, s2_config.transformer.capacity, 200);
 verifyEqual(test_case, s2_config.ref.nh3_output, 7.12e4);
 verifyEqual(test_case, s2_config.ref.lcoa, 464);
+verifyEqual(test_case, s2_config.ref.net_profit, 6.65e6);
 verifyEqual(test_case, s2_config.ref.ael_hours, 5492);
 verifyEqual(test_case, s2_config.ref.grid_buy, 0.0015);
 verifyEqual(test_case, s2_config.ref.grid_sell, 0.1920);

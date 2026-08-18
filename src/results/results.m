@@ -10,6 +10,10 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     C_purchase = context.C_purchase;
     C_sell = context.C_sell;
     ael_common = context.ael_common;
+    N_AEL_initial = 0;
+    if isfield(context, 'N_AEL_initial')
+        N_AEL_initial = context.N_AEL_initial;
+    end
 
     P_AEL_opt = sol.P_AEL;
     HB_load_opt = sol.HB_load;
@@ -18,6 +22,10 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     P_sell_opt = sol.p_sell;
     P_curt_opt = sol.p_curt;
     u_purchase_opt = sol.u_purchase;
+    has_N_AEL = isfield(sol, 'n_ael');
+    if has_N_AEL
+        N_AEL_opt = round(sol.n_ael);
+    end
     %H2_short_opt = sol.h2_short;
 
     H2_prod_kg_opt = P_AEL_opt * dt / AEL_spec_energy * H2_density;
@@ -37,6 +45,8 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.output = output;
     result.sol = sol;
     result.time = time_opt;
+    result.optimization = struct('mode', 'single_stage', ...
+        'operating_fval', fval);
 
     result.dispatch = struct();
     result.dispatch.time = time_opt;
@@ -48,6 +58,9 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.dispatch.P_sell = P_sell_opt;
     result.dispatch.P_curt = P_curt_opt;
     result.dispatch.u_purchase = u_purchase_opt;
+    if has_N_AEL
+        result.dispatch.N_AEL = N_AEL_opt;
+    end
     %result.dispatch.H2_short = H2_short_opt;
 
     result.dispatch.H2_prod = H2_prod_kg_opt;
@@ -58,6 +71,9 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.AEL = struct();
     result.AEL.P = P_AEL_opt;
     result.AEL.H2_prod = H2_prod_kg_opt;
+    if has_N_AEL
+        result.AEL.online_modules = N_AEL_opt;
+    end
 
     result.HB = struct();
     result.HB.load = HB_load_opt;
@@ -89,6 +105,12 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.summary.NH3_prod_t_y = result.summary.NH3_prod_kg / 1000;
     result.summary.ael_equiv_hours = ...
         sum(P_AEL_opt) * dt / ael_common.max_power;
+    if has_N_AEL
+        result.summary.AEL_average_online_modules = mean(N_AEL_opt);
+        AEL_module_change = diff([N_AEL_initial; N_AEL_opt(:)]);
+        result.summary.AEL_startup_count = sum(max(AEL_module_change, 0));
+        result.summary.AEL_shutdown_count = sum(max(-AEL_module_change, 0));
+    end
     result.summary.HB_average_load = mean(HB_load_opt);
     result.summary.sell_rate = ...
         result.summary.sell_kwh / max(result.summary.renewable_kwh, eps);
@@ -99,14 +121,27 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.summary.co2_intensity = ...
         params.environment.grid_co2 * result.summary.purchase_kwh ...
         / max(result.summary.NH3_prod_kg, eps);
-    result.zhou_audit = build_zhou_audit(params, result.summary);
-
     result.cost = struct();
     result.cost.purchase = sum(C_purchase .* P_purchase_opt) * dt;
     result.cost.sell_revenue = sum(C_sell .* P_sell_opt) * dt;
     result.cost.curtail = sum(C_curt .* P_curt_opt) * dt;
+    result.cost.water = params.material.water_price * (...
+        params.AEL.common.water_use * result.summary.H2_prod_kg / ...
+            params.unit.mass_scale + ...
+        params.HB.water_use * result.summary.NH3_prod_kg / ...
+            params.unit.mass_scale);
+    result.cost.catalyst = params.material.cat_price * ...
+        result.summary.NH3_prod_kg / params.unit.mass_scale;
+    result.cost.raw_material = result.cost.water + ...
+        result.cost.catalyst + result.cost.purchase;
     %result.cost.H2_short = sum(C_H2_short .* H2_short_opt);
     result.cost.total = fval;
+
+    result.economics = result_LCOA(params, result);
+    result.summary.lcoa = result.economics.lcoa;
+    result.summary.net_profit = result.economics.net_profit;
+    result.cost.annual = result.economics.total_cost;
+    result.zhou_audit = build_zhou_audit(params, result.summary);
 
     power_residual = P_total + P_purchase_opt ...
         - P_AEL_opt - P_HB_kw_opt - P_sell_opt - P_curt_opt;
@@ -119,6 +154,16 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.check.buy_sell_overlap_kwh = sum(P_purchase_opt .* P_sell_opt) * dt;
 
     fprintf('AEL等效利用小时：%.2f h/a\n', result.summary.ael_equiv_hours);
+    if isfield(result.summary, 'AEL_startup_count')
+        fprintf('AEL启动台次：%.0f 台次/a\n', result.summary.AEL_startup_count);
+    end
+    if result.summary.NH3_prod_t_y > 0
+        fprintf('平准化制氨成本：%.2f $/t；系统年净利润：%.3f M$/a\n', ...
+            result.summary.lcoa, result.summary.net_profit / 1e6);
+    else
+        fprintf('平准化制氨成本：未计算；系统年净利润：%.3f M$/a\n', ...
+            result.summary.net_profit / 1e6);
+    end
     print_zhou_audit(result.zhou_audit);
 end
 
@@ -134,6 +179,7 @@ function audit = build_zhou_audit(params, summary)
     audit.ref_curtail_rate = get_ref(params.ref, 'curtailment', NaN);
     audit.ref_purchase_rate = get_ref(params.ref, 'grid_buy', NaN);
     audit.ref_co2_intensity = get_ref(params.ref, 'co2_intensity', NaN);
+    audit.ref_lcoa = get_ref(params.ref, 'lcoa', NaN);
 
     audit.NH3_gap_t_y = summary.NH3_prod_t_y - audit.ref_NH3_t_y;
     audit.NH3_gap_percent = ...
@@ -144,6 +190,11 @@ function audit = build_zhou_audit(params, summary)
     audit.purchase_rate_gap = summary.purchase_rate - audit.ref_purchase_rate;
     audit.co2_intensity_gap = ...
         summary.co2_intensity - audit.ref_co2_intensity;
+    if isfield(summary, 'lcoa') && summary.NH3_prod_t_y > 0
+        audit.lcoa_gap = summary.lcoa - audit.ref_lcoa;
+    else
+        audit.lcoa_gap = NaN;
+    end
 
     audit.implied_renewable_kwh = NaN;
     audit.renewable_scale_to_ref = NaN;
@@ -188,6 +239,11 @@ function print_zhou_audit(audit)
         audit.purchase_rate_gap * 100);
     fprintf('碳强度偏差：%+.6f kgCO2/kgNH3\n', ...
         audit.co2_intensity_gap);
+    if isfinite(audit.lcoa_gap)
+        fprintf('平准化制氨成本偏差：%+.2f $/t\n', audit.lcoa_gap);
+    else
+        fprintf('平准化制氨成本偏差：未计算\n');
+    end
     if isfinite(audit.renewable_scale_to_ref)
         fprintf('按文献KPI反推的年可再生电量：%.3f GWh；当前需乘缩放因子：%.4f\n', ...
             audit.implied_renewable_kwh / 1e6, ...
