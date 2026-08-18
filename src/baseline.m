@@ -145,6 +145,14 @@ function results = baseline(params,renewable_data)
             exitflag, output.message);
     end
 
+    [sol.n_ael_optimized, sol.ael_count_info] = ...
+        algorithm(sol.P_AEL, ael_common);
+    milp_module_change = diff([0; round(sol.n_ael(:))]);
+    fprintf(['AEL台数后处理：MILP启动台次 %.0f，', ...
+        '滑动窗口启动台次 %.0f。\n'], ...
+        sum(max(milp_module_change, 0)), ...
+        sol.ael_count_info.startup_count);
+
     disp(sol);
     disp(['最优运行目标值: ', num2str(fval)]);
     disp(['求解状态: ', num2str(exitflag)]);

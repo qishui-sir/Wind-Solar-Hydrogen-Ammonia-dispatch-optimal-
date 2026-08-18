@@ -22,9 +22,14 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     P_sell_opt = sol.p_sell;
     P_curt_opt = sol.p_curt;
     u_purchase_opt = sol.u_purchase;
-    has_N_AEL = isfield(sol, 'n_ael');
+    has_N_AEL = isfield(sol, 'n_ael_optimized') || ...
+        isfield(sol, 'n_ael');
     if has_N_AEL
-        N_AEL_opt = round(sol.n_ael);
+        if isfield(sol, 'n_ael_optimized')
+            N_AEL_opt = round(sol.n_ael_optimized);
+        else
+            N_AEL_opt = round(sol.n_ael);
+        end
     end
     %H2_short_opt = sol.h2_short;
 
@@ -45,7 +50,11 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.output = output;
     result.sol = sol;
     result.time = time_opt;
-    result.optimization = struct('mode', 'single_stage', ...
+    optimization_mode = 'single_stage';
+    if isfield(sol, 'n_ael_optimized')
+        optimization_mode = 'single_stage_with_count_postprocess';
+    end
+    result.optimization = struct('mode', optimization_mode, ...
         'operating_fval', fval);
 
     result.dispatch = struct();
@@ -60,6 +69,12 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.dispatch.u_purchase = u_purchase_opt;
     if has_N_AEL
         result.dispatch.N_AEL = N_AEL_opt;
+        if isfield(sol, 'ael_count_info')
+            result.dispatch.N_AEL_lower = ...
+                sol.ael_count_info.lower_bound;
+            result.dispatch.N_AEL_upper = ...
+                sol.ael_count_info.upper_bound;
+        end
     end
     %result.dispatch.H2_short = H2_short_opt;
 
@@ -152,6 +167,12 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.check.max_power_residual_kw = max(abs(power_residual));
     result.check.max_storage_residual_kg = max(abs(storage_residual));
     result.check.buy_sell_overlap_kwh = sum(P_purchase_opt .* P_sell_opt) * dt;
+    if has_N_AEL && isfield(sol, 'ael_count_info')
+        result.check.max_AEL_lower_violation = max([0; ...
+            sol.ael_count_info.lower_bound(:) - N_AEL_opt(:)]);
+        result.check.max_AEL_upper_violation = max([0; ...
+            N_AEL_opt(:) - sol.ael_count_info.upper_bound(:)]);
+    end
 
     fprintf('AEL等效利用小时：%.2f h/a\n', result.summary.ael_equiv_hours);
     if isfield(result.summary, 'AEL_startup_count')

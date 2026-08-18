@@ -10,6 +10,52 @@ addpath(fullfile(project_dir, 'src', 'params'));
 addpath(fullfile(project_dir, 'src', 'results'));
 end
 
+function testAelCountAlgorithmRespectsPowerBounds(test_case)
+ael_common = AEL().common;
+power_kw = [0; 5000; 20000; 20000; 5000; 0];
+
+[optimized_count, info] = algorithm(power_kw, ael_common);
+
+verifyEqual(test_case, info.lower_bound, [0; 1; 4; 4; 1; 0]);
+verifyEqual(test_case, info.upper_bound, [0; 5; 20; 20; 5; 0]);
+verifyGreaterThanOrEqual(test_case, optimized_count, info.lower_bound);
+verifyLessThanOrEqual(test_case, optimized_count, info.upper_bound);
+verifyEqual(test_case, optimized_count, round(optimized_count));
+end
+
+function testAelCountAlgorithmRetainsOnlyFeasibleOnlineModules(test_case)
+ael_common = AEL().common;
+power_kw = [40000; 7000; 45000];
+options = struct('future_hours', 1, 'history_days', 7, ...
+    'future_weight', 0.7, 'keep_threshold', 0.5);
+
+[optimized_count, info] = algorithm(power_kw, ael_common, options);
+
+verifyEqual(test_case, info.lower_bound, [8; 2; 9]);
+verifyEqual(test_case, info.upper_bound, [26; 7; 26]);
+verifyEqual(test_case, optimized_count, [8; 7; 9]);
+verifyEqual(test_case, info.startup_count, 10);
+verifyEqual(test_case, info.start_event_count, 2);
+end
+
+function testAelCountAlgorithmClipsSolverToleranceAtZero(test_case)
+ael_common = AEL().common;
+power_kw = [-1e-5; 0; 5000];
+
+[optimized_count, info] = algorithm(power_kw, ael_common);
+
+verifyEqual(test_case, info.lower_bound, [0; 0; 1]);
+verifyEqual(test_case, info.upper_bound, [0; 0; 5]);
+verifyEqual(test_case, optimized_count, [0; 0; 1]);
+end
+
+function testAelCountAlgorithmRejectsMaterialNegativePower(test_case)
+ael_common = AEL().common;
+
+verifyError(test_case, @() algorithm(-1, ael_common), ...
+    'algorithm:negative_power');
+end
+
 function testDefaultScenarioIsS2(test_case)
 case_config = my_system();
 
@@ -66,6 +112,9 @@ sol.p_sell = [50; 140];
 sol.p_curt = [0; 0];
 sol.u_purchase = [0; 0];
 sol.n_ael = [0; 2];
+sol.n_ael_optimized = [1; 1];
+sol.ael_count_info = struct('lower_bound', [1; 1], ...
+    'upper_bound', [2; 2]);
 
 renewable_data = struct();
 renewable_data.time_count = 2;
@@ -89,12 +138,18 @@ built = feval('results', params, renewable_data, sol, -1, 1, ...
     struct('message', 'ok'), context);
 
 verifyEqual(test_case, built.dispatch.P_AEL, sol.P_AEL);
-verifyEqual(test_case, built.dispatch.N_AEL, sol.n_ael);
+verifyEqual(test_case, built.dispatch.N_AEL, sol.n_ael_optimized);
+verifyEqual(test_case, built.dispatch.N_AEL_lower, [1; 1]);
+verifyEqual(test_case, built.dispatch.N_AEL_upper, [2; 2]);
 verifyEqual(test_case, built.summary.H2_prod_kg, ...
     sum(sol.P_AEL) * dt / context.AEL_spec_energy * context.H2_density, ...
     'AbsTol', 1e-12);
 verifyEqual(test_case, built.summary.AEL_average_online_modules, 1);
-verifyEqual(test_case, built.summary.AEL_startup_count, 2);
+verifyEqual(test_case, built.summary.AEL_startup_count, 1);
+verifyEqual(test_case, built.optimization.mode, ...
+    'single_stage_with_count_postprocess');
+verifyEqual(test_case, built.check.max_AEL_lower_violation, 0);
+verifyEqual(test_case, built.check.max_AEL_upper_violation, 0);
 expected_water_cost = params.material.water_price * (...
     params.AEL.common.water_use * built.summary.H2_prod_kg / 1000 + ...
     params.HB.water_use * built.summary.NH3_prod_kg / 1000);
