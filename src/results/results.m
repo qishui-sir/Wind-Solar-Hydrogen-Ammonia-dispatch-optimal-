@@ -59,7 +59,7 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
         optimization_mode = 'single_stage_with_count_postprocess';
     end
     result.optimization = struct('mode', optimization_mode, ...
-        'operating_fval', fval);
+        'objective_value', fval);
 
     result.dispatch = struct();
     result.dispatch.time = time_opt;
@@ -101,6 +101,10 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.HB.P = P_HB_kw_opt;
     result.HB.NH3_prod = NH3_prod_kg_opt;
     result.HB.H2_use = H2_use_kg_opt;
+    [NH3_daily_cumulative_volatility, NH3_daily_volatility] = ...
+        calculate_daily_cumulative_volatility(...
+            NH3_prod_kg_opt, NH3_rate, dt);
+    result.HB.daily_volatility = NH3_daily_volatility;
 
     result.storage = struct();
     result.storage.H2 = storage_H2_opt;
@@ -124,6 +128,8 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     %result.summary.H2_short_kg = sum(H2_short_opt);
     result.summary.NH3_prod_kg = sum(NH3_prod_kg_opt);
     result.summary.NH3_prod_t_y = result.summary.NH3_prod_kg / 1000;
+    result.summary.NH3_daily_cumulative_volatility = ...
+        NH3_daily_cumulative_volatility;
     result.summary.ael_equiv_hours = ...
         sum(P_AEL_opt) * dt / ael_common.max_power;
     result.summary.AEL_start_energy_kwh = ...
@@ -155,16 +161,17 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
             params.unit.mass_scale);
     result.cost.catalyst = params.material.cat_price * ...
         result.summary.NH3_prod_kg / params.unit.mass_scale;
-    result.cost.raw_material = result.cost.water + ...
-        result.cost.catalyst + result.cost.purchase;
+    result.cost.raw_material = result.cost.water + result.cost.catalyst;
+    result.cost.variable = result.cost.raw_material + ...
+        result.cost.purchase + result.cost.curtail;
     %result.cost.H2_short = sum(C_H2_short .* H2_short_opt);
-    result.cost.total = fval;
 
     result.economics = result_LCOA(params, result);
     result.summary.lcoa = result.economics.lcoa;
     result.summary.net_profit = result.economics.net_profit;
     result.cost.annual = result.economics.total_cost;
-    result.zhou_audit = build_zhou_audit(params, result.summary);
+    result.cost.total = result.economics.total_cost;
+    result.cost.objective_value = fval;
 
     power_residual = P_total + P_purchase_opt ...
         - P_AEL_opt - P_AEL_start_opt - P_HB_kw_opt ...
@@ -183,104 +190,60 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
             N_AEL_opt(:) - sol.ael_count_info.upper_bound(:)]);
     end
 
-    fprintf('AEL等效利用小时：%.2f h/a\n', result.summary.ael_equiv_hours);
-    if isfield(result.summary, 'AEL_startup_count')
-        fprintf('AEL启动台次：%.0f 台次/a\n', result.summary.AEL_startup_count);
+    print_current_results(result.summary);
+end
+
+function [DCV, daily_volatility] = calculate_daily_cumulative_volatility(...
+        NH3_prod_kg, rated_NH3_kg_h, dt)
+    samples_per_day_exact = 24 / dt;
+    samples_per_day = round(samples_per_day_exact);
+    if abs(samples_per_day - samples_per_day_exact) > 1e-9
+        error('results:unsupported_time_step', ...
+            'dt must divide 24 hours exactly to calculate daily volatility.');
     end
-    if result.summary.AEL_start_energy_kwh > 0
+
+    NH3_rate_kg_h = NH3_prod_kg(:) / dt;
+    day_count = floor(numel(NH3_rate_kg_h) / samples_per_day);
+    if day_count == 0
+        DCV = NaN;
+        daily_volatility = zeros(0, 1);
+        return
+    end
+
+    complete_sample_count = day_count * samples_per_day;
+    daily_NH3_rate = reshape(...
+        NH3_rate_kg_h(1:complete_sample_count), samples_per_day, day_count);
+    daily_mean = mean(daily_NH3_rate, 1);
+    daily_rms = sqrt(mean((daily_NH3_rate - daily_mean).^2, 1));
+    daily_volatility = daily_rms(:) / max(rated_NH3_kg_h, eps);
+    DCV = mean(daily_volatility);
+end
+
+function print_current_results(summary)
+    fprintf('\n========== 当前计算结果 ==========\n');
+    fprintf('NH3产量：%.3f 万t/a\n', summary.NH3_prod_t_y / 1e4);
+    if isfinite(summary.NH3_daily_cumulative_volatility)
+        fprintf('制氨日累计波动率：%.2f %%\n', ...
+            summary.NH3_daily_cumulative_volatility * 100);
+    else
+        fprintf('制氨日累计波动率：未计算（调度时长不足24 h）\n');
+    end
+    fprintf('AEL等效利用小时：%.2f h/a\n', summary.ael_equiv_hours);
+    if isfield(summary, 'AEL_startup_count')
+        fprintf('AEL启动台次：%.0f 台次/a\n', summary.AEL_startup_count);
+    end
+    if summary.AEL_start_energy_kwh > 0
         fprintf('AEL启动耗电：%.3f MWh/a\n', ...
-            result.summary.AEL_start_energy_kwh / 1000);
+            summary.AEL_start_energy_kwh / 1000);
     end
-    if result.summary.NH3_prod_t_y > 0
-        fprintf('平准化制氨成本：%.2f $/t；系统年净利润：%.3f M$/a\n', ...
-            result.summary.lcoa, result.summary.net_profit / 1e6);
+    fprintf('售电率：%.4f %%\n', summary.sell_rate * 100);
+    fprintf('弃电率：%.4f %%\n', summary.curtail_rate * 100);
+    fprintf('购电率：%.4f %%\n', summary.purchase_rate * 100);
+    fprintf('碳排放强度：%.6f kgCO2/kgNH3\n', summary.co2_intensity);
+    if summary.NH3_prod_t_y > 0
+        fprintf('平准化制氨成本：%.2f $/t\n', summary.lcoa);
     else
-        fprintf('平准化制氨成本：未计算；系统年净利润：%.3f M$/a\n', ...
-            result.summary.net_profit / 1e6);
+        fprintf('平准化制氨成本：未计算\n');
     end
-    print_zhou_audit(result.zhou_audit);
-end
-
-function audit = build_zhou_audit(params, summary)
-    audit = struct();
-    if ~isfield(params, 'ref') || ~isfield(params.ref, 'nh3_output')
-        return
-    end
-
-    audit.ref_NH3_t_y = params.ref.nh3_output;
-    audit.ref_AEL_hours = get_ref(params.ref, 'ael_hours', NaN);
-    audit.ref_sell_rate = get_ref(params.ref, 'grid_sell', NaN);
-    audit.ref_curtail_rate = get_ref(params.ref, 'curtailment', NaN);
-    audit.ref_purchase_rate = get_ref(params.ref, 'grid_buy', NaN);
-    audit.ref_co2_intensity = get_ref(params.ref, 'co2_intensity', NaN);
-    audit.ref_lcoa = get_ref(params.ref, 'lcoa', NaN);
-
-    audit.NH3_gap_t_y = summary.NH3_prod_t_y - audit.ref_NH3_t_y;
-    audit.NH3_gap_percent = ...
-        audit.NH3_gap_t_y / max(audit.ref_NH3_t_y, eps) * 100;
-    audit.AEL_hours_gap = summary.ael_equiv_hours - audit.ref_AEL_hours;
-    audit.sell_rate_gap = summary.sell_rate - audit.ref_sell_rate;
-    audit.curtail_rate_gap = summary.curtail_rate - audit.ref_curtail_rate;
-    audit.purchase_rate_gap = summary.purchase_rate - audit.ref_purchase_rate;
-    audit.co2_intensity_gap = ...
-        summary.co2_intensity - audit.ref_co2_intensity;
-    if isfield(summary, 'lcoa') && summary.NH3_prod_t_y > 0
-        audit.lcoa_gap = summary.lcoa - audit.ref_lcoa;
-    else
-        audit.lcoa_gap = NaN;
-    end
-
-    audit.implied_renewable_kwh = NaN;
-    audit.renewable_scale_to_ref = NaN;
-    if all(isfield(params.ref, {'ael_hours', 'grid_buy', ...
-            'grid_sell', 'curtailment'}))
-        ref_ael_kwh = params.ref.ael_hours * params.AEL.common.max_power;
-        ref_hb_kwh = params.ref.nh3_output * params.HB.spec_energy * 1000;
-        denominator = 1 + params.ref.grid_buy ...
-            - params.ref.grid_sell - params.ref.curtailment;
-        audit.implied_renewable_kwh = ...
-            (ref_ael_kwh + ref_hb_kwh) / denominator;
-        audit.renewable_scale_to_ref = ...
-            audit.implied_renewable_kwh ...
-            / max(summary.renewable_kwh, eps);
-    end
-end
-
-function value = get_ref(ref, field_name, default_value)
-    if isfield(ref, field_name)
-        value = ref.(field_name);
-    else
-        value = default_value;
-    end
-end
-
-function print_zhou_audit(audit)
-    if ~isfield(audit, 'ref_NH3_t_y')
-        return
-    end
-
-    fprintf('\n========== Zhou S2 对标审计 ==========\n');
-    fprintf('NH3产量：%.3f 万t/y；文献：%.3f 万t/y；偏差：%+.2f %%\n', ...
-        audit.ref_NH3_t_y / 1e4 + audit.NH3_gap_t_y / 1e4, ...
-        audit.ref_NH3_t_y / 1e4, audit.NH3_gap_percent);
-    fprintf('AEL等效利用小时偏差：%+.2f h/a\n', ...
-        audit.AEL_hours_gap);
-    fprintf('售电率偏差：%+.4f %%\n', ...
-        audit.sell_rate_gap * 100);
-    fprintf('弃电率偏差：%+.4f %%\n', ...
-        audit.curtail_rate_gap * 100);
-    fprintf('购电率偏差：%+.4f %%\n', ...
-        audit.purchase_rate_gap * 100);
-    fprintf('碳强度偏差：%+.6f kgCO2/kgNH3\n', ...
-        audit.co2_intensity_gap);
-    if isfinite(audit.lcoa_gap)
-        fprintf('平准化制氨成本偏差：%+.2f $/t\n', audit.lcoa_gap);
-    else
-        fprintf('平准化制氨成本偏差：未计算\n');
-    end
-    if isfinite(audit.renewable_scale_to_ref)
-        fprintf('按文献KPI反推的年可再生电量：%.3f GWh；当前需乘缩放因子：%.4f\n', ...
-            audit.implied_renewable_kwh / 1e6, ...
-            audit.renewable_scale_to_ref);
-    end
+    fprintf('系统年净利润：%.3f M$/a\n', summary.net_profit / 1e6);
 end

@@ -138,13 +138,20 @@ context.AEL_spec_energy = params.AEL.common.spec_energy;
 context.H2_density = params.unit.h2_density;
 context.NH3_rate = params.HB.nh3_output;
 context.HB_power_kw = params.HB.nom_power * 1000;
-context.C_curt = 0.01;
+context.C_curt = params.grid.curtail_penalty;
 context.C_purchase = params.grid.buy_price;
 context.C_sell = params.grid.sell_price;
 context.ael_common = params.AEL.common;
 context.N_AEL_initial = 0;
 
-built = feval('results', params, renewable_data, sol, -1, 1, ...
+H2_prod_kg = sum(sol.P_AEL) * dt / context.AEL_spec_energy ...
+    * context.H2_density;
+water_cost = params.material.water_price * ...
+    params.AEL.common.water_use * H2_prod_kg / params.unit.mass_scale;
+objective_value = annual_fixed_cost(params).total + water_cost ...
+    - params.grid.sell_price * sum(sol.p_sell) * dt;
+
+built = feval('results', params, renewable_data, sol, objective_value, 1, ...
     struct('message', 'ok'), context);
 
 verifyEqual(test_case, built.dispatch.P_AEL, sol.P_AEL);
@@ -174,6 +181,66 @@ verifyEqual(test_case, built.cost.catalyst, expected_catalyst_cost, ...
 verifyEqual(test_case, built.check.max_power_residual_kw, 0, ...
     'AbsTol', 1e-12);
 verifyEqual(test_case, built.time, renewable_data.time);
+end
+
+function testResultsComputesCurrentAmmoniaKpisWithoutReferenceComparison(test_case)
+params = my_system('s2');
+dt = 1;
+T = 48;
+hb_load = [zeros(12, 1); ones(12, 1); 0.5 * ones(24, 1)];
+nh3_rate = params.HB.nh3_output;
+h2_use_kg = hb_load * nh3_rate * params.HB.lit_h2;
+
+sol = struct();
+sol.HB_load = hb_load;
+sol.P_AEL = h2_use_kg * params.AEL.common.spec_energy / ...
+    params.unit.h2_density;
+sol.storage_H2 = zeros(T + 1, 1);
+sol.p_purchase = 100 * hb_load;
+sol.p_sell = zeros(T, 1);
+sol.p_curt = zeros(T, 1);
+sol.u_purchase = double(sol.p_purchase > 0);
+
+renewable_data = struct('time_count', T, 'time', (1:T)');
+context = struct();
+context.T = T;
+context.dt = dt;
+context.P_total = sol.P_AEL + hb_load * params.HB.nom_power * 1000 ...
+    - sol.p_purchase;
+context.AEL_spec_energy = params.AEL.common.spec_energy;
+context.H2_density = params.unit.h2_density;
+context.NH3_rate = nh3_rate;
+context.HB_power_kw = params.HB.nom_power * 1000;
+context.C_curt = params.grid.curtail_penalty;
+context.C_purchase = params.grid.buy_price;
+context.C_sell = params.grid.sell_price;
+context.ael_common = params.AEL.common;
+
+NH3_prod_kg = sum(hb_load) * nh3_rate * dt;
+H2_prod_kg = sum(h2_use_kg);
+water_cost = params.material.water_price * (...
+    params.AEL.common.water_use * H2_prod_kg / params.unit.mass_scale + ...
+    params.HB.water_use * NH3_prod_kg / params.unit.mass_scale);
+objective_value = annual_fixed_cost(params).total + water_cost + ...
+    params.material.cat_price * NH3_prod_kg / params.unit.mass_scale + ...
+    params.grid.buy_price * sum(sol.p_purchase) * dt - ...
+    params.ammonia.price * NH3_prod_kg / params.unit.mass_scale;
+
+command_output = evalc("built = feval('results', params, renewable_data, " + ...
+    "sol, objective_value, 1, struct('message', 'ok'), context);");
+
+expected_co2_intensity = params.environment.grid_co2 * ...
+    sum(sol.p_purchase) * dt / built.summary.NH3_prod_kg;
+verifyEqual(test_case, built.summary.NH3_daily_cumulative_volatility, ...
+    0.25, 'AbsTol', 1e-12);
+verifyEqual(test_case, built.HB.daily_volatility, [0.5; 0], ...
+    'AbsTol', 1e-12);
+verifyEqual(test_case, built.summary.co2_intensity, ...
+    expected_co2_intensity, 'AbsTol', 1e-12);
+verifySubstring(test_case, command_output, '制氨日累计波动率：25.00 %');
+verifySubstring(test_case, command_output, '碳排放强度：');
+verifyEmpty(test_case, regexp(command_output, '对标|文献|偏差', 'once'));
+verifyFalse(test_case, isfield(built, 'zhou_audit'));
 end
 
 function testResultLcoaUsesZhouCostBreakdown(test_case)
@@ -238,6 +305,43 @@ verifyEqual(test_case, economics.total_cost, expected_total_cost, ...
 verifyEqual(test_case, economics.net_profit, ...
     expected_INC - expected_total_cost, 'AbsTol', 1e-8);
 verifyEqual(test_case, economics.lcoa, expected_lcoa, 'AbsTol', 1e-8);
+end
+
+function testAnnualObjectiveAccountingMatchesReportedNetProfit(test_case)
+params = my_system('s2');
+fixed = annual_fixed_cost(params);
+
+result = struct();
+result.summary = struct();
+result.summary.NH3_prod_t_y = 1000;
+result.summary.H2_prod_kg = 2000;
+result.summary.purchase_kwh = 5000;
+result.summary.sell_kwh = 2000;
+result.summary.curtail_kwh = 300;
+result.dispatch = struct('P_purchase', [0; 300; 100]);
+
+economics = result_LCOA(params, result);
+variable_cost = economics.RM.water + economics.RM.catalyst + ...
+    economics.RM.grid_purchase + economics.RM.curtailment;
+objective_value = fixed.total + variable_cost - economics.INC.total;
+
+verifyEqual(test_case, fixed.total, economics.CEC.total + ...
+    economics.OM.total + economics.LC.total + ...
+    economics.RM.grid_capacity, 'AbsTol', 1e-8);
+verifyEqual(test_case, -objective_value, economics.net_profit, ...
+    'AbsTol', 1e-8);
+end
+
+function testBaselineObjectiveIncludesAnnualAccounting(test_case)
+test_dir = fileparts(mfilename('fullpath'));
+project_dir = fileparts(test_dir);
+baseline_source = fileread(fullfile(project_dir, 'src', 'baseline.m'));
+
+verifyNotEmpty(test_case, regexp(baseline_source, ...
+    'annual_fixed_cost\s*\(', 'once'));
+verifyNotEmpty(test_case, regexp(baseline_source, ...
+    'prob\.Objective\s*=\s*obj_formula\s*\+\s*annual_fixed_cost_expr', ...
+    'once'));
 end
 
 function testReferenceS2EconomicsMatchesZhouLcoa(test_case)

@@ -85,6 +85,7 @@ config.transformer.max_load = 0.90; % Transformer maximum load, fraction
 config.grid.sell_price = 0.041;     % Grid selling price, USD/kWh
 config.grid.buy_price = 0.053;      % Grid buying price, USD/kWh
 config.grid.cap_fee = 3.85;         % Grid capacity fee, USD/(kW month)
+config.grid.curtail_penalty = 0.01; % Curtailment penalty, USD/kWh
 config.grid.contract_kw = [];       % Contract demand, kW; empty uses dispatch peak
 config.grid.curtail_limit = 0.10;   % Curtailment limit, fraction
 config.grid.max_sell = 0.20;        % Electricity selling limit, fraction

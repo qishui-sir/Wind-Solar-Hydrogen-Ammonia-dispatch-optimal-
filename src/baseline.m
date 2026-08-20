@@ -46,6 +46,11 @@ function results = baseline(params,renewable_data)
     P_sell = optimvar('p_sell', T, 'LowerBound', 0, 'UpperBound', transformer_kw);
     P_curt = optimvar('p_curt', T, 'LowerBound', 0);
     u_purchase = optimvar('u_purchase', T, 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1);
+    grid_contract_is_fixed = ~isempty(params.grid.contract_kw);
+    if ~grid_contract_is_fixed
+        P_grid_contract = optimvar('grid_contract_kw', 1, ...
+            'LowerBound', 0, 'UpperBound', transformer_kw);
+    end
     SU_AEL = optimvar('SU_AEL',T,'Type','integer','LowerBound',0,'UpperBound',Num_AEL);
     SD_AEL = optimvar('SD_AEL',T,'Type','integer','LowerBound',0,'UpperBound',Num_AEL);
     I_AEL_up = optimvar('I_AEL_up', T, 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1);
@@ -75,6 +80,9 @@ function results = baseline(params,renewable_data)
     prob.Constraints.H2_terminal = storage_H2(end) == initial_storage;
     prob.Constraints.purchase = P_purchase <= u_purchase * transformer_kw;
     prob.Constraints.sell = P_sell <= (1 - u_purchase) * transformer_kw;
+    if ~grid_contract_is_fixed
+        prob.Constraints.grid_contract = P_purchase <= P_grid_contract;
+    end
     prob.Constraints.sell_rate = ...
         mean(P_sell) <= ...
         params.grid.max_sell * mean(P_total);
@@ -122,7 +130,7 @@ function results = baseline(params,renewable_data)
     NH3_total_kg = sum(NH3_prod_kg);
     NH3_income = params.ammonia.price * NH3_total_kg / 1000;
 
-    C_curt = 0.01;
+    C_curt = params.grid.curtail_penalty;
     C_purchase = params.grid.buy_price;
     C_sell = params.grid.sell_price;
     C_water = params.material.water_price;
@@ -136,7 +144,15 @@ function results = baseline(params,renewable_data)
         NH3_income + ...
         C_water * sum(water_use_t) + ...
         C_catalyst * sum(NH3_prod_t);
-    prob.Objective = obj_formula;
+    if grid_contract_is_fixed
+        fixed_cost = annual_fixed_cost(params);
+        grid_capacity_cost = fixed_cost.grid_capacity;
+    else
+        fixed_cost = annual_fixed_cost(params, 0);
+        grid_capacity_cost = params.grid.cap_fee * 12 * P_grid_contract;
+    end
+    annual_fixed_cost_expr = fixed_cost.base_total + grid_capacity_cost;
+    prob.Objective = obj_formula + annual_fixed_cost_expr;
 
     options = optimoptions('intlinprog', 'Display', 'iter',...
         'ConstraintTolerance', 1e-5, ...
@@ -159,7 +175,7 @@ function results = baseline(params,renewable_data)
     end
 
     disp(sol);
-    disp(['最优运行目标值: ', num2str(fval)]);
+    disp(['最优年度成本减收益: ', num2str(fval)]);
     disp(['求解状态: ', num2str(exitflag)]);
     disp(output);
 
