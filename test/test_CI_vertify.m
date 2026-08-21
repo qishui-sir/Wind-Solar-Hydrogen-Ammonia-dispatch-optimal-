@@ -64,12 +64,19 @@ else
 end
 switch_count = sum(abs(diff(hb_on)));
 
+storage_limits = h2_storage_limits(...
+    params.h2_storage, params.unit.h2_density);
 h2_capacity_kg = must_positive_scalar(...
-    params.h2_storage.mass, 'params.h2_storage.mass');
-h2_soc = storage_h2_kg / h2_capacity_kg;
-h2_soc_p05 = prctile(h2_soc, 5);
-h2_min_margin = min(h2_soc - protocol.h2_safe_soc);
-h2_risk_hours = sum(h2_soc < protocol.h2_safe_soc) * dt;
+    storage_limits.max_mass, 'storage_limits.max_mass');
+h2_min_kg = must_nonnegative_scalar(...
+    storage_limits.min_mass, 'storage_limits.min_mass');
+h2_work_kg = must_positive_scalar(...
+    storage_limits.work_mass, 'storage_limits.work_mass');
+h2_abs_soc = storage_h2_kg / h2_capacity_kg;
+h2_work_soc = (storage_h2_kg - h2_min_kg) / h2_work_kg;
+h2_soc_p05 = prctile(h2_work_soc, 5);
+h2_min_margin = min(h2_work_soc - protocol.h2_safe_soc);
+h2_risk_hours = sum(h2_work_soc < protocol.h2_safe_soc) * dt;
 
 metric = protocol.core_metrics;
 value = [daily_shortfall_p95; mar; switch_count; h2_soc_p05];
@@ -97,6 +104,19 @@ validation.hard_safety = table(protocol.hard_safety_metric, ...
     hard_status, 'VariableNames', {'Metric', 'Value', 'Unit', ...
     'SafetySOC', 'RiskHours', 'Status'});
 
+physical_tolerance_kg = 1e-6 * max(1, h2_capacity_kg);
+physical_margin_kg = min(storage_h2_kg - h2_min_kg);
+physical_risk_hours = sum(...
+    storage_h2_kg < h2_min_kg - physical_tolerance_kg) * dt;
+physical_status = "pass";
+if physical_margin_kg < -physical_tolerance_kg
+    physical_status = "fail";
+end
+validation.physical_safety = table("pressure_inventory_floor", ...
+    physical_margin_kg, "kg", h2_min_kg, physical_risk_hours, ...
+    physical_status, 'VariableNames', {'Metric', 'Margin', 'Unit', ...
+    'MinimumInventory', 'ViolationHours', 'Status'});
+
 validation.protocol = protocol;
 validation.data = struct();
 validation.data.year = identify_data_year(result, renewable_data);
@@ -112,8 +132,10 @@ validation.diagnostics = struct();
 validation.diagnostics.minimum_hb_load = min(hb_load);
 validation.diagnostics.maximum_hb_load = max(hb_load);
 validation.diagnostics.maximum_hb_ramp = max(hourly_ramp);
-validation.diagnostics.minimum_h2_soc = min(h2_soc);
-validation.diagnostics.maximum_h2_soc = max(h2_soc);
+validation.diagnostics.minimum_h2_abs_soc = min(h2_abs_soc);
+validation.diagnostics.maximum_h2_abs_soc = max(h2_abs_soc);
+validation.diagnostics.minimum_h2_work_soc = min(h2_work_soc);
+validation.diagnostics.maximum_h2_work_soc = max(h2_work_soc);
 validation.diagnostics.hb_switching_observed = any(diff(hb_on) ~= 0);
 validation.diagnostics.all_core_computable = all(computable);
 validation.diagnostics.h2_hard_safety_pass = hard_status == "pass";
@@ -243,6 +265,13 @@ if ~(isnumeric(value) && isscalar(value) && isfinite(value) && value > 0)
 end
 end
 
+function value = must_nonnegative_scalar(value, name)
+if ~(isnumeric(value) && isscalar(value) && isfinite(value) && value >= 0)
+    error('test_CI_vertify:bad_nonnegative_scalar', ...
+        '%s must be a nonnegative finite scalar.', name);
+end
+end
+
 function print_validation(validation)
 fprintf('\n========== Real-dispatch core-indicator validation ==========\n');
 fprintf('Protocol: v%s / Seal %s\n', ...
@@ -251,9 +280,12 @@ fprintf('Data year: %s; samples: %d; complete days: %d; dt: %.3f h\n', ...
     validation.data.year, validation.data.sample_count, ...
     validation.data.complete_days, validation.data.time_step_h);
 fprintf('HB state source: %s\n', validation.data.hb_state_source);
+fprintf('H2 SOC basis: absolute inventory and usable inventory above minimum pressure\n');
 disp(validation.core_metrics);
-fprintf('Hard H2 safety audit:\n');
+fprintf('H2 working-reserve audit:\n');
 disp(validation.hard_safety);
+fprintf('H2 physical pressure-floor audit:\n');
+disp(validation.physical_safety);
 fprintf('Conclusion: %s\n', validation.conclusion);
 fprintf('%s\n', validation.note);
 fprintf('=============================================================\n');

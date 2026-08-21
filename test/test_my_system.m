@@ -75,6 +75,51 @@ verifyEqual(test_case, case_config.h2_storage.capacity, 11.0e4);
 verifyEqual(test_case, case_config.ref.lcoa, 464);
 end
 
+function testH2StoragePressureDefinesPhysicalBounds(test_case)
+case_config = my_system('s2');
+storage = case_config.h2_storage;
+
+verifyEqual(test_case, storage.pressure_basis, 'absolute');
+verifyEqual(test_case, storage.min_abs_soc, 1 / 3, 'AbsTol', 1e-12);
+verifyEqual(test_case, storage.min_capacity, 11.0e4 / 3, ...
+    'AbsTol', 1e-9);
+verifyEqual(test_case, storage.work_capacity, 2 * 11.0e4 / 3, ...
+    'AbsTol', 1e-9);
+verifyEqual(test_case, storage.min_mass, 3295.6, 'AbsTol', 1e-9);
+verifyEqual(test_case, storage.work_mass, 6591.2, 'AbsTol', 1e-9);
+verifyEqual(test_case, storage.initial_mass, 6591.2, 'AbsTol', 1e-9);
+end
+
+function testH2StorageGaugePressureUsesAbsolutePressureRatio(test_case)
+storage = struct('capacity', 22000, 'min_pressure', 0.5, ...
+    'max_pressure', 1.5, 'pressure_basis', 'gauge', ...
+    'atm_pressure', 0.101325, 'init_work_soc', 0.5);
+
+limits = h2_storage_limits(storage, 0.08988);
+expected_fraction = (0.5 + 0.101325) / (1.5 + 0.101325);
+
+verifyEqual(test_case, limits.min_abs_soc, expected_fraction, ...
+    'AbsTol', 1e-12);
+verifyEqual(test_case, limits.min_capacity, 22000 * expected_fraction, ...
+    'AbsTol', 1e-9);
+verifyEqual(test_case, limits.initial_mass, ...
+    (limits.min_capacity + 0.5 * limits.work_capacity) * 0.08988, ...
+    'AbsTol', 1e-9);
+end
+
+function testBaselineUsesPressureDerivedStorageBounds(test_case)
+test_dir = fileparts(mfilename('fullpath'));
+project_dir = fileparts(test_dir);
+baseline_source = fileread(fullfile(project_dir, 'src', 'baseline.m'));
+
+verifyNotEmpty(test_case, regexp(baseline_source, ...
+    'storage_limits\s*=\s*h2_storage_limits\(', 'once'));
+verifyNotEmpty(test_case, regexp(baseline_source, ...
+    'initial_storage\s*=\s*storage_limits\.initial_mass', 'once'));
+verifyNotEmpty(test_case, regexp(baseline_source, ...
+    "storage_H2_min,'UpperBound',storage_H2_max", 'once'));
+end
+
 function testStandaloneParameterFiles(test_case)
 test_dir = fileparts(mfilename('fullpath'));
 project_dir = fileparts(test_dir);
@@ -115,7 +160,8 @@ dt = 1;
 sol = struct();
 sol.P_AEL = [50; 60];
 sol.HB_load = [0; 0];
-sol.storage_H2 = [10; 10.8988; 11.97736];
+storage_initial = params.h2_storage.initial_mass;
+sol.storage_H2 = storage_initial + [0; 0.8988; 1.97736];
 sol.p_purchase = [0; 0];
 sol.p_sell = [45; 140];
 sol.p_curt = [0; 0];
@@ -181,6 +227,26 @@ verifyEqual(test_case, built.cost.catalyst, expected_catalyst_cost, ...
 verifyEqual(test_case, built.check.max_power_residual_kw, 0, ...
     'AbsTol', 1e-12);
 verifyEqual(test_case, built.time, renewable_data.time);
+verifyEqual(test_case, built.storage.soc_abs, ...
+    sol.storage_H2 / params.h2_storage.mass, 'AbsTol', 1e-12);
+verifyEqual(test_case, built.storage.soc_work, ...
+    (sol.storage_H2 - params.h2_storage.min_mass) / ...
+    params.h2_storage.work_mass, 'AbsTol', 1e-12);
+verifyEqual(test_case, built.summary.h2_min_work_soc, 0.5, ...
+    'AbsTol', 1e-12);
+end
+
+function testCiValidationUsesWorkingInventorySoc(test_case)
+test_dir = fileparts(mfilename('fullpath'));
+project_dir = fileparts(test_dir);
+source = fileread(fullfile(project_dir, 'test', 'test_CI_vertify.m'));
+
+verifyNotEmpty(test_case, regexp(source, ...
+    'h2_work_soc\s*=\s*\(storage_h2_kg\s*-\s*h2_min_kg\)', 'once'));
+verifyNotEmpty(test_case, regexp(source, ...
+    'h2_abs_soc\s*=\s*storage_h2_kg\s*/\s*h2_capacity_kg', 'once'));
+verifyNotEmpty(test_case, regexp(source, ...
+    'h2_soc_p05\s*=\s*prctile\(h2_work_soc,\s*5\)', 'once'));
 end
 
 function testResultsComputesCurrentAmmoniaKpisWithoutReferenceComparison(test_case)

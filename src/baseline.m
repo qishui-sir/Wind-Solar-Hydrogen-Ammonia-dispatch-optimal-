@@ -28,8 +28,10 @@ function results = baseline(params,renewable_data)
     end
     H2_density = params.unit.h2_density;
 
-    storage_H2_max = params.h2_storage.mass;
-    initial_storage = 0.5*storage_H2_max;
+    storage_limits = h2_storage_limits(params.h2_storage, H2_density);
+    storage_H2_min = storage_limits.min_mass;
+    storage_H2_max = storage_limits.max_mass;
+    initial_storage = storage_limits.initial_mass;
 
     HB_max_load = params.HB.max_load;
     HB_min_load = params.HB.min_load;
@@ -41,7 +43,8 @@ function results = baseline(params,renewable_data)
     N_AEL = optimvar('n_ael',T,'Type','integer','LowerBound', 0 ,'UpperBound', Num_AEL);
     P_AEL = optimvar('P_AEL',T,'LowerBound',0,'UpperBound',P_AEL_max);
     HB_load = optimvar('HB_load',T,'LowerBound',HB_min_load,'UpperBound',HB_max_load);
-    storage_H2 = optimvar('storage_H2',T+1,'LowerBound',0,'UpperBound',storage_H2_max);
+    storage_H2 = optimvar('storage_H2',T+1,'LowerBound',...
+        storage_H2_min,'UpperBound',storage_H2_max);
     P_purchase = optimvar('p_purchase', T, 'LowerBound', 0, 'UpperBound', transformer_kw);
     P_sell = optimvar('p_sell', T, 'LowerBound', 0, 'UpperBound', transformer_kw);
     P_curt = optimvar('p_curt', T, 'LowerBound', 0);

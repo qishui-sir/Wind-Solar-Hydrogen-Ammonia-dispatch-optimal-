@@ -64,6 +64,9 @@ config.h2_storage.module_cap = 22000;   % H2 storage module capacity, Nm3
 config.h2_storage.min_pressure = 0.5;   % H2 storage minimum pressure, MPa
 config.h2_storage.max_pressure = 1.5;   % H2 storage maximum pressure, MPa
 config.h2_storage.temperature = 30;     % H2 storage operating temperature, degC
+config.h2_storage.pressure_basis = 'absolute'; % Zhou pressure modeling basis
+config.h2_storage.atm_pressure = 0.101325;     % Standard atmosphere, MPa
+config.h2_storage.init_work_soc = 0.5;         % Initial usable-inventory SOC
 
 config.ammonia.price = 557;         % Ammonia selling price, USD/t
 config.material.water_price = 1.4;  % Water price, USD/t
@@ -149,6 +152,13 @@ switch scenario_id
         error('default:bad_case', 'scenario_id must be s1, s2, or s3.');
 end
 
-config.h2_storage.mass = ...
-    config.h2_storage.capacity * config.unit.h2_density; % H2 storage capacity, kg
+storage_limits = h2_storage_limits(...
+    config.h2_storage, config.unit.h2_density);
+config.h2_storage.mass = storage_limits.max_mass; % Maximum H2 inventory, kg
+config.h2_storage.min_mass = storage_limits.min_mass; % Pressure heel gas, kg
+config.h2_storage.work_mass = storage_limits.work_mass; % Usable H2 inventory, kg
+config.h2_storage.initial_mass = storage_limits.initial_mass; % Initial H2, kg
+config.h2_storage.min_abs_soc = storage_limits.min_abs_soc;
+config.h2_storage.min_capacity = storage_limits.min_capacity; % Minimum inventory, Nm3
+config.h2_storage.work_capacity = storage_limits.work_capacity; % Usable inventory, Nm3
 end

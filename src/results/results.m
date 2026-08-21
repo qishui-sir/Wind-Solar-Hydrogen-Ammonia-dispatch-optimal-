@@ -14,6 +14,8 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     if isfield(context, 'N_AEL_initial')
         N_AEL_initial = context.N_AEL_initial;
     end
+    storage_limits = h2_storage_limits(...
+        params.h2_storage, params.unit.h2_density);
 
     P_AEL_opt = sol.P_AEL;
     P_AEL_start_opt = zeros(T, 1);
@@ -108,6 +110,14 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
 
     result.storage = struct();
     result.storage.H2 = storage_H2_opt;
+    result.storage.soc_abs = ...
+        storage_H2_opt / storage_limits.max_mass;
+    result.storage.soc_work = ...
+        (storage_H2_opt - storage_limits.min_mass) / ...
+        storage_limits.work_mass;
+    result.storage.min_mass = storage_limits.min_mass;
+    result.storage.max_mass = storage_limits.max_mass;
+    result.storage.work_mass = storage_limits.work_mass;
 
     result.grid = struct();
     result.grid.purchase = P_purchase_opt;
@@ -125,6 +135,9 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.summary.renewable_kwh = sum(P_total) * dt;
     result.summary.H2_prod_kg = sum(H2_prod_kg_opt);
     result.summary.H2_use_kg = sum(H2_use_kg_opt);
+    result.summary.h2_min_abs_soc = min(result.storage.soc_abs);
+    result.summary.h2_min_work_soc = min(result.storage.soc_work);
+    result.summary.h2_p05_work_soc = prctile(result.storage.soc_work, 5);
     %result.summary.H2_short_kg = sum(H2_short_opt);
     result.summary.NH3_prod_kg = sum(NH3_prod_kg_opt);
     result.summary.NH3_prod_t_y = result.summary.NH3_prod_kg / 1000;
@@ -240,6 +253,10 @@ function print_current_results(summary)
     fprintf('弃电率：%.4f %%\n', summary.curtail_rate * 100);
     fprintf('购电率：%.4f %%\n', summary.purchase_rate * 100);
     fprintf('碳排放强度：%.6f kgCO2/kgNH3\n', summary.co2_intensity);
+    fprintf('储氢最低绝对SOC：%.2f %%；最低可调用SOC：%.2f %%\n', ...
+        summary.h2_min_abs_soc * 100, summary.h2_min_work_soc * 100);
+    fprintf('储氢可调用SOC第5百分位：%.2f %%\n', ...
+        summary.h2_p05_work_soc * 100);
     if summary.NH3_prod_t_y > 0
         fprintf('平准化制氨成本：%.2f $/t\n', summary.lcoa);
     else
