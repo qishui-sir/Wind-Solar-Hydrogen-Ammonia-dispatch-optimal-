@@ -2,6 +2,3 @@
 docs/
 
 *.asv
-
-#ignore test
-test/
