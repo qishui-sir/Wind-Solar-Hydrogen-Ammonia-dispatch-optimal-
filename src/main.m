@@ -1,9 +1,10 @@
 clear;clc;
 
 source_dir = fileparts(mfilename('fullpath'));
-project_dir = fileparts(source_dir);
-params_dir = fullfile(source_dir, 'params');
-addpath(params_dir);
+addpath(source_dir);
+addpath(fullfile(source_dir, 'params'));
+addpath(fullfile(source_dir, 'results'));
+addpath(fullfile(source_dir, 'protocol'));
 
 data_cfg = struct();
 data_cfg.pv_year = 2022;
@@ -13,9 +14,8 @@ data_cfg.pw_capacity_kw = 200000;
 renewable_data = load_res_year(data_cfg);
 
 params = my_system('s2');
-params.AEL.common.startup = true; % Use S3 startup electricity in the S2 case.
-ael_output = qi_ael_model(2000, 0, params.AEL.detail);
+params.AEL.common.startup = true;
 
-results = baseline(params,renewable_data);
+results = baseline(params, renewable_data);
 %% 
 % figure_total(params,results);

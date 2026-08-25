@@ -1,5 +1,5 @@
 function config = my_system(scenario_id)
-%MY_SYSTEM Complete default, AEL, and HB parameters for a 7-day PtA case.
+%MY_SYSTEM Complete default, AEL, and HB parameters for Zhou PtA cases.
 %   config = my_system() returns the S2 continuous flexible case.
 %   config = my_system('s1'|'s2'|'s3') selects a Zhou scenario.
 

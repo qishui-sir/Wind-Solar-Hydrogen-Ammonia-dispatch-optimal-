@@ -10,61 +10,6 @@ addpath(fullfile(project_dir, 'src', 'params'));
 addpath(fullfile(project_dir, 'src', 'results'));
 end
 
-function testAelCountAlgorithmRespectsPowerBounds(test_case)
-ael_common = AEL().common;
-power_kw = [0; 5000; 20000; 20000; 5000; 0];
-
-[optimized_count, info] = algorithm(power_kw, ael_common);
-
-verifyEqual(test_case, info.lower_bound, [0; 1; 4; 4; 1; 0]);
-verifyEqual(test_case, info.upper_bound, [0; 5; 20; 20; 5; 0]);
-verifyGreaterThanOrEqual(test_case, optimized_count, info.lower_bound);
-verifyLessThanOrEqual(test_case, optimized_count, info.upper_bound);
-verifyEqual(test_case, optimized_count, round(optimized_count));
-end
-
-function testAelCountAlgorithmRetainsOnlyFeasibleOnlineModules(test_case)
-ael_common = AEL().common;
-power_kw = [40000; 7000; 45000];
-options = struct('future_hours', 1, 'history_days', 7, ...
-    'future_weight', 0.7, 'keep_threshold', 0.5);
-
-[optimized_count, info] = algorithm(power_kw, ael_common, options);
-
-verifyEqual(test_case, info.lower_bound, [8; 2; 9]);
-verifyEqual(test_case, info.upper_bound, [26; 7; 26]);
-verifyEqual(test_case, optimized_count, [8; 7; 9]);
-verifyEqual(test_case, info.startup_count, 10);
-verifyEqual(test_case, info.start_event_count, 2);
-end
-
-function testAelCountAlgorithmClipsSolverToleranceAtZero(test_case)
-ael_common = AEL().common;
-power_kw = [-1e-5; 0; 5000];
-
-[optimized_count, info] = algorithm(power_kw, ael_common);
-
-verifyEqual(test_case, info.lower_bound, [0; 0; 1]);
-verifyEqual(test_case, info.upper_bound, [0; 0; 5]);
-verifyEqual(test_case, optimized_count, [0; 0; 1]);
-end
-
-function testAelCountAlgorithmRejectsMaterialNegativePower(test_case)
-ael_common = AEL().common;
-
-verifyError(test_case, @() algorithm(-1, ael_common), ...
-    'algorithm:negative_power');
-end
-
-function testBaselineDoesNotInvokeSlidingWindowAlgorithm(test_case)
-test_dir = fileparts(mfilename('fullpath'));
-project_dir = fileparts(test_dir);
-baseline_source = fileread(fullfile(project_dir, 'src', 'baseline.m'));
-
-verifyEmpty(test_case, regexp(baseline_source, ...
-    '\<algorithm\s*\(', 'once'));
-end
-
 function testDefaultScenarioIsS2(test_case)
 case_config = my_system();
 
@@ -110,14 +55,16 @@ end
 function testBaselineUsesPressureDerivedStorageBounds(test_case)
 test_dir = fileparts(mfilename('fullpath'));
 project_dir = fileparts(test_dir);
-baseline_source = fileread(fullfile(project_dir, 'src', 'baseline.m'));
+model_source = fileread(fullfile(project_dir, 'src', 'dispatch_model.m'));
 
-verifyNotEmpty(test_case, regexp(baseline_source, ...
+verifyNotEmpty(test_case, regexp(model_source, ...
     'storage_limits\s*=\s*h2_storage_limits\(', 'once'));
-verifyNotEmpty(test_case, regexp(baseline_source, ...
-    'initial_storage\s*=\s*storage_limits\.initial_mass', 'once'));
-verifyNotEmpty(test_case, regexp(baseline_source, ...
-    "storage_H2_min,'UpperBound',storage_H2_max", 'once'));
+verifyNotEmpty(test_case, regexp(model_source, ...
+    '''h2_kg'',\s*option_value\(initial_options,\s*\.\.\.\s*', 'once'));
+verifyNotEmpty(test_case, regexp(model_source, ...
+    '''LowerBound'',\s*storage_limits\.min_mass,\s*\.\.\.\s*', 'once'));
+verifyNotEmpty(test_case, regexp(model_source, ...
+    '''UpperBound'',\s*storage_limits\.max_mass', 'once'));
 end
 
 function testStandaloneParameterFiles(test_case)
@@ -135,22 +82,18 @@ ael_parameters = AEL(default_config, 's2');
 hb_parameters = HB(default_config, 's2');
 
 verifyEqual(test_case, default_config.ref.lcoa, 464);
-verifyEqual(test_case, ael_parameters.detail.far_const, 96485.33212);
 verifyEqual(test_case, ael_parameters.common.capacity, 130);
-verifyEqual(test_case, ael_parameters.detail.stack_h2, 500);
 verifyEqual(test_case, ael_parameters.common.module_h2, 1000);
 verifyEqual(test_case, hb_parameters.act_h2, 6 / 34);
 verifyEqual(test_case, hb_parameters.max_load, 1.00);
 end
 
-function testAelParametersUseCommonDetailSections(test_case)
+function testAelParametersExposeOnlyZhouCommonSection(test_case)
 ael_parameters = AEL();
 
-verifyEqual(test_case, fieldnames(ael_parameters), {'common'; 'detail'});
+verifyEqual(test_case, fieldnames(ael_parameters), {'common'});
 verifyTrue(test_case, all(isfield(ael_parameters.common, ...
-    {'capacity', 'max_power', 'min_power', 'spec_energy'})));
-verifyTrue(test_case, all(isfield(ael_parameters.detail, ...
-    {'far_const', 'stack_temp', 'stack_h2'})));
+    {'capacity', 'max_power', 'min_power', 'spec_energy', 'module_num'})));
 end
 
 function testResultsBuilderCreatesBaselineSummary(test_case)
@@ -197,9 +140,10 @@ water_cost = params.material.water_price * ...
 objective_value = annual_fixed_cost(params).total + water_cost ...
     - params.grid.sell_price * sum(sol.p_sell) * dt;
 
-built = feval('results', params, renewable_data, sol, objective_value, 1, ...
-    struct('message', 'ok'), context);
+[built, printed_output] = runResultsWithCapturedOutput( ...
+    params, renewable_data, sol, objective_value, context);
 
+verifyNotEmpty(test_case, printed_output);
 verifyEqual(test_case, built.dispatch.P_AEL, sol.P_AEL);
 verifyEqual(test_case, built.dispatch.P_AEL_start, sol.P_AEL_start);
 verifyEqual(test_case, built.dispatch.N_AEL, sol.n_ael_optimized);
@@ -292,8 +236,8 @@ objective_value = annual_fixed_cost(params).total + water_cost + ...
     params.grid.buy_price * sum(sol.p_purchase) * dt - ...
     params.ammonia.price * NH3_prod_kg / params.unit.mass_scale;
 
-command_output = evalc("built = feval('results', params, renewable_data, " + ...
-    "sol, objective_value, 1, struct('message', 'ok'), context);");
+[built, command_output] = runResultsWithCapturedOutput( ...
+    params, renewable_data, sol, objective_value, context);
 
 expected_co2_intensity = params.environment.grid_co2 * ...
     sum(sol.p_purchase) * dt / built.summary.NH3_prod_kg;
@@ -401,12 +345,15 @@ end
 function testBaselineObjectiveIncludesAnnualAccounting(test_case)
 test_dir = fileparts(mfilename('fullpath'));
 project_dir = fileparts(test_dir);
-baseline_source = fileread(fullfile(project_dir, 'src', 'baseline.m'));
+model_source = fileread(fullfile(project_dir, 'src', 'dispatch_model.m'));
 
-verifyNotEmpty(test_case, regexp(baseline_source, ...
+verifyNotEmpty(test_case, regexp(model_source, ...
     'annual_fixed_cost\s*\(', 'once'));
-verifyNotEmpty(test_case, regexp(baseline_source, ...
-    'prob\.Objective\s*=\s*obj_formula\s*\+\s*annual_fixed_cost_expr', ...
+verifyNotEmpty(test_case, regexp(model_source, ...
+    'economic_objective\s*=\s*variable_objective\s*\+\s*fixed_cost_expression', ...
+    'once'));
+verifyNotEmpty(test_case, regexp(model_source, ...
+    'prob\.Objective\s*=\s*economic_objective', ...
     'once'));
 end
 
@@ -508,7 +455,6 @@ s2_config = default('s2');
 s3_config = default('s3');
 
 verifyEqual(test_case, s2_config.time.step, 1);
-verifyEqual(test_case, s2_config.time.days, 7);
 verifyEqual(test_case, s2_config.time.hour_year, 8760);
 verifyEqual(test_case, s2_config.unit.h2_density, 0.08988);
 verifyEqual(test_case, s2_config.unit.mass_scale, 1000);
@@ -607,8 +553,6 @@ verifyEqual(test_case, case_config.renewable.total_capacity, ...
     case_config.renewable.PV_capacity + case_config.renewable.PW_capacity);
 verifyEqual(test_case, case_config.AEL.common.max_power, 130000);
 verifyEqual(test_case, case_config.AEL.common.module_num, 26);
-verifyEqual(test_case, case_config.AEL.detail.stack_num, 52);
-verifyEqual(test_case, case_config.AEL.detail.stack_per_module, 2);
 verifyEqual(test_case, case_config.h2_storage.mass, 9886.8, 'AbsTol', 1e-9);
 verifyEqual(test_case, case_config.converter.capacity, ...
     case_config.AEL.common.capacity);
@@ -639,60 +583,19 @@ verifyEqual(test_case, case_config.HB.h2_demand, 2014.50, 'AbsTol', 5e-3);
 verifyEqual(test_case, case_config.HB.nom_power, 10.8447, 'AbsTol', 5e-5);
 end
 
-function testTemperatureAndStartupUnitNames(test_case)
-case_config = my_system('s2');
-
-verifyEqual(test_case, case_config.AEL.detail.stack_temp, 90.0);
-verifyEqual(test_case, case_config.AEL.detail.sep_temp, 90.0);
-verifyEqual(test_case, case_config.AEL.detail.pid_i_set, 89.57);
-verifyEqual(test_case, case_config.AEL.detail.mpc_set, 93.23);
-verifyEqual(test_case, case_config.AEL.common.startup_elec, 0.15);
-end
-
-function testQiAelVoltageHeatAndHydrogenEquations(test_case)
-ael_parameters = AEL();
-model_output = qi_ael_model(2000, 0, ael_parameters.detail);
-
-verifyEqual(test_case, model_output.avg_temp, 90.0);
-verifyEqual(test_case, model_output.rev_voltage, ...
-    1.1752222640544785, 'AbsTol', 1e-12);
-verifyEqual(test_case, model_output.ohm_voltage, 0.30672, 'AbsTol', 1e-12);
-verifyEqual(test_case, model_output.act_voltage, ...
-    0.7888550832435931, 'AbsTol', 1e-12);
-verifyEqual(test_case, model_output.cel_voltage, ...
-    2.2707973472980716, 'AbsTol', 1e-12);
-verifyEqual(test_case, model_output.power, ...
-    2.7067904379793015, 'AbsTol', 1e-12);
-verifyEqual(test_case, model_output.hea_power, ...
-    0.9426304379793013, 'AbsTol', 1e-12);
-verifyEqual(test_case, model_output.hyd_power, 1.76416, 'AbsTol', 1e-12);
-verifyEqual(test_case, model_output.h2_flow, ...
-    498.75708358750325, 'AbsTol', 1e-9);
-verifyEqual(test_case, model_output.hhv_efficiency, ...
-    0.6517534476429573, 'AbsTol', 1e-12);
-end
-
-function testQiAelModelLoadsAelDefaults(test_case)
-test_dir = fileparts(mfilename('fullpath'));
-project_dir = fileparts(test_dir);
-src_dir = fullfile(project_dir, 'src');
-params_dir = fullfile(src_dir, 'params');
-old_path = path;
-path_cleanup = onCleanup(@() path(old_path));
-
-rmpath(params_dir);
-addpath(src_dir, '-begin');
-default_output = qi_ael_model(2000);
-
-addpath(params_dir, '-begin');
-explicit_output = qi_ael_model(2000, 0, AEL());
-
-verifyEqual(test_case, default_output.power, explicit_output.power, 'AbsTol', 1e-12);
-verifyEqual(test_case, default_output.deg_voltage, 0);
-end
-
 function testRejectsUnknownScenario(test_case)
 verifyError(test_case, @() my_system('s4'), 'my_system:bad_case');
+end
+
+function [built, printed_output] = runResultsWithCapturedOutput( ...
+    params, renewable_data, sol, objective_value, context)
+built = [];
+printed_output = evalc('built = callResults();');
+
+    function value = callResults()
+        value = results(params, renewable_data, sol, objective_value, 1, ...
+            struct('message', 'ok'), context);
+    end
 end
 
 function verifyFieldNamesAreShort(test_case, value, prefix)

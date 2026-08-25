@@ -1,4 +1,6 @@
-# ignore docs
-docs/
+# Track the frozen protocol while leaving other generated docs ignored.
+docs/*
+!docs/protocol_v5.md
 
 *.asv
+runs/

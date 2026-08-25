@@ -1,5 +1,5 @@
 function config = default(scenario_id)
-%DEFAULT Default system-level parameters for the Zhou 7-day PtA case.
+%DEFAULT Default system-level parameters for the Zhou PtA cases.
 
 if nargin < 1 || isempty(scenario_id)
     scenario_id = 's2';
@@ -21,7 +21,6 @@ config.source.doi = '10.1016/j.enconman.2024.118720'; % Source DOI
 config.source.note = 'Table 2 plus Table 3/4 scenario data.'; % Source table note
 
 config.time.step = 1;           % Simulation time step, h
-config.time.days = 7;           % Simulation horizon, day
 config.time.hour_day = 24;      % Hours per day, h/day
 config.time.hour_year = 8760;   % Hours per year, h/year
 
@@ -37,6 +36,7 @@ config.renewable.PW_ref = 300e3;        % Zhou recommended PW/wind capacity, kW
 config.renewable.PW_min = 0;            % PW/wind scan lower bound, kW
 config.renewable.PW_max = 400e3;        % PW/wind scan upper bound, kW
 config.renewable.PW_step = 50e3;        % PW/wind scan step, kW
+config.renewable.input_scale = 0.8623;   % Unresolved S2 renewable-input calibration
 config.renewable.data_dir = '';         % Renewable data folder; empty means caller sets it
 config.renewable.start_time = [];       % Renewable data start time; empty means first row
 

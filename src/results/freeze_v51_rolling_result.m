@@ -1,0 +1,113 @@
+function [frozen_result, freeze_info] = freeze_v51_rolling_result(config)
+%FREEZE_V51_ROLLING_RESULT Persist a completed rolling result as evidence.
+
+if nargin < 1 || isempty(config)
+    config = struct();
+end
+
+project_dir = project_root();
+add_project_paths(project_dir);
+
+source_mat_path = option_value(config, 'source_mat_path', ...
+    fullfile(project_dir, 'runs', 'rolling', ...
+    'v51_contract_plan_and_hb_smoothing_2022_latest.mat'));
+output_path = option_value(config, 'output_path', ...
+    fullfile(project_dir, 'runs', 'rolling', 'frozen', ...
+    'v51_contract_plan_and_hb_smoothing_2022_frozen.mat'));
+save_output = option_value(config, 'save_output', true);
+
+if ~isfile(source_mat_path)
+    error('freeze_v51_rolling_result:missing_source', ...
+        'Missing rolling result: %s', source_mat_path);
+end
+loaded = load(source_mat_path, 'result', 'run_info', 'metrics', ...
+    'params', 'renewable_data', 'source_run_info');
+required = {'result', 'run_info', 'metrics', 'params', ...
+    'renewable_data'};
+for index = 1:numel(required)
+    if ~isfield(loaded, required{index})
+        error('freeze_v51_rolling_result:bad_source', ...
+            'Source MAT must contain %s.', required{index});
+    end
+end
+
+require_completed_result(loaded.run_info, loaded.metrics);
+
+source_file = dir(source_mat_path);
+freeze_info = struct( ...
+    'status', "frozen", ...
+    'frozen_at', string(datetime('now')), ...
+    'source_mat_path', string(source_mat_path), ...
+    'source_file_bytes', source_file.bytes, ...
+    'source_file_datenum', source_file.datenum, ...
+    'output_path', string(output_path), ...
+    'protocol_version', loaded.metrics.ProtocolVersion, ...
+    'protocol_seal', loaded.metrics.ProtocolSeal, ...
+    'data_year', loaded.run_info.data_year, ...
+    'scheme', loaded.run_info.scheme, ...
+    'forecast_mode', loaded.run_info.forecast_mode, ...
+    'primary', loaded.metrics.Primary, ...
+    'economic', loaded.metrics.Economic, ...
+    'feasibility', loaded.metrics.Feasibility);
+
+frozen_result = loaded.result;
+frozen_run_info = loaded.run_info;
+frozen_metrics = loaded.metrics;
+params = loaded.params;
+renewable_data = loaded.renewable_data;
+if isfield(loaded, 'source_run_info')
+    source_run_info = loaded.source_run_info;
+else
+    source_run_info = struct();
+end
+
+if save_output
+    output_dir = fileparts(output_path);
+    if ~isfolder(output_dir)
+        mkdir(output_dir);
+    end
+    save(output_path, 'frozen_result', 'frozen_run_info', ...
+        'frozen_metrics', 'freeze_info', 'params', ...
+        'renewable_data', 'source_run_info');
+end
+end
+
+function require_completed_result(run_info, metrics)
+if ~isfield(run_info, 'status') || string(run_info.status) ~= "completed"
+    error('freeze_v51_rolling_result:not_completed', ...
+        'Only completed rolling results can be frozen.');
+end
+required_flags = {'strict_delivery_ok', 'terminal_contract_ok', ...
+    'annual_output_ok', 'terminal_h2_ok', 'power_balance_ok', ...
+    'storage_balance_ok', 'annual_co2_ok', 'annual_sell_ok', ...
+    'annual_curtail_ok', 'lcoa_cap_ok'};
+for index = 1:numel(required_flags)
+    name = required_flags{index};
+    if ~isfield(metrics.Feasibility, name) || ...
+            ~metrics.Feasibility.(name)
+        error('freeze_v51_rolling_result:failed_feasibility', ...
+            'Cannot freeze result because %s is false.', name);
+    end
+end
+end
+
+function project_dir = project_root()
+results_dir = fileparts(mfilename('fullpath'));
+src_dir = fileparts(results_dir);
+project_dir = fileparts(src_dir);
+end
+
+function add_project_paths(project_dir)
+addpath(fullfile(project_dir, 'src'));
+addpath(fullfile(project_dir, 'src', 'params'));
+addpath(fullfile(project_dir, 'src', 'results'));
+addpath(fullfile(project_dir, 'src', 'protocol'));
+end
+
+function value = option_value(config, name, default_value)
+if isfield(config, name) && ~isempty(config.(name))
+    value = config.(name);
+else
+    value = default_value;
+end
+end

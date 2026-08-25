@@ -1,201 +1,171 @@
-function results = baseline(params,renewable_data)
-    opts = struct();
-    thisFile = mfilename('fullpath');
-    rootDir = fileparts(thisFile);
-    fprintf("%s\n%s",thisFile,rootDir);
-    addpath(rootDir+"/params");
-    addpath(rootDir+"/results");
+function result = baseline(params, renewable_data, run_options)
+%BASELINE Solve the Zhou S2 annual dispatch model and assemble its results.
 
-    T = renewable_data.time_count;
-    dt = params.time.step;
-    transformer_kw = params.transformer.max_load * params.transformer.capacity * 1000;
+if nargin < 3 || isempty(run_options)
+    run_options = struct();
+end
+verbose = option_value(run_options, 'verbose', true);
 
-    PV = renewable_data.pv_power_kw * 0.8623;
-    PW = renewable_data.pw_power_kw * 0.8623;
-    P_total = PV + PW;
-    annual_renewable = sum(P_total) * dt;
+this_file = mfilename('fullpath');
+source_dir = fileparts(this_file);
+if verbose
+    fprintf("%s\n%s", this_file, source_dir);
+end
+addpath(fullfile(source_dir, 'params'));
+addpath(fullfile(source_dir, 'results'));
 
-    ael_common = params.AEL.common;
-    Num_AEL = ael_common.module_num;
-    P_AEL_max = ael_common.max_power;
+model = dispatch_model(params, renewable_data, run_options);
+contract_enabled = model.contract.enabled;
 
-    AEL_spec_energy = ael_common.spec_energy;
-    AEL_module_power = ael_common.module_power;
-    AEL_start_power_per_module = 0;
-    if ael_common.startup
-        AEL_start_power_per_module = ...
-            ael_common.startup_elec * AEL_module_power;
-    end
-    H2_density = params.unit.h2_density;
+solver_display = option_value(run_options, 'solver_display', 'iter');
+default_relative_gap = option_value( ...
+    run_options, 'relative_gap_tolerance', 1e-4);
+solver_options = optimoptions('intlinprog', ...
+    'Display', solver_display, ...
+    'ConstraintTolerance', 1e-5, ...
+    'RelativeGapTolerance', 1e-4);
+solver_options.RelativeGapTolerance = default_relative_gap;
+max_time_seconds = option_value(run_options, 'max_time_seconds', []);
+if ~isempty(max_time_seconds)
+    solver_options.MaxTime = max_time_seconds;
+end
 
-    storage_limits = h2_storage_limits(params.h2_storage, H2_density);
-    storage_H2_min = storage_limits.min_mass;
-    storage_H2_max = storage_limits.max_mass;
-    initial_storage = storage_limits.initial_mass;
-
-    HB_max_load = params.HB.max_load;
-    HB_min_load = params.HB.min_load;
-    HB_ramp = params.HB.ramp_rate;
-    HB_power_kw = params.HB.nom_power*1000;
-    NH3_rate = params.HB.nh3_output;
-
-    % Define optimization variables
-    N_AEL = optimvar('n_ael',T,'Type','integer','LowerBound', 0 ,'UpperBound', Num_AEL);
-    P_AEL = optimvar('P_AEL',T,'LowerBound',0,'UpperBound',P_AEL_max);
-    HB_load = optimvar('HB_load',T,'LowerBound',HB_min_load,'UpperBound',HB_max_load);
-    storage_H2 = optimvar('storage_H2',T+1,'LowerBound',...
-        storage_H2_min,'UpperBound',storage_H2_max);
-    P_purchase = optimvar('p_purchase', T, 'LowerBound', 0, 'UpperBound', transformer_kw);
-    P_sell = optimvar('p_sell', T, 'LowerBound', 0, 'UpperBound', transformer_kw);
-    P_curt = optimvar('p_curt', T, 'LowerBound', 0);
-    u_purchase = optimvar('u_purchase', T, 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1);
-    grid_contract_is_fixed = ~isempty(params.grid.contract_kw);
-    if ~grid_contract_is_fixed
-        P_grid_contract = optimvar('grid_contract_kw', 1, ...
-            'LowerBound', 0, 'UpperBound', transformer_kw);
-    end
-    SU_AEL = optimvar('SU_AEL',T,'Type','integer','LowerBound',0,'UpperBound',Num_AEL);
-    SD_AEL = optimvar('SD_AEL',T,'Type','integer','LowerBound',0,'UpperBound',Num_AEL);
-    I_AEL_up = optimvar('I_AEL_up', T, 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1);
-    P_AEL_start = AEL_start_power_per_module * SU_AEL;
-
-    %H2_short = optimvar('h2_short', T, 'LowerBound', 0);
-    H2_prod_kg = P_AEL * dt / AEL_spec_energy * H2_density;
-    NH3_prod_kg = HB_load * NH3_rate * dt;
-    H2_use_kg = NH3_prod_kg * params.HB.lit_h2;
-    P_HB_kw = HB_load * HB_power_kw;
-    H2_prod_t = H2_prod_kg / params.unit.mass_scale;
-    NH3_prod_t = NH3_prod_kg / params.unit.mass_scale;
-    water_use_t = params.AEL.common.water_use * H2_prod_t ...
-        + params.HB.water_use * NH3_prod_t;
-
-    % create optimization problems
-    prob = optimproblem('ObjectiveSense', 'minimize');
-
-    % constraint condition
-    prob.Constraints.power_balance = ...
-        P_total + P_purchase == P_AEL + P_AEL_start + ...
-        P_HB_kw + P_sell + P_curt;
-    prob.Constraints.H2_storage = ...
-        storage_H2(2:end) == storage_H2(1:end-1) + H2_prod_kg ...
-         - H2_use_kg;
-    prob.Constraints.H2_initial = storage_H2(1) == initial_storage;
-    prob.Constraints.H2_terminal = storage_H2(end) == initial_storage;
-    prob.Constraints.purchase = P_purchase <= u_purchase * transformer_kw;
-    prob.Constraints.sell = P_sell <= (1 - u_purchase) * transformer_kw;
-    if ~grid_contract_is_fixed
-        prob.Constraints.grid_contract = P_purchase <= P_grid_contract;
-    end
-    prob.Constraints.sell_rate = ...
-        mean(P_sell) <= ...
-        params.grid.max_sell * mean(P_total);
-    prob.Constraints.HB_ramp_up = HB_load(2:end) - HB_load(1:end-1) <= HB_ramp;
-    prob.Constraints.HB_ramp_down = HB_load(1:end-1) - HB_load(2:end) <=HB_ramp;
-    prob.Constraints.curtail = P_curt <= P_total;
-    prob.Constraints.curtail_rate = sum(P_curt) * dt <= ...
-        params.grid.curtail_limit * annual_renewable;
-    prob.Constraints.AEL_module_lower = ...
-        ael_common.min_load * N_AEL * AEL_module_power <= P_AEL;
-    prob.Constraints.AEL_module_upper = ...
-        P_AEL <= ael_common.max_load * N_AEL * AEL_module_power;
-    N_AEL_initial = 0;
-    N_AEL_previous = [N_AEL_initial; N_AEL(1:end-1)];
-    prob.Constraints.AEL_transition = ...
-        N_AEL - N_AEL_previous == SU_AEL - SD_AEL;
-    prob.Constraints.AEL_start_available = SU_AEL <= Num_AEL - N_AEL_previous;
-    prob.Constraints.AEL_stop_available = SD_AEL <= N_AEL_previous;
-    prob.Constraints.AEL_start_indicator = SU_AEL <= Num_AEL * I_AEL_up;
-    prob.Constraints.AEL_stop_indicator = SD_AEL <= Num_AEL * (1 - I_AEL_up);
-    % min stable start time 
-    min_run_h = 1;   
-    L_run = ceil(min_run_h / dt);
-    AEL_min_run = optimconstr(T, 1);
-    for tau = 1:T
-        k1 = max(1, tau - L_run);
-        k2 = tau - 1;
-
-        if k1 <= k2
-            AEL_min_run(tau) = ...
-                N_AEL(tau) >= sum(SU_AEL(k1:k2));
-        else
-            AEL_min_run(tau) = ...
-                N_AEL(tau) >= 0;
-        end
-    end
-    prob.Constraints.AEL_min_run = AEL_min_run;
-
-    if params.environment.co2_enabled
-        prob.Constraints.co2_limit = ...
-            params.environment.grid_co2 * sum(P_purchase) * dt <= ...
-            params.environment.co2_limit * sum(NH3_prod_kg);
-    end
-
-    NH3_total_kg = sum(NH3_prod_kg);
-    NH3_income = params.ammonia.price * NH3_total_kg / 1000;
-
-    C_curt = params.grid.curtail_penalty;
-    C_purchase = params.grid.buy_price;
-    C_sell = params.grid.sell_price;
-    C_water = params.material.water_price;
-    C_catalyst = params.material.cat_price;
-    %C_H2_short = 1e4;
-
-    % objective function
-    obj_formula = sum(C_curt .* P_curt * dt) + ...
-        sum(C_purchase .* P_purchase * dt) - ...
-        sum(C_sell .* P_sell * dt) - ...
-        NH3_income + ...
-        C_water * sum(water_use_t) + ...
-        C_catalyst * sum(NH3_prod_t);
-    if grid_contract_is_fixed
-        fixed_cost = annual_fixed_cost(params);
-        grid_capacity_cost = fixed_cost.grid_capacity;
+initial_solution_supplied = false;
+if contract_enabled
+    economic_relative_gap = option_value(run_options, ...
+        'economic_relative_gap_tolerance', default_relative_gap);
+    solver_options.RelativeGapTolerance = economic_relative_gap;
+    initial_solution = option_value( ...
+        run_options, 'initial_solution', struct());
+    initial_solution = sanitize_initial_solution(initial_solution);
+    if isempty(fieldnames(initial_solution))
+        [sol, fval, exitflag, output] = solve(model.problem, ...
+            'Solver', 'intlinprog', 'Options', solver_options);
     else
-        fixed_cost = annual_fixed_cost(params, 0);
-        grid_capacity_cost = params.grid.cap_fee * 12 * P_grid_contract;
+        [sol, fval, exitflag, output] = solve( ...
+            model.problem, initial_solution, ...
+            'Solver', 'intlinprog', 'Options', solver_options);
+        initial_solution_supplied = true;
     end
-    annual_fixed_cost_expr = fixed_cost.base_total + grid_capacity_cost;
-    prob.Objective = obj_formula + annual_fixed_cost_expr;
+    require_feasible_solution(sol, exitflag, output, ...
+        'fixed contract economic dispatch', true);
+else
+    [sol, fval, exitflag, output] = solve(model.problem, ...
+        'Solver', 'intlinprog', 'Options', solver_options);
+    require_feasible_solution(sol, exitflag, output, ...
+        'economic baseline', false);
+end
 
-    options = optimoptions('intlinprog', 'Display', 'iter',...
-        'ConstraintTolerance', 1e-5, ...
-        'RelativeGapTolerance', 1e-4);
-    [sol, fval, exitflag, output] = solve(prob, ...
-        'Solver', 'intlinprog', ...
-        'Options', options);
+sol.P_AEL_start = model.context.AEL_start_power_per_module * sol.SU_AEL;
+if verbose && model.context.ael_common.startup
+    fprintf('AEL启动耗电：%.3f MWh/a。\n', ...
+        sum(sol.P_AEL_start) * model.context.dt / 1000);
+end
+if verbose
+    print_solver_result(sol, fval, exitflag, output);
+end
 
-    if exitflag <= 0 || isempty(sol.P_AEL)
-        error('baseline:no_feasible_solution', ...
-            ['Optimization did not return a feasible dispatch. ', ...
-            'Exitflag: %d. Solver message: %s'], ...
-            exitflag, output.message);
+result = results(params, renewable_data, sol, fval, ...
+    exitflag, output, model.context);
+if contract_enabled
+    result.contract = contract_result(result, sol, model.contract);
+    result.optimization.mode = 'fixed_contract_economic_feasibility';
+    result.optimization.initial_solution_supplied = ...
+        initial_solution_supplied;
+    result.optimization.capacity_feasible = true;
+    result.optimization.economic_objective_converged = exitflag == 1;
+    result.optimization.economic_relative_gap_tolerance = ...
+        economic_relative_gap;
+end
+end
+
+function initial_solution = sanitize_initial_solution(initial_solution)
+removed_fields = {'daily_contract_kg', 'P_AEL_start'};
+for field_index = 1:numel(removed_fields)
+    if isfield(initial_solution, removed_fields{field_index})
+        initial_solution = rmfield(initial_solution, ...
+            removed_fields{field_index});
     end
+end
+end
 
-    sol.P_AEL_start = AEL_start_power_per_module * sol.SU_AEL;
-    if ael_common.startup
-        fprintf('AEL启动耗电：%.3f MWh/a。\n', ...
-            sum(sol.P_AEL_start) * dt / 1000);
+function contract = contract_result(result, sol, settings)
+daily_nh3_kg = sum(reshape(result.dispatch.NH3_prod, ...
+    settings.samples_per_day, []), 1)';
+backlog_kg = zeros(numel(daily_nh3_kg), 1);
+previous_backlog = 0;
+for day_index = 1:numel(daily_nh3_kg)
+    previous_backlog = max(0, previous_backlog + ...
+        settings.daily_quantity_kg - daily_nh3_kg(day_index));
+    backlog_kg(day_index) = previous_backlog;
+end
+
+contract = struct();
+contract.quantity_source = "fixed_outer_search_candidate";
+contract.no_early_delivery_credit = true;
+contract.max_delay_days = settings.max_delay_days;
+contract.daily_quantity_kg = settings.daily_quantity_kg;
+contract.day_count = numel(daily_nh3_kg);
+contract.annual_quantity_t = ...
+    settings.daily_quantity_kg * contract.day_count / 1000;
+contract.daily_nh3_kg = daily_nh3_kg;
+contract.backlog_kg = backlog_kg;
+contract.maximum_backlog_kg = max(backlog_kg);
+contract.max_allowed_backlog_kg = ...
+    settings.max_delay_days * settings.daily_quantity_kg;
+contract.terminal_backlog_kg = backlog_kg(end);
+contract.delay_ok = contract.maximum_backlog_kg <= ...
+    contract.max_allowed_backlog_kg + 1e-3;
+contract.terminal_ok = contract.terminal_backlog_kg <= 1e-3;
+contract.lcoa_cap_usd_per_t = settings.lcoa_cap_usd_per_t;
+contract.selected_lcoa_usd_per_t = result.summary.lcoa;
+contract.model_backlog_envelope_kg = sol.contract_backlog(2:end);
+end
+
+function require_feasible_solution(sol, exitflag, output, phase_name, ...
+        accept_time_limit_incumbent)
+has_incumbent = isstruct(sol) && isfield(sol, 'P_AEL') && ...
+    ~isempty(sol.P_AEL);
+if has_incumbent && isfield(output, 'constrviolation') && ...
+        output.constrviolation > 1e-5
+    has_incumbent = false;
+end
+if ~has_incumbent
+    if exitflag == -2
+        error_id = 'baseline:infeasible_problem';
+    else
+        error_id = 'baseline:no_feasible_solution';
     end
+    error(error_id, ...
+        ['%s optimization did not return a feasible dispatch. ', ...
+        'Exitflag: %d. Solver message: %s'], ...
+        phase_name, exitflag, output.message);
+end
+time_limit_incumbent_is_allowed = ...
+    accept_time_limit_incumbent && exitflag == 0;
+if exitflag <= 0 && ~time_limit_incumbent_is_allowed
+    error('baseline:solver_not_converged', ...
+        ['%s optimization returned an incumbent but did not converge. ', ...
+        'Exitflag: %d. Solver message: %s'], ...
+        phase_name, exitflag, output.message);
+end
+end
 
-    disp(sol);
+function print_solver_result(sol, fval, exitflag, output)
+disp(sol);
+if exitflag == 1
     disp(['最优年度成本减收益: ', num2str(fval)]);
-    disp(['求解状态: ', num2str(exitflag)]);
-    disp(output);
+else
+    disp(['当前可行年度成本减收益: ', num2str(fval)]);
+end
+disp(['求解状态: ', num2str(exitflag)]);
+disp(output);
+end
 
-    result_context = struct();
-    result_context.T = T;
-    result_context.dt = dt;
-    result_context.P_total = P_total;
-    result_context.AEL_spec_energy = AEL_spec_energy;
-    result_context.H2_density = H2_density;
-    result_context.NH3_rate = NH3_rate;
-    result_context.HB_power_kw = HB_power_kw;
-    result_context.C_curt = C_curt;
-    result_context.C_purchase = C_purchase;
-    result_context.C_sell = C_sell;
-    result_context.ael_common = ael_common;
-    result_context.N_AEL_initial = N_AEL_initial;
-
-    results = feval('results', params, renewable_data, sol, fval, ...
-        exitflag, output, result_context);
+function value = option_value(options, name, default_value)
+if isstruct(options) && isfield(options, name) && ~isempty(options.(name))
+    value = options.(name);
+else
+    value = default_value;
+end
 end

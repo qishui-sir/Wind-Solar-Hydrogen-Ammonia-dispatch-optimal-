@@ -1,5 +1,5 @@
 function par = HB(config, scenario_id)
-%HB Haber-Bosch parameters for the Zhou 7-day PtA case.
+%HB Haber-Bosch parameters for the Zhou PtA cases.
 
 if nargin == 1 && (ischar(config) || (isstring(config) && isscalar(config)))
     scenario_id = config;
