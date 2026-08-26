@@ -1,6 +1,23 @@
-# Track the frozen protocol while leaving other generated docs ignored.
+# Generated heavy results are ignored by default; lightweight manifests are tracked.
 docs/*
+!docs/
 !docs/protocol_v5.md
+!docs/reproducibility.md
+!docs/project_structure.md
+!docs/stage0_file_inventory.md
+!docs/stage0_environment_report.md
+!docs/stage0_constraint_audit.md
+!docs/stage0_quality_gate_report.md
+!docs/decisions/
+!docs/decisions/*.md
 
+runs/*
+!runs/
+!runs/manifest/
+!runs/manifest/*.csv
+!runs/manifest/*.json
+!runs/manifest/*.md
+!runs/manifest/*.mat
+
+paper_outputs/
 *.asv
-runs/

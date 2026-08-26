@@ -1,10 +1,8 @@
-clear;clc;
+clear; clc;
 
 source_dir = fileparts(mfilename('fullpath'));
-addpath(source_dir);
-addpath(fullfile(source_dir, 'params'));
-addpath(fullfile(source_dir, 'results'));
-addpath(fullfile(source_dir, 'protocol'));
+addpath(fullfile(source_dir, 'utils'), '-begin');
+project_dir = setup_project_paths(source_dir); %#ok<NASGU>
 
 data_cfg = struct();
 data_cfg.pv_year = 2022;
@@ -17,5 +15,4 @@ params = my_system('s2');
 params.AEL.common.startup = true;
 
 results = baseline(params, renewable_data);
-%% 
-% figure_total(params,results);
+% figure_total(params, results);

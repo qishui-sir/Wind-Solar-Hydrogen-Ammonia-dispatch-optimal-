@@ -1,30 +1,70 @@
-% TEST_CI_VERTIFY Evaluate the locked core indicators on a real MILP result.
-% Run src/main.m first so results, params, and renewable_data exist in the
-% current workspace. This script does not solve or modify the optimization.
-
-required_variables = ["results", "params", "renewable_data"];
-for variable_index = 1:numel(required_variables)
-    variable_name = char(required_variables(variable_index));
-    if exist(variable_name, 'var') ~= 1
-        error('test_CI_vertify:missing_workspace_input', ...
-            ['Missing workspace variable "%s". Run src/main.m first, ', ...
-            'then run test/test_CI_vertify.m in the same workspace.'], ...
-            variable_name);
-    end
+function tests = test_CI_vertify
+%TEST_CI_VERTIFY Validate locked core indicators on deterministic fixtures.
+tests = functiontests(localfunctions);
 end
 
-CI_protocol = struct();
-CI_protocol.version = "4.0.0";
-CI_protocol.seal = "731C9F86";
-CI_protocol.core_metrics = ["daily_shortfall_p95"; "mar"; ...
-    "switch_count"; "h2_soc_p05"];
-CI_protocol.hard_safety_metric = "h2_min_margin";
-CI_protocol.h2_safe_soc = 0.20;
-CI_protocol.scope = "real_MILP_dispatch_descriptive_validation";
+function setupOnce(~)
+test_dir = fileparts(mfilename('fullpath'));
+project_dir = fileparts(test_dir);
+addpath(fullfile(project_dir, 'src', 'utils'), '-begin');
+setup_project_paths(project_dir);
+end
 
-CI_validation = evaluate_real_dispatch(...
-    results, params, renewable_data, CI_protocol);
-print_validation(CI_validation);
+function testEvaluateLockedCoreIndicatorsOnFixture(test_case)
+[result, params, renewable_data, protocol] = validation_fixture();
+
+validation = evaluate_real_dispatch(result, params, renewable_data, protocol);
+
+verifyEqual(test_case, height(validation.core_metrics), 4);
+verifyTrue(test_case, validation.diagnostics.all_core_computable);
+verifyEqual(test_case, validation.hard_safety.Status, "pass");
+verifyEqual(test_case, validation.physical_safety.Status, "pass");
+verifyEqual(test_case, validation.data.year, "2022");
+verifyEqual(test_case, validation.confirmatory_claim_allowed, false);
+end
+
+function testRejectsInfeasibleResult(test_case)
+[result, params, renewable_data, protocol] = validation_fixture();
+result.exitflag = -2;
+
+verifyError(test_case, @() evaluate_real_dispatch(result, params, ...
+    renewable_data, protocol), 'test_CI_vertify:infeasible_result');
+end
+
+function [result, params, renewable_data, protocol] = validation_fixture()
+params = my_system('s2');
+params.time.step = 1;
+T = 48;
+hb_load = [0.40 * ones(24, 1); 0.60 * ones(24, 1)];
+nh3_prod = hb_load * params.HB.nh3_output * params.time.step;
+h2_soc_work = linspace(0.40, 0.80, T + 1)';
+storage_h2 = params.h2_storage.min_mass + ...
+    h2_soc_work * params.h2_storage.work_mass;
+
+result = struct();
+result.exitflag = 1;
+result.dispatch = struct( ...
+    'HB_load', hb_load, ...
+    'HB_on', ones(T, 1), ...
+    'NH3_prod', nh3_prod, ...
+    'storage_H2', storage_h2);
+result.summary = struct('NH3_daily_cumulative_volatility', 0.10);
+result.time = datetime(2022, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') + ...
+    hours(0:T - 1)';
+
+renewable_data = struct();
+renewable_data.time_count = T;
+renewable_data.time = result.time;
+
+protocol = struct();
+protocol.version = "4.0.0";
+protocol.seal = "731C9F86";
+protocol.core_metrics = ["daily_shortfall_p95"; "mar"; ...
+    "switch_count"; "h2_soc_p05"];
+protocol.hard_safety_metric = "h2_min_margin";
+protocol.h2_safe_soc = 0.20;
+protocol.scope = "real_MILP_dispatch_descriptive_validation";
+end
 
 function validation = evaluate_real_dispatch(...
         result, params, renewable_data, protocol)
@@ -270,23 +310,4 @@ if ~(isnumeric(value) && isscalar(value) && isfinite(value) && value >= 0)
     error('test_CI_vertify:bad_nonnegative_scalar', ...
         '%s must be a nonnegative finite scalar.', name);
 end
-end
-
-function print_validation(validation)
-fprintf('\n========== Real-dispatch core-indicator validation ==========\n');
-fprintf('Protocol: v%s / Seal %s\n', ...
-    validation.protocol.version, validation.protocol.seal);
-fprintf('Data year: %s; samples: %d; complete days: %d; dt: %.3f h\n', ...
-    validation.data.year, validation.data.sample_count, ...
-    validation.data.complete_days, validation.data.time_step_h);
-fprintf('HB state source: %s\n', validation.data.hb_state_source);
-fprintf('H2 SOC basis: absolute inventory and usable inventory above minimum pressure\n');
-disp(validation.core_metrics);
-fprintf('H2 working-reserve audit:\n');
-disp(validation.hard_safety);
-fprintf('H2 physical pressure-floor audit:\n');
-disp(validation.physical_safety);
-fprintf('Conclusion: %s\n', validation.conclusion);
-fprintf('%s\n', validation.note);
-fprintf('=============================================================\n');
 end

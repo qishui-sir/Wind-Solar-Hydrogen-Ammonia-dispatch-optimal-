@@ -343,20 +343,27 @@ verifyEqual(test_case, -objective_value, economics.net_profit, ...
 end
 
 function testBaselineObjectiveIncludesAnnualAccounting(test_case)
-test_dir = fileparts(mfilename('fullpath'));
-project_dir = fileparts(test_dir);
-model_source = fileread(fullfile(project_dir, 'src', 'dispatch_model.m'));
+params = my_system('s2');
+params.environment.co2_enabled = false;
+renewable_data = minimalDispatchModelFixture(24);
 
-verifyNotEmpty(test_case, regexp(model_source, ...
-    'annual_fixed_cost\s*\(', 'once'));
-verifyNotEmpty(test_case, regexp(model_source, ...
-    'economic_objective\s*=\s*variable_objective\s*\+\s*fixed_cost_expression', ...
-    'once'));
-verifyNotEmpty(test_case, regexp(model_source, ...
-    'prob\.Objective\s*=\s*economic_objective', ...
-    'once'));
+model_with_fixed = dispatch_model(params, renewable_data, ...
+    struct('include_annual_fixed_cost', true));
+model_without_fixed = dispatch_model(params, renewable_data, ...
+    struct('include_annual_fixed_cost', false));
+solution = zeroSolutionFromVariables(model_with_fixed.variables);
+
+objective_with_fixed = evaluate( ...
+    model_with_fixed.expressions.economic_objective, solution);
+objective_without_fixed = evaluate( ...
+    model_without_fixed.expressions.economic_objective, solution);
+fixed_cost = annual_fixed_cost(params);
+
+verifyEqual(test_case, objective_with_fixed - objective_without_fixed, ...
+    fixed_cost.total, 'AbsTol', 1e-6);
+verifyEqual(test_case, evaluate(model_with_fixed.problem.Objective, ...
+    solution), objective_with_fixed, 'AbsTol', 1e-8);
 end
-
 function testReferenceS2EconomicsMatchesZhouLcoa(test_case)
 params = my_system('s2');
 
@@ -587,6 +594,21 @@ function testRejectsUnknownScenario(test_case)
 verifyError(test_case, @() my_system('s4'), 'my_system:bad_case');
 end
 
+function renewable_data = minimalDispatchModelFixture(time_count)
+renewable_data = struct();
+renewable_data.time_count = time_count;
+renewable_data.pv_power_kw = 50e3 * ones(time_count, 1);
+renewable_data.pw_power_kw = 50e3 * ones(time_count, 1);
+end
+
+function solution = zeroSolutionFromVariables(variables)
+names = fieldnames(variables);
+solution = struct();
+for name_index = 1:numel(names)
+    name = names{name_index};
+    solution.(name) = zeros(size(variables.(name)));
+end
+end
 function [built, printed_output] = runResultsWithCapturedOutput( ...
     params, renewable_data, sol, objective_value, context)
 built = [];

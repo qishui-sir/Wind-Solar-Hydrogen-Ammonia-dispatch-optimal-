@@ -1,0 +1,11 @@
+RelativePath,Category,Role,Extension,Bytes,LastModified,SHA256,AbsolutePath
+data/renewables_ninja/2022PV.csv,data,raw_input,.csv,423559,2026-07-22 21:12:00,6b9bd9cbd87025f55d96e67b30366bfa91a19224bee29636683c849c31d5bb6c,C:\Users\祁水\Desktop\风光氢氨系统\project\data\renewables_ninja\2022PV.csv
+data/renewables_ninja/2022PW.csv,data,raw_input,.csv,264812,2026-07-22 21:12:00,94ac60b946d18b15b486ad59e33e5a07d57683202516988b7f39ada70dd69fa1,C:\Users\祁水\Desktop\风光氢氨系统\project\data\renewables_ninja\2022PW.csv
+data/renewables_ninja/2023PV.csv,data,raw_input,.csv,423337,2026-07-22 21:12:00,4b947ae363ce11568e33aed4b912186ac361750eebb3fd95fcc9c875a9cfddb3,C:\Users\祁水\Desktop\风光氢氨系统\project\data\renewables_ninja\2023PV.csv
+data/renewables_ninja/2023PW.csv,data,raw_input,.csv,346497,2026-07-22 21:12:00,8173421076ab98027199ec6ef864eaa62f6298014fe7f72e2a3ea58b2a18093e,C:\Users\祁水\Desktop\风光氢氨系统\project\data\renewables_ninja\2023PW.csv
+data/renewables_ninja/2024PV.csv,data,raw_input,.csv,325229,2026-07-22 21:12:00,6f4ca83d35cccc9c85893040db8352ccdcef5e7a04d3c4b60629352266751038,C:\Users\祁水\Desktop\风光氢氨系统\project\data\renewables_ninja\2024PV.csv
+data/renewables_ninja/2024PW.csv,data,raw_input,.csv,265343,2026-07-22 21:12:00,1ebc2d327946adaf3a5616c52faabfb5b3af75782f0bb49da6b09de98da0b222,C:\Users\祁水\Desktop\风光氢氨系统\project\data\renewables_ninja\2024PW.csv
+data/renewables_ninja/2025PV.csv,data,raw_input,.csv,324340,2026-07-22 21:12:00,5f4af48daac6363e3ae9c6e2e93ff2f8b76e8f006baf537d2193609e9a46e669,C:\Users\祁水\Desktop\风光氢氨系统\project\data\renewables_ninja\2025PV.csv
+data/renewables_ninja/2025PW.csv,data,raw_input,.csv,346541,2026-07-22 21:12:00,720b2e573d3374fe7bd04bfa81fe13717ac46ca77184ae8be292cc071cbf9760,C:\Users\祁水\Desktop\风光氢氨系统\project\data\renewables_ninja\2025PW.csv
+data/renewables_ninja/daily_PV_WT_power.pdf,data,data_artifact,.pdf,21534,2026-08-15 09:41:28,a8f559a68af7b75ea390f24c7e4dc431ff4a4a966d9294413a3a0e2e446ce06f,C:\Users\祁水\Desktop\风光氢氨系统\project\data\renewables_ninja\daily_PV_WT_power.pdf
+data/renewables_ninja/daily_PV_WT_power.png,data,data_artifact,.png,347663,2026-08-14 15:07:50,9f3ec79e9513f55d53745d4338a45d2172529af4432f23baaaa625b6761317b9,C:\Users\祁水\Desktop\风光氢氨系统\project\data\renewables_ninja\daily_PV_WT_power.png
