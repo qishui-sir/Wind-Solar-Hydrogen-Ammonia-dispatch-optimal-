@@ -1,6 +1,6 @@
 # Stage 0 File Inventory
 
-Generated: 2026-08-26 15:38:49
+Generated: 2026-08-26 15:53:32
 
 This inventory separates source, tests, raw input data, generated results, and documentation for reproducible review.
 
@@ -29,7 +29,7 @@ This inventory separates source, tests, raw input data, generated results, and d
 - `data/renewables_ninja/2024PW.csv` [data, raw_input] SHA256 `1ebc2d327946adaf3a5616c52faabfb5b3af75782f0bb49da6b09de98da0b222`
 - `data/renewables_ninja/2025PV.csv` [data, raw_input] SHA256 `5f4af48daac6363e3ae9c6e2e93ff2f8b76e8f006baf537d2193609e9a46e669`
 - `data/renewables_ninja/2025PW.csv` [data, raw_input] SHA256 `720b2e573d3374fe7bd04bfa81fe13717ac46ca77184ae8be292cc071cbf9760`
-- `docs/protocol_v5.md` [docs, protocol] SHA256 `3101b7d134d5536966ee82663262323e40b2120e3df7527441b81085fda5037c`
+- `docs/protocol_v5.md` [docs, protocol] SHA256 `5e50f67947fe5d84e71c9b088bac832b9444951c286b4fbcd30a36a134b0f167`
 - `src/baseline.m` [source, source_code] SHA256 `272ccf9343348b3678ce86aad491f10eec3625a18d321991d6a251ab69e7dda5`
 - `src/dispatch_model.m` [source, source_code] SHA256 `461f9bf44ba5d5daf4153cefb39af1540327eb6b98fe1abf0d273457c5c75634`
 - `src/figures/plot_figure.m` [source, source_code] SHA256 `6976605d57ed260d23d4a8fa35a3692677caf08f251135f3d5ac55b2d555d917`
@@ -48,7 +48,7 @@ This inventory separates source, tests, raw input data, generated results, and d
 - `src/pipeline/run_reproduce_core_results.m` [source, source_code] SHA256 `45833f0b3bb71869d60e773be0f7e90e89618987150cbc625da20d999e358e72`
 - `src/pipeline/run_reproduce_full_grid.m` [source, source_code] SHA256 `17286eaad6b5d3dab8a568eec40e8d9abd39199c9d2f6e31da26ef953a422329`
 - `src/pipeline/run_stage0_quality_gate.m` [source, source_code] SHA256 `53a67e3dce8c2a1b67383b0fdd3df3640c4d2e84be85eea9afa45951c10d9bf1`
-- `src/protocol/protocol_v5.m` [source, source_code] SHA256 `759caf3be4299115a00d288f94e75f873f0a749e484886757db22c6bb22389d6`
+- `src/protocol/protocol_v5.m` [source, source_code] SHA256 `0cd46c864adcf7ffc0c1b1a268f34e8ea04455cbf0c1dbbff868b21fcddbe107`
 - `src/protocol/s2_baseline_manifest.m` [source, source_code] SHA256 `c27f5ff528f7ef87aa6078dae6e5dbde5a13f22a5e4bd62ad76336944e71b26d`
 - `src/reproducibility/stage0_constraint_audit.m` [source, source_code] SHA256 `26b68997659a787fba75e8d53500a2b561ad783c511b383b822063c6c508442f`
 - `src/reproducibility/stage0_freeze_check.m` [source, source_code] SHA256 `e9df9b1cdcfdcad3c22a1cb3395a33b57d07031b35d69f0f358d3f77bb19687a`
@@ -71,6 +71,6 @@ This inventory separates source, tests, raw input data, generated results, and d
 - `test/test_chose_index.m` [test, test_code] SHA256 `f15342914299527034eacc77ca255ed76eed30fc8b38f2a3e9d47a415d61cab4`
 - `test/test_load_res_year.m` [test, test_code] SHA256 `7c8b38915464e3e4756fda1c51156706b5788d261e05163c6171310a0e549700`
 - `test/test_my_system.m` [test, test_code] SHA256 `561d90226361253187a343b0d7c4e030f041e240a7a6f6048b4e525e054141ff`
-- `test/test_protocol_v5.m` [test, test_code] SHA256 `fa4901c4db7a40d08b8e653a9c402c7b8a5c5af5def0458b573e9e0ac2980a15`
+- `test/test_protocol_v5.m` [test, test_code] SHA256 `cd583b7a723ac3e36e70ac34e1e7e9d4ba9be597b3733504409405d53ec1af51`
 - `test/test_stage0_reproducibility.m` [test, test_code] SHA256 `d0aac67052e48a6f78b660fb3c8ecdffbaecf16745b4a43b6881b1c7605250b7`
 - `test/test_stage0_stage1.m` [test, test_code] SHA256 `4edc0918f9cf0aebe5261b033d9028fda90bbee1169a2d26a813eb721c0ac560`

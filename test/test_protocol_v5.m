@@ -625,6 +625,69 @@ verifyEqual(test_case, protocol_v5('checksum', subprotocol), ...
     subprotocol.Seal);
 end
 
+function testProtocolV52FreezesClaimAndHoldoutBoundary(test_case)
+protocol = protocol_v5('v5_2');
+
+verifyEqual(test_case, protocol.ProtocolVersion, "5.2.0");
+verifyEqual(test_case, protocol.ParentProtocolVersion, "5.1.37");
+verifyEqual(test_case, protocol.ParentProtocolSeal, "000CDCA8");
+verifyEqual(test_case, protocol.FreezeStage, ...
+    "claim_selection_and_holdout_boundary");
+verifyEqual(test_case, protocol.MainClaim.ClaimType, ...
+    "cost_bounded_stability_noninferiority");
+verifyFalse(test_case, protocol.MainClaim.AllowsUniversalStabilityIndexClaim);
+verifyTrue(test_case, protocol_v5('verify_v5_2', protocol));
+verifyEqual(test_case, protocol.Seal, "D18BB5A0");
+
+verifyEqual(test_case, protocol.DataSplit.SelectionYear, 2024);
+verifyEqual(test_case, protocol.DataSplit.HoldoutYear, 2025);
+verifyFalse(test_case, protocol.DataSplit.HoldoutUsedForSelection);
+verifyEqual(test_case, protocol.DataSplit.HoldoutOpeningRule, ...
+    "open_once_after_v5_2_protocol_tests_and_quality_gate_pass");
+end
+
+function testProtocolV52FreezesPrimaryMetricsAndThresholds(test_case)
+protocol = protocol_v5('v5_2');
+primary_names = [protocol.PrimaryOutcomes.Name];
+primary_roles = [protocol.PrimaryOutcomes.Role];
+primary_directions = [protocol.PrimaryOutcomes.Direction];
+
+verifyEqual(test_case, primary_names, ...
+    ["contract_shortfall_p95", "mar", "h2_soc_p05", "lcoa"]);
+verifyTrue(test_case, all(primary_roles == "primary"));
+verifyEqual(test_case, primary_directions, ...
+    ["smaller_is_better", "smaller_is_better", ...
+     "larger_is_better", "smaller_is_better"]);
+verifyEqual(test_case, protocol.SuccessCriteria.MaxLCOAIncreaseFraction, ...
+    0.02, 'AbsTol', 1e-12);
+verifyEqual(test_case, ...
+    protocol.SuccessCriteria.ContractShortfallP95RelativeNoninferiorityMargin, ...
+    0.01, 'AbsTol', 1e-12);
+verifyEqual(test_case, ...
+    protocol.SuccessCriteria.MinimumMaterialImprovementFraction, ...
+    0.10, 'AbsTol', 1e-12);
+verifyEqual(test_case, protocol.SuccessCriteria.H2SOCP05MinimumAbsoluteGain, ...
+    0, 'AbsTol', 1e-12);
+end
+
+function testProtocolV52ExcludesOracleFromConfirmatorySelection(test_case)
+protocol = protocol_v5('v5_2');
+scheme_names = [protocol.Schemes.Name];
+is_oracle = [protocol.Schemes.DiagnosticOracleOnly];
+eligible = [protocol.Schemes.EligibleForConfirmatorySelection];
+
+verifyTrue(test_case, any(scheme_names == ...
+    "perfect_information_oracle_diagnostic"));
+verifyFalse(test_case, any(is_oracle & eligible));
+verifyTrue(test_case, all(eligible(~is_oracle)));
+verifyEqual(test_case, protocol.SelectionRule.Method, ...
+    "filter_then_lexicographic_sort");
+verifyEqual(test_case, protocol.SelectionRule.SortOrder, ...
+    ["contract_shortfall_p95"; "mar"; "h2_soc_p05_desc"; "lcoa"]);
+verifyEqual(test_case, protocol.FailureInterpretation.NoCandidatePasses, ...
+    "report_no_confirmatory_superiority_and_present_best_tradeoff");
+end
+
 function delete_if_file(file_path)
 if isfile(file_path)
     delete(file_path);

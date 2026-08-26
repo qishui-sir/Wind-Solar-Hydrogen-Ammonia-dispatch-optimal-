@@ -4,12 +4,12 @@ README.md,project,project_config,.md,1901,2026-08-26 15:23:28,b968131d027390a643
 docs/decisions/ADR-001-stage0-reproducibility-boundary.md,docs,documentation,.md,1422,2026-08-26 10:50:58,d8baa464963483fe17f6c551c41fc842616249cf1f233a53c8cd7d40e29cd727,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\decisions\ADR-001-stage0-reproducibility-boundary.md
 docs/decisions/ADR-002-source-tree-boundaries.md,docs,documentation,.md,1733,2026-08-26 11:28:03,0b5fb9c093e03c5e946ae4420cc0d36f1ca582c577bd84a0dadd49798ee114e8,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\decisions\ADR-002-source-tree-boundaries.md
 docs/project_structure.md,docs,documentation,.md,2607,2026-08-26 15:23:28,e8a0c86eb44a4714bfd6574c78679998f20550081b946433098fb8134b85b5d7,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\project_structure.md
-docs/protocol_v5.md,docs,protocol,.md,39056,2026-08-24 14:12:37,3101b7d134d5536966ee82663262323e40b2120e3df7527441b81085fda5037c,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\protocol_v5.md
+docs/protocol_v5.md,docs,protocol,.md,41901,2026-08-26 15:50:07,5e50f67947fe5d84e71c9b088bac832b9444951c286b4fbcd30a36a134b0f167,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\protocol_v5.md
 docs/reproducibility.md,docs,documentation,.md,3229,2026-08-26 11:28:03,5b3e82b280f22fe6b3243c971443e859881bec5b9edc9f1182b9656c3365cda9,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\reproducibility.md
-docs/stage0_constraint_audit.md,docs,documentation,.md,231,2026-08-26 15:31:22,8bb1868e42f28b7ba3968e0db41d063b73ac7b3961415aa956ae96730f615d4b,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\stage0_constraint_audit.md
-docs/stage0_environment_report.md,docs,documentation,.md,400,2026-08-26 15:31:12,810cd68a948658bcbc13f2125d05ce61ee562c8567fd7dede289a6455609bded,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\stage0_environment_report.md
-docs/stage0_file_inventory.md,docs,documentation,.md,7384,2026-08-26 15:31:11,31fc6bea5b30216eb1ec5e6734096ae691a6aed02419579177f9f9f08b49d596,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\stage0_file_inventory.md
-docs/stage0_quality_gate_report.md,docs,documentation,.md,930,2026-08-26 15:31:54,a11bf338b6168de09978cd9e03fe0b86e5fec9b29196eecf25ad335c71a6114c,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\stage0_quality_gate_report.md
+docs/stage0_constraint_audit.md,docs,documentation,.md,231,2026-08-26 15:39:00,aa9d8edd0ee442a2fb44a5cbe718e2799147fd8bf72dc345b17529175ff21640,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\stage0_constraint_audit.md
+docs/stage0_environment_report.md,docs,documentation,.md,400,2026-08-26 15:38:50,c26bb78f7cc124c029ed99781670bd63877ecf2a56c2ce2ca427da884adb1377,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\stage0_environment_report.md
+docs/stage0_file_inventory.md,docs,documentation,.md,7384,2026-08-26 15:38:49,ff39a05c4f397c09de451e950b7a1d6fcdaa0db23d9eb822f0de9a056e18d1d3,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\stage0_file_inventory.md
+docs/stage0_quality_gate_report.md,docs,documentation,.md,930,2026-08-26 15:39:33,2e4542a64659523d2f7262c2812e4b1e8526e6f066c473cbee9ffba9671e48e4,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\stage0_quality_gate_report.md
 docs/sungrow.pdf,docs,documentation,.pdf,594068,2026-08-06 21:09:51,2c7ca189d4440565eb67eecfaa7ccdd703ebc20ec33f0eb5512acd91b4ab78e4,C:\Users\祁水\Desktop\风光氢氨系统\project\docs\sungrow.pdf
 src/baseline.m,source,source_code,.m,6405,2026-08-22 20:33:54,272ccf9343348b3678ce86aad491f10eec3625a18d321991d6a251ab69e7dda5,C:\Users\祁水\Desktop\风光氢氨系统\project\src\baseline.m
 src/dispatch_model.m,source,source_code,.m,49392,2026-08-24 20:38:44,461f9bf44ba5d5daf4153cefb39af1540327eb6b98fe1abf0d273457c5c75634,C:\Users\祁水\Desktop\风光氢氨系统\project\src\dispatch_model.m
@@ -29,7 +29,7 @@ src/pipeline/run_quick_tests.m,source,source_code,.m,1426,2026-08-26 15:26:48,23
 src/pipeline/run_reproduce_core_results.m,source,source_code,.m,1381,2026-08-26 15:26:50,45833f0b3bb71869d60e773be0f7e90e89618987150cbc625da20d999e358e72,C:\Users\祁水\Desktop\风光氢氨系统\project\src\pipeline\run_reproduce_core_results.m
 src/pipeline/run_reproduce_full_grid.m,source,source_code,.m,1023,2026-08-26 15:26:51,17286eaad6b5d3dab8a568eec40e8d9abd39199c9d2f6e31da26ef953a422329,C:\Users\祁水\Desktop\风光氢氨系统\project\src\pipeline\run_reproduce_full_grid.m
 src/pipeline/run_stage0_quality_gate.m,source,source_code,.m,4973,2026-08-26 15:26:52,53a67e3dce8c2a1b67383b0fdd3df3640c4d2e84be85eea9afa45951c10d9bf1,C:\Users\祁水\Desktop\风光氢氨系统\project\src\pipeline\run_stage0_quality_gate.m
-src/protocol/protocol_v5.m,source,source_code,.m,28495,2026-08-24 14:05:52,759caf3be4299115a00d288f94e75f873f0a749e484886757db22c6bb22389d6,C:\Users\祁水\Desktop\风光氢氨系统\project\src\protocol\protocol_v5.m
+src/protocol/protocol_v5.m,source,source_code,.m,34883,2026-08-26 15:47:42,0cd46c864adcf7ffc0c1b1a268f34e8ea04455cbf0c1dbbff868b21fcddbe107,C:\Users\祁水\Desktop\风光氢氨系统\project\src\protocol\protocol_v5.m
 src/protocol/s2_baseline_manifest.m,source,source_code,.m,7079,2026-08-21 19:25:07,c27f5ff528f7ef87aa6078dae6e5dbde5a13f22a5e4bd62ad76336944e71b26d,C:\Users\祁水\Desktop\风光氢氨系统\project\src\protocol\s2_baseline_manifest.m
 src/reproducibility/stage0_constraint_audit.m,source,source_code,.m,9005,2026-08-26 11:28:03,26b68997659a787fba75e8d53500a2b561ad783c511b383b822063c6c508442f,C:\Users\祁水\Desktop\风光氢氨系统\project\src\reproducibility\stage0_constraint_audit.m
 src/reproducibility/stage0_freeze_check.m,source,source_code,.m,4627,2026-08-26 15:27:18,e9df9b1cdcfdcad3c22a1cb3395a33b57d07031b35d69f0f358d3f77bb19687a,C:\Users\祁水\Desktop\风光氢氨系统\project\src\reproducibility\stage0_freeze_check.m
@@ -52,6 +52,6 @@ test/test_CI_vertify.m,test,test_code,.m,12069,2026-08-26 10:50:58,5e11a5c7e03fc
 test/test_chose_index.m,test,test_code,.m,117223,2026-08-20 22:07:30,f15342914299527034eacc77ca255ed76eed30fc8b38f2a3e9d47a415d61cab4,C:\Users\祁水\Desktop\风光氢氨系统\project\test\test_chose_index.m
 test/test_load_res_year.m,test,test_code,.m,2281,2026-08-21 16:38:14,7c8b38915464e3e4756fda1c51156706b5788d261e05163c6171310a0e549700,C:\Users\祁水\Desktop\风光氢氨系统\project\test\test_load_res_year.m
 test/test_my_system.m,test,test_code,.m,27920,2026-08-26 10:50:58,561d90226361253187a343b0d7c4e030f041e240a7a6f6048b4e525e054141ff,C:\Users\祁水\Desktop\风光氢氨系统\project\test\test_my_system.m
-test/test_protocol_v5.m,test,test_code,.m,29599,2026-08-26 15:23:02,fa4901c4db7a40d08b8e653a9c402c7b8a5c5af5def0458b573e9e0ac2980a15,C:\Users\祁水\Desktop\风光氢氨系统\project\test\test_protocol_v5.m
+test/test_protocol_v5.m,test,test_code,.m,32487,2026-08-26 15:48:46,cd583b7a723ac3e36e70ac34e1e7e9d4ba9be597b3733504409405d53ec1af51,C:\Users\祁水\Desktop\风光氢氨系统\project\test\test_protocol_v5.m
 test/test_stage0_reproducibility.m,test,test_code,.m,2091,2026-08-26 11:28:03,d0aac67052e48a6f78b660fb3c8ecdffbaecf16745b4a43b6881b1c7605250b7,C:\Users\祁水\Desktop\风光氢氨系统\project\test\test_stage0_reproducibility.m
 test/test_stage0_stage1.m,test,test_code,.m,32072,2026-08-26 15:23:01,4edc0918f9cf0aebe5261b033d9028fda90bbee1169a2d26a813eb721c0ac560,C:\Users\祁水\Desktop\风光氢氨系统\project\test\test_stage0_stage1.m
