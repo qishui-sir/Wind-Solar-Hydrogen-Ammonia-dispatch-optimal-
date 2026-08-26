@@ -1,6 +1,6 @@
 # Stage 0 File Inventory
 
-Generated: 2026-08-26 11:34:41
+Generated: 2026-08-26 15:38:49
 
 This inventory separates source, tests, raw input data, generated results, and documentation for reproducible review.
 
@@ -15,7 +15,7 @@ This inventory separates source, tests, raw input data, generated results, and d
 | paper_outputs | generated_paper_output | 7 |
 | project | project_config | 2 |
 | runs | generated_result | 204 |
-| source | source_code | 35 |
+| source | source_code | 37 |
 | test | test_artifact | 4 |
 | test | test_code | 7 |
 
@@ -36,21 +36,22 @@ This inventory separates source, tests, raw input data, generated results, and d
 - `src/figures/thermod.m` [source, source_code] SHA256 `8f5f62145e54812020d9f9d8ea484aeb7a86a4244042d96d8aa374a6251fd1ac`
 - `src/load_res_year.m` [source, source_code] SHA256 `1e149aee47f932995b3460c167d99a0e812bc6016ac78a8bd8bec11fd4932cfa`
 - `src/main.m` [source, source_code] SHA256 `30930d968ba3be1062e539a4495cf6caba6a66b000f784cc08d5a624e97dab77`
-- `src/paper/export_main_figures.m` [source, source_code] SHA256 `c2145ea90d3b50539a49631a7c036a442901b4cfa29938da4419e6e0abf04cc6`
-- `src/paper/export_main_tables.m` [source, source_code] SHA256 `66d319b9424f47a0b733fbfdd57fc065eddd4fce206c64ed20f579a345ccc067`
+- `src/paper/export_main_figures.m` [source, source_code] SHA256 `bfd6c1aa6212d407bb52348dde4357acd3b80a2bc1ddc996ea82ef535af1b690`
+- `src/paper/export_main_tables.m` [source, source_code] SHA256 `a5a63d2f79dd51528b5decc0699856dd9029bc62ebf71f35918d80be76b835ea`
 - `src/params/AEL.m` [source, source_code] SHA256 `145c11bac3f6ab12cc43c515408533478c9e76e7febe99d0fdc5217d88a8bf5e`
 - `src/params/HB.m` [source, source_code] SHA256 `a2b83c0a73c385c673938393d45ae561972933116e59fe6f53474be5ffc2f261`
 - `src/params/default.m` [source, source_code] SHA256 `6c67c746c1117ffa637b3c2b6778c4bb021275441896095e5faecff0477e5804`
 - `src/params/h2_storage_limits.m` [source, source_code] SHA256 `01f4fa82bb4f414e2d3a4af66f8bb6bb1d2fe8804cecb5570b004d78951556bf`
 - `src/params/my_system.m` [source, source_code] SHA256 `aabaa6e75a61ee9bc5f1fd7380d51f122768ee8da61fa96ec4be062e05bbd140`
-- `src/pipeline/run_full_tests.m` [source, source_code] SHA256 `4c5359f9a93e262be60a7c50edf059bc4331de74639ab6803e886b2ab64cfc91`
-- `src/pipeline/run_quick_tests.m` [source, source_code] SHA256 `b043c0d127705c13c04dfd375e116798c1368fe369ad0beb8f5e299e0104353c`
-- `src/pipeline/run_reproduce_core_results.m` [source, source_code] SHA256 `1626daef9dc10ea86d0239ad090470b403fcef0831eee463ced38f6c1588fe66`
-- `src/pipeline/run_reproduce_full_grid.m` [source, source_code] SHA256 `3c13009399348b760f9d1523642563f41f282a0c176bdd337d42cdeae8e3e9ea`
-- `src/pipeline/run_stage0_quality_gate.m` [source, source_code] SHA256 `7add7fb80cee0e9320bf48dacca0875b856f39087d17ccf75371a3ce932fc3f4`
+- `src/pipeline/run_full_tests.m` [source, source_code] SHA256 `765ef52bc9ce0a7c3d6dde9e2b7b5b6ad54b27006bf8491e8cb7bdda5222dc5e`
+- `src/pipeline/run_quick_tests.m` [source, source_code] SHA256 `23085551f93021262cbca24b1d859da1566d75bcc4992a59193faeccf77da90e`
+- `src/pipeline/run_reproduce_core_results.m` [source, source_code] SHA256 `45833f0b3bb71869d60e773be0f7e90e89618987150cbc625da20d999e358e72`
+- `src/pipeline/run_reproduce_full_grid.m` [source, source_code] SHA256 `17286eaad6b5d3dab8a568eec40e8d9abd39199c9d2f6e31da26ef953a422329`
+- `src/pipeline/run_stage0_quality_gate.m` [source, source_code] SHA256 `53a67e3dce8c2a1b67383b0fdd3df3640c4d2e84be85eea9afa45951c10d9bf1`
 - `src/protocol/protocol_v5.m` [source, source_code] SHA256 `759caf3be4299115a00d288f94e75f873f0a749e484886757db22c6bb22389d6`
 - `src/protocol/s2_baseline_manifest.m` [source, source_code] SHA256 `c27f5ff528f7ef87aa6078dae6e5dbde5a13f22a5e4bd62ad76336944e71b26d`
 - `src/reproducibility/stage0_constraint_audit.m` [source, source_code] SHA256 `26b68997659a787fba75e8d53500a2b561ad783c511b383b822063c6c508442f`
+- `src/reproducibility/stage0_freeze_check.m` [source, source_code] SHA256 `e9df9b1cdcfdcad3c22a1cb3395a33b57d07031b35d69f0f358d3f77bb19687a`
 - `src/reproducibility/stage0_manifest.m` [source, source_code] SHA256 `27a374c5b3b521b70e91c15a44b0ece3008a6db2891015d1e06155769583fa08`
 - `src/results/annual_fixed_cost.m` [source, source_code] SHA256 `a7b78fc822b1847a35a7a4e5aaf7806db7b05baa980e8c1f07bb9402cf5f67ad`
 - `src/results/evaluate_protocol_v51_metrics.m` [source, source_code] SHA256 `4abf9f86a6de08d2846ed813dab28c83c3fc488cff90e72b86fefcc33a6b5b5a`
@@ -58,17 +59,18 @@ This inventory separates source, tests, raw input data, generated results, and d
 - `src/results/result_LCOA.m` [source, source_code] SHA256 `ec8b84ae67025450c909bdb24ab34776e463e5b8501b2db6f649468501540742`
 - `src/results/results.m` [source, source_code] SHA256 `23bf1cdb0ef55d024b0c2216d8d332ce34ca218a8f37979ea3c20301509a8be6`
 - `src/rolling_dispatch.m` [source, source_code] SHA256 `988cb1c59ec36cb39553eed3a057e30d6477a3bcd1147dc93cda455d60874f22`
-- `src/stage0_freeze_check.m` [source, source_code] SHA256 `ddb23691b6d48b781f1f460409c3acd3f321d83812589fdb3fa35bd14852bf88`
-- `src/stage1_run_zhou_s2_baseline.m` [source, source_code] SHA256 `f0270a2f0a6dd57d374844eedb1b8697cbc4bbfe31df52120415cc70bd64207e`
-- `src/stage3_run_v51_contract_closed_loop.m` [source, source_code] SHA256 `e00e3fbecc2799f092280b3fbfceba74ecbd72bb280b68eb9834cd34cb6cde5b`
-- `src/stage4_run_v51_h2_reserve_grid.m` [source, source_code] SHA256 `b2a4d114507af69622d8e1fac50dff80827c2b90d1603343a44dad188b62612b`
-- `src/stage5_run_v51_joint_grid.m` [source, source_code] SHA256 `f1edca5dd46be2b7397e86e5c65cadbd97f8c7441a03fdcd2266695ec7cb137d`
+- `src/stages/stage1_run_zhou_s2_baseline.m` [source, source_code] SHA256 `90f5343d542bbaadf0858a9dcb50b0e0cb9a993bba26ae1b433e7ec9c46c4251`
+- `src/stages/stage3_run_v51_contract_closed_loop.m` [source, source_code] SHA256 `cceecd4734188e38893de4e87c10298a9842df290d0683445cec27b49e158a70`
+- `src/stages/stage4_run_v51_h2_reserve_grid.m` [source, source_code] SHA256 `f2a9db1894c9b33aa3ee0fbda09d97602063bddddd3248d9d8a180b340b251a5`
+- `src/stages/stage5_run_v51_joint_grid.m` [source, source_code] SHA256 `0c9c1c784310b8310f500c5493cb0e5f02160f8b9467dd3c20b1a9b67d3d21af`
+- `src/utils/ensure_directory.m` [source, source_code] SHA256 `6e119d33237f9eacb1ec4324b862dd6de0aaf0b00c6419bdd98dc032cf27d72e`
+- `src/utils/option_value.m` [source, source_code] SHA256 `bec6c67f114f88480f6c50e74f7e70690887109145688f1a3ec3c18e3580c029`
 - `src/utils/project_root.m` [source, source_code] SHA256 `74e24cc87256c1f7fdc3cf831656d127e2911bf7122ff3fe3c7091dfa444adae`
-- `src/utils/setup_project_paths.m` [source, source_code] SHA256 `bce35bde3bde987baaee4fe41ed877b395e66e644bec0a7d3503cf772bc1dc25`
+- `src/utils/setup_project_paths.m` [source, source_code] SHA256 `27ba35f7f7344309b20d01ea4178d5d093f829bf1b9c88643166fa37df6b3696`
 - `test/test_CI_vertify.m` [test, test_code] SHA256 `5e11a5c7e03fc29f797cffd01cf7bc25b8118adcfd513d011a0dd341e491709b`
 - `test/test_chose_index.m` [test, test_code] SHA256 `f15342914299527034eacc77ca255ed76eed30fc8b38f2a3e9d47a415d61cab4`
 - `test/test_load_res_year.m` [test, test_code] SHA256 `7c8b38915464e3e4756fda1c51156706b5788d261e05163c6171310a0e549700`
 - `test/test_my_system.m` [test, test_code] SHA256 `561d90226361253187a343b0d7c4e030f041e240a7a6f6048b4e525e054141ff`
-- `test/test_protocol_v5.m` [test, test_code] SHA256 `715cb07abe0f884f9ef77bafba3358d77c8e4cc37a0439197a9f900fe73ea9c2`
+- `test/test_protocol_v5.m` [test, test_code] SHA256 `fa4901c4db7a40d08b8e653a9c402c7b8a5c5af5def0458b573e9e0ac2980a15`
 - `test/test_stage0_reproducibility.m` [test, test_code] SHA256 `d0aac67052e48a6f78b660fb3c8ecdffbaecf16745b4a43b6881b1c7605250b7`
-- `test/test_stage0_stage1.m` [test, test_code] SHA256 `fc602120d0916e6f3486104c04adcc3322fd662b9b87499e84c68eccb405612c`
+- `test/test_stage0_stage1.m` [test, test_code] SHA256 `4edc0918f9cf0aebe5261b033d9028fda90bbee1169a2d26a813eb721c0ac560`

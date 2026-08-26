@@ -29,10 +29,11 @@ report = run_stage0_quality_gate();
 | `src/params` | Physical and economic parameter definitions. |
 | `src/protocol` | Frozen protocol and baseline manifests. |
 | `src/results` | KPI, economics, and metric evaluation. |
-| `src/reproducibility` | Stage 0 manifests and constraint audits. |
+| `src/reproducibility` | Stage 0 freeze checks, manifests, and constraint audits. |
+| `src/stages` | Scientific experiment stage runners. |
 | `src/pipeline` | User-facing run commands. |
 | `src/paper` | Manuscript table and figure export adapters. |
-| `src/utils` | Generic project root and path setup only. |
+| `src/utils` | Generic project root, path setup, and small shared helpers. |
 
 See `docs/project_structure.md` for the full directory contract.
 

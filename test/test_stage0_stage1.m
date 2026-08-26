@@ -6,10 +6,8 @@ function setupOnce(test_case)
 test_dir = fileparts(mfilename('fullpath'));
 project_dir = fileparts(test_dir);
 test_case.TestData.project_dir = project_dir;
-addpath(fullfile(project_dir, 'src'));
-addpath(fullfile(project_dir, 'src', 'params'));
-addpath(fullfile(project_dir, 'src', 'results'));
-addpath(fullfile(project_dir, 'src', 'protocol'));
+addpath(fullfile(project_dir, 'src', 'utils'), '-begin');
+setup_project_paths(project_dir);
 end
 
 function testStage0FreezeCheckPassesWithoutRunningNestedTests(test_case)

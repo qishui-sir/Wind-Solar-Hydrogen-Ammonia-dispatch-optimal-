@@ -118,11 +118,3 @@ fprintf(fid, 'table. They are not silently excluded and should not be used ');
 fprintf(fid, 'as manuscript evidence unless later protocol eligibility checks ');
 fprintf(fid, 'accept them.\n');
 end
-
-function value = option_value(config, name, default_value)
-if isfield(config, name) && ~isempty(config.(name))
-    value = config.(name);
-else
-    value = default_value;
-end
-end

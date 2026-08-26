@@ -5,8 +5,7 @@ if nargin < 1 || isempty(config)
     config = struct();
 end
 
-project_dir = project_root();
-add_project_paths(project_dir);
+project_dir = setup_project_paths(mfilename('fullpath'));
 
 run_tests = option_value(config, 'run_tests', true);
 protocol = protocol_v5();
@@ -50,18 +49,6 @@ if ~report.passed
 end
 end
 
-function project_dir = project_root()
-src_dir = fileparts(mfilename('fullpath'));
-project_dir = fileparts(src_dir);
-end
-
-function add_project_paths(project_dir)
-addpath(fullfile(project_dir, 'src'));
-addpath(fullfile(project_dir, 'src', 'params'));
-addpath(fullfile(project_dir, 'src', 'results'));
-addpath(fullfile(project_dir, 'src', 'protocol'));
-end
-
 function missing_files = missing_required_files(project_dir)
 required_files = [
     "src/load_res_year.m"
@@ -74,6 +61,11 @@ required_files = [
     "src/params/my_system.m"
     "src/protocol/protocol_v5.m"
     "src/protocol/s2_baseline_manifest.m"
+    "src/reproducibility/stage0_freeze_check.m"
+    "src/stages/stage1_run_zhou_s2_baseline.m"
+    "src/stages/stage3_run_v51_contract_closed_loop.m"
+    "src/stages/stage4_run_v51_h2_reserve_grid.m"
+    "src/stages/stage5_run_v51_joint_grid.m"
     "test/test_my_system.m"
     "test/test_load_res_year.m"
     "test/test_protocol_v5.m"];
@@ -90,6 +82,11 @@ end
 function present_files = present_forbidden_files(project_dir)
 forbidden_files = [
     "src/algorithm.m"
+    "src/stage0_freeze_check.m"
+    "src/stage1_run_zhou_s2_baseline.m"
+    "src/stage3_run_v51_contract_closed_loop.m"
+    "src/stage4_run_v51_h2_reserve_grid.m"
+    "src/stage5_run_v51_joint_grid.m"
     "src/" + "qi_ael_" + "model.m"
     "src/class/" + "AEL" + "Config.m"
     "test/" + "test_load_res_" + "7day.m"
@@ -143,12 +140,4 @@ else
     rel_path = string(file_path);
 end
 rel_path = replace(rel_path, filesep, "/");
-end
-
-function value = option_value(config, name, default_value)
-if isfield(config, name) && ~isempty(config.(name))
-    value = config.(name);
-else
-    value = default_value;
-end
 end

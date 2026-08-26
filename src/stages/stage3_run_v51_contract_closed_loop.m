@@ -5,8 +5,7 @@ if nargin < 1 || isempty(config)
     config = struct();
 end
 
-project_dir = project_root();
-add_project_paths(project_dir);
+project_dir = setup_project_paths(mfilename('fullpath'));
 
 dry_run = option_value(config, 'dry_run', false);
 save_output = option_value(config, 'save_output', true);
@@ -447,24 +446,4 @@ if ~isfolder(run_dir)
 end
 save(output_path, 'result', 'run_info', 'metrics', 'params', ...
     'renewable_data', 'contract', 'stage1_result', 'stage1_run_info');
-end
-
-function project_dir = project_root()
-src_dir = fileparts(mfilename('fullpath'));
-project_dir = fileparts(src_dir);
-end
-
-function add_project_paths(project_dir)
-addpath(fullfile(project_dir, 'src'));
-addpath(fullfile(project_dir, 'src', 'params'));
-addpath(fullfile(project_dir, 'src', 'results'));
-addpath(fullfile(project_dir, 'src', 'protocol'));
-end
-
-function value = option_value(config, name, default_value)
-if isfield(config, name) && ~isempty(config.(name))
-    value = config.(name);
-else
-    value = default_value;
-end
 end

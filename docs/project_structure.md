@@ -18,13 +18,13 @@ This project is organized so that physical modeling, experiment orchestration, r
 | Folder/File | Responsibility |
 |---|---|
 | `baseline.m`, `dispatch_model.m`, `rolling_dispatch.m`, `load_res_year.m` | Core model/data logic. |
-| `stage*_run_*.m` | Scientific experiment stages and optimization sweeps. |
+| `stages/` | Scientific experiment stages and optimization sweeps. |
 | `params/` | Physical, economic, and system parameter definitions. |
 | `protocol/` | Frozen protocol and baseline manifest definitions. |
 | `results/` | Cost, KPI, freeze, and metric evaluation routines. |
 | `figures/` | Legacy or exploratory plotting code. |
-| `utils/` | Generic project bootstrap only: root detection and path setup. |
-| `reproducibility/` | Stage 0 manifests and constraint audits. |
+| `utils/` | Generic project bootstrap and small shared helpers. |
+| `reproducibility/` | Stage 0 freeze checks, manifests, and constraint audits. |
 | `pipeline/` | User-facing run commands for tests, quality gate, and reproduction. |
 | `paper/` | Export adapters for manuscript tables and figures. |
 
@@ -32,8 +32,16 @@ This project is organized so that physical modeling, experiment orchestration, r
 
 Stage 0 files are not generic utilities. They belong under `src/reproducibility/`.
 
+- `stage0_freeze_check.m` verifies the frozen source/data boundary.
 - `stage0_manifest.m` generates file, environment, and result manifests.
 - `stage0_constraint_audit.m` audits existing MAT result residuals.
 - `run_stage0_quality_gate.m` remains in `src/pipeline/` because it is an executable workflow.
 
 This avoids scattering evidence-tracing code across `utils/` while keeping the review-facing audit layer explicit.
+
+## Growth Control Rule
+
+New stages should normally extend existing protocol, test, pipeline, and
+manifest files. Add a new source file only when it introduces a stable
+responsibility shared by multiple workflows or when an existing file has become
+too large to review safely.

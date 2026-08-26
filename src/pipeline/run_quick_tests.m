@@ -37,11 +37,3 @@ fprintf('Total: %d; Passed: %d; Failed: %d\n', numel(test_results), ...
     nnz([test_results.Passed]), nnz(~[test_results.Passed]));
 fprintf('========================================\n');
 end
-
-function value = option_value(config, name, default_value)
-if isfield(config, name) && ~isempty(config.(name))
-    value = config.(name);
-else
-    value = default_value;
-end
-end

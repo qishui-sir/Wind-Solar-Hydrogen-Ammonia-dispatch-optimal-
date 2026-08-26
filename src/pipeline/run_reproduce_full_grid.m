@@ -30,11 +30,3 @@ project_dir = fileparts(src_dir);
 addpath(fullfile(src_dir, 'utils'), '-begin');
 project_dir = setup_project_paths(project_dir);
 end
-
-function value = option_value(config, name, default_value)
-if isfield(config, name) && ~isempty(config.(name))
-    value = config.(name);
-else
-    value = default_value;
-end
-end

@@ -6,10 +6,8 @@ function setupOnce(test_case)
 test_dir = fileparts(mfilename('fullpath'));
 project_dir = fileparts(test_dir);
 test_case.TestData.project_dir = project_dir;
-addpath(fullfile(project_dir, 'src'));
-addpath(fullfile(project_dir, 'src', 'params'));
-addpath(fullfile(project_dir, 'src', 'results'));
-addpath(fullfile(project_dir, 'src', 'protocol'));
+addpath(fullfile(project_dir, 'src', 'utils'), '-begin');
+setup_project_paths(project_dir);
 end
 
 function testProtocolStatesItsResultInformedTiming(test_case)
@@ -199,7 +197,7 @@ verifyEmpty(test_case, regexp(main_source, ...
     'stage\d+_run_', 'once'));
 
 stage1_source = fileread(fullfile(test_case.TestData.project_dir, ...
-    'src', 'stage1_run_zhou_s2_baseline.m'));
+    'src', 'stages', 'stage1_run_zhou_s2_baseline.m'));
 verifyNotEmpty(test_case, regexp(stage1_source, ...
     'data_year\s*=\s*option_value\(config,\s*''data_year'',\s*2022\)', ...
     'once'));

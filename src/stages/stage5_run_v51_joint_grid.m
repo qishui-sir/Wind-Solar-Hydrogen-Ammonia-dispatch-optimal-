@@ -5,8 +5,7 @@ if nargin < 1 || isempty(config)
     config = struct();
 end
 
-project_dir = project_root();
-add_project_paths(project_dir);
+project_dir = setup_project_paths(mfilename('fullpath'));
 subprotocol = protocol_v5('v5_1');
 if ~protocol_v5('verify_v5_1', subprotocol)
     error('stage5_run_v51_joint_grid:bad_protocol', ...
@@ -108,10 +107,13 @@ run_info = struct( ...
         subprotocol.Calibration.LexicographicOrder, ...
     'output_path', "");
 
-rows = empty_grid_row();
-rows(1) = [];
-if option_value(config, 'include_baseline', true)
-    rows(end + 1) = baseline_row(baseline_mat_path);
+include_baseline = option_value(config, 'include_baseline', true);
+row_capacity = planned_candidate_count + double(include_baseline);
+rows = repmat(empty_grid_row(), max(row_capacity, 1), 1);
+row_count = 0;
+if include_baseline
+    row_count = row_count + 1;
+    rows(row_count) = baseline_row(baseline_mat_path);
 end
 
 candidate_count = 0;
@@ -137,7 +139,8 @@ for reserve_index = 1:numel(reserve_designs)
             candidate.is_baseline = false;
             if dry_run
                 candidate.status = "planned";
-                rows(end + 1) = candidate;
+                row_count = row_count + 1;
+                rows(row_count) = candidate;
                 continue
             end
             if candidate_progress
@@ -187,10 +190,12 @@ for reserve_index = 1:numel(reserve_designs)
                     planned_candidate_count, candidate, ...
                     toc(candidate_timer));
             end
-            rows(end + 1) = candidate;
+            row_count = row_count + 1;
+            rows(row_count) = candidate;
             if save_output && ~dry_run
                 save_stage5_checkpoint(output_dir, source_year_value, ...
-                    rows, run_info, subprotocol, candidate_count);
+                    rows(1:row_count), run_info, subprotocol, ...
+                    candidate_count);
             end
         end
         if candidate_count >= candidate_limit
@@ -202,7 +207,7 @@ for reserve_index = 1:numel(reserve_designs)
     end
 end
 
-grid_table = struct2table(rows);
+grid_table = struct2table(rows(1:row_count));
 run_info.status = "completed";
 run_info.candidate_count = candidate_count;
 run_info.selected_candidate = select_candidate(grid_table);
@@ -240,19 +245,26 @@ end
 function designs = create_reserve_designs(quantiles, lookahead_days)
 quantiles = unique(quantiles(:)', 'stable');
 lookahead_days = unique(lookahead_days(:)', 'stable');
-designs = struct('quantile', {}, 'lookahead_days', {});
+design_capacity = nnz(quantiles == 0) ...
+    + nnz(quantiles ~= 0) * numel(lookahead_days);
+designs = repmat(struct('quantile', NaN, 'lookahead_days', NaN), ...
+    max(design_capacity, 1), 1);
+design_count = 0;
 for quantile = quantiles
     if quantile == 0
-        designs(end + 1) = struct( ...
+        design_count = design_count + 1;
+        designs(design_count) = struct( ...
             'quantile', 0, 'lookahead_days', 0);
         continue
     end
     for lookahead = lookahead_days
-        designs(end + 1) = struct( ...
+        design_count = design_count + 1;
+        designs(design_count) = struct( ...
             'quantile', quantile, ...
             'lookahead_days', lookahead);
     end
 end
+designs = designs(1:design_count);
 end
 
 function id = candidate_id(quantile, lookahead, pacing, smoothing)
@@ -426,31 +438,5 @@ elseif isfield(loaded, 'renewable_data') && ...
 else
     error('stage5_run_v51_joint_grid:missing_year', ...
         'Input MAT must provide run_info.data_year or datetime values.');
-end
-end
-
-function add_project_paths(project_dir)
-addpath(fullfile(project_dir, 'src'));
-addpath(fullfile(project_dir, 'src', 'params'));
-addpath(fullfile(project_dir, 'src', 'results'));
-addpath(fullfile(project_dir, 'src', 'protocol'));
-end
-
-function project_dir = project_root()
-src_dir = fileparts(mfilename('fullpath'));
-project_dir = fileparts(src_dir);
-end
-
-function ensure_directory(path_value)
-if ~isfolder(path_value)
-    mkdir(path_value);
-end
-end
-
-function value = option_value(config, name, default_value)
-if isfield(config, name) && ~isempty(config.(name))
-    value = config.(name);
-else
-    value = default_value;
 end
 end
