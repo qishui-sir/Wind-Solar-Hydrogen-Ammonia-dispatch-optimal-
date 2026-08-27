@@ -1,0 +1,296 @@
+function [selected, audit_table, selection_info] = ...
+        select_protocol_v52_candidate(grid_table, run_info, config)
+%SELECT_PROTOCOL_V52_CANDIDATE Apply the frozen v5.2 2024 selection rule.
+
+if nargin < 2 || isempty(run_info)
+    run_info = struct();
+end
+if nargin < 3 || isempty(config)
+    config = struct();
+end
+
+protocol = protocol_v5('v5_2');
+if ~protocol_v5('verify_v5_2', protocol)
+    error('select_protocol_v52_candidate:bad_protocol', ...
+        'Protocol v5.2 verification failed.');
+end
+selection_year = protocol.DataSplit.SelectionYear;
+data_year = get_data_year(run_info, config);
+if data_year ~= selection_year
+    error('select_protocol_v52_candidate:bad_data_year', ...
+        ['v5.2 selection must use calibration year %d only; ', ...
+        'received %d.'], selection_year, data_year);
+end
+
+validate_grid_table(grid_table);
+row_count = height(grid_table);
+reference_index = find_reference_index(grid_table, config);
+reference_case_id = string(grid_table.case_id(reference_index));
+reference_lcoa = grid_table.LCOA_USD_t(reference_index);
+reference_shortfall = ...
+    grid_table.contract_shortfall_p95_kg(reference_index);
+reference_mar = grid_table.MAR(reference_index);
+reference_h2_soc_p05 = grid_table.h2_soc_p05(reference_index);
+if ~(isfinite(reference_lcoa) && reference_lcoa > 0)
+    error('select_protocol_v52_candidate:bad_reference', ...
+        'Reference LCOA must be a positive finite value.');
+end
+if ~(isfinite(reference_shortfall) && reference_shortfall >= 0)
+    error('select_protocol_v52_candidate:bad_reference', ...
+        'Reference contract_shortfall_p95_kg must be finite and nonnegative.');
+end
+
+audit_table = grid_table;
+audit_table.source_data_year = repmat(data_year, row_count, 1);
+audit_table.protocol_version = repmat(protocol.ProtocolVersion, row_count, 1);
+audit_table.protocol_seal = repmat(protocol.Seal, row_count, 1);
+audit_table.is_reference = false(row_count, 1);
+audit_table.is_reference(reference_index) = true;
+
+hard_feasibility_passed = compute_hard_feasibility(grid_table);
+lcoa_increase_fraction = grid_table.LCOA_USD_t ./ reference_lcoa - 1;
+lcoa_cap_passed = grid_table.lcoa_cap_ok & ...
+    lcoa_increase_fraction <= ...
+    protocol.SuccessCriteria.MaxLCOAIncreaseFraction + 1e-12;
+shortfall_ratio = compute_shortfall_ratio( ...
+    grid_table.contract_shortfall_p95_kg, reference_shortfall);
+contract_shortfall_passed = compute_contract_noninferiority( ...
+    grid_table.contract_shortfall_p95_kg, reference_shortfall, protocol);
+oracle_excluded = detect_oracle_rows(grid_table);
+status_completed = string(grid_table.status) == "completed";
+
+contract_improvement_fraction = compute_improvement_fraction( ...
+    reference_shortfall, grid_table.contract_shortfall_p95_kg);
+mar_improvement_fraction = compute_improvement_fraction( ...
+    reference_mar, grid_table.MAR);
+h2_soc_absolute_gain = grid_table.h2_soc_p05 - reference_h2_soc_p05;
+stability_screen_passed = ...
+    contract_improvement_fraction >= ...
+        protocol.SuccessCriteria.MinimumMaterialImprovementFraction ...
+    | mar_improvement_fraction >= ...
+        protocol.SuccessCriteria.MinimumMaterialImprovementFraction ...
+    | h2_soc_absolute_gain >= ...
+        protocol.SuccessCriteria.H2SOCP05MinimumAbsoluteGain;
+
+eligible = status_completed & hard_feasibility_passed & lcoa_cap_passed ...
+    & contract_shortfall_passed & ~oracle_excluded ...
+    & ~audit_table.is_reference;
+
+audit_table.status_completed = status_completed;
+audit_table.hard_feasibility_passed = hard_feasibility_passed;
+audit_table.lcoa_increase_fraction = lcoa_increase_fraction;
+audit_table.lcoa_cap_passed_v52 = lcoa_cap_passed;
+audit_table.contract_shortfall_p95_relative_to_reference = shortfall_ratio;
+audit_table.contract_shortfall_noninferior_v52 = ...
+    contract_shortfall_passed;
+audit_table.oracle_excluded_v52 = oracle_excluded;
+audit_table.contract_shortfall_improvement_fraction = ...
+    contract_improvement_fraction;
+audit_table.mar_improvement_fraction = mar_improvement_fraction;
+audit_table.h2_soc_p05_absolute_gain = h2_soc_absolute_gain;
+audit_table.stability_screen_passed_v52 = stability_screen_passed;
+audit_table.eligible_for_selection = eligible;
+audit_table.selection_rank = NaN(row_count, 1);
+audit_table.exclusion_reason = build_exclusion_reasons( ...
+    status_completed, hard_feasibility_passed, lcoa_cap_passed, ...
+    contract_shortfall_passed, oracle_excluded, audit_table.is_reference);
+
+[audit_table, selected] = rank_and_select(audit_table, eligible);
+selection_info = make_selection_info(protocol, data_year, ...
+    reference_case_id, audit_table, selected);
+end
+
+function data_year = get_data_year(run_info, config)
+data_year = option_value(config, 'data_year', []);
+if isempty(data_year) && isstruct(run_info) && isfield(run_info, 'data_year')
+    data_year = run_info.data_year;
+end
+if ~(isnumeric(data_year) && isscalar(data_year) && ...
+        isfinite(data_year) && data_year == floor(data_year))
+    error('select_protocol_v52_candidate:missing_data_year', ...
+        'run_info.data_year or config.data_year must be an integer year.');
+end
+end
+
+function validate_grid_table(grid_table)
+if ~istable(grid_table)
+    error('select_protocol_v52_candidate:bad_grid_table', ...
+        'grid_table must be a MATLAB table.');
+end
+required_names = [ ...
+    "case_id"; ...
+    "status"; ...
+    "is_baseline"; ...
+    "contract_shortfall_p95_kg"; ...
+    "MAR"; ...
+    "h2_soc_p05"; ...
+    "LCOA_USD_t"; ...
+    hard_feasibility_columns(); ...
+    "lcoa_cap_ok"];
+missing = required_names(~ismember(required_names, ...
+    string(grid_table.Properties.VariableNames)));
+if ~isempty(missing)
+    error('select_protocol_v52_candidate:bad_grid_table', ...
+        'grid_table is missing required columns: %s', ...
+        strjoin(missing, ', '));
+end
+if height(grid_table) == 0
+    error('select_protocol_v52_candidate:empty_grid_table', ...
+        'grid_table must contain at least one row.');
+end
+end
+
+function reference_index = find_reference_index(grid_table, config)
+reference_case_id = string(option_value(config, 'reference_case_id', ""));
+if strlength(reference_case_id) > 0
+    matches = string(grid_table.case_id) == reference_case_id;
+else
+    matches = grid_table.is_baseline == true;
+end
+if nnz(matches) ~= 1
+    error('select_protocol_v52_candidate:bad_reference', ...
+        'v5.2 selection requires exactly one reference baseline row.');
+end
+reference_index = find(matches, 1);
+end
+
+function columns = hard_feasibility_columns()
+columns = [ ...
+    "strict_delivery_ok"; ...
+    "terminal_contract_ok"; ...
+    "annual_output_ok"; ...
+    "terminal_h2_ok"; ...
+    "annual_co2_ok"; ...
+    "annual_sell_ok"; ...
+    "annual_curtail_ok"];
+end
+
+function passed = compute_hard_feasibility(grid_table)
+columns = hard_feasibility_columns();
+passed = true(height(grid_table), 1);
+for column_index = 1:numel(columns)
+    values = grid_table.(columns(column_index));
+    passed = passed & values == true;
+end
+end
+
+function ratio = compute_shortfall_ratio(shortfall, reference_shortfall)
+ratio = NaN(size(shortfall));
+if reference_shortfall > 1e-9
+    ratio = shortfall ./ reference_shortfall;
+else
+    ratio(shortfall <= 1e-9) = 1;
+end
+end
+
+function passed = compute_contract_noninferiority( ...
+        shortfall, reference_shortfall, protocol)
+margin = protocol.SuccessCriteria ...
+    .ContractShortfallP95RelativeNoninferiorityMargin;
+if reference_shortfall > 1e-9
+    threshold = reference_shortfall * (1 + margin);
+else
+    threshold = 1e-9;
+end
+passed = shortfall <= threshold + 1e-9;
+end
+
+function oracle_excluded = detect_oracle_rows(grid_table)
+oracle_excluded = false(height(grid_table), 1);
+if ismember("scheme_name", string(grid_table.Properties.VariableNames))
+    oracle_excluded = string(grid_table.scheme_name) == ...
+        "perfect_information_oracle_diagnostic";
+elseif ismember("scheme", string(grid_table.Properties.VariableNames))
+    oracle_excluded = string(grid_table.scheme) == ...
+        "perfect_information_oracle_diagnostic";
+end
+end
+
+function improvement = compute_improvement_fraction(reference, values)
+improvement = NaN(size(values));
+if isfinite(reference) && abs(reference) > 1e-12
+    improvement = (reference - values) ./ abs(reference);
+end
+end
+
+function reasons = build_exclusion_reasons(status_completed, ...
+        hard_passed, lcoa_passed, shortfall_passed, oracle_excluded, ...
+        is_reference)
+reasons = strings(numel(status_completed), 1);
+reasons = append_reason(reasons, ~status_completed, ...
+    "status_not_completed");
+reasons = append_reason(reasons, ~hard_passed, ...
+    "hard_feasibility_failed");
+reasons = append_reason(reasons, ~lcoa_passed, ...
+    "lcoa_cap_failed");
+reasons = append_reason(reasons, ~shortfall_passed, ...
+    "contract_shortfall_noninferiority_failed");
+reasons = append_reason(reasons, oracle_excluded, ...
+    "oracle_diagnostic_excluded");
+reasons = append_reason(reasons, is_reference, ...
+    "reference_baseline_not_candidate");
+reasons(strlength(reasons) == 0) = "eligible";
+end
+
+function reasons = append_reason(reasons, mask, reason)
+indices = find(mask(:))';
+for index = indices
+    if strlength(reasons(index)) == 0
+        reasons(index) = reason;
+    else
+        reasons(index) = reasons(index) + ";" + reason;
+    end
+end
+end
+
+function [audit_table, selected] = rank_and_select(audit_table, eligible)
+eligible_indices = find(eligible);
+if isempty(eligible_indices)
+    selected = struct( ...
+        'status', "no_eligible_candidate", ...
+        'case_id', "", ...
+        'selection_rank', NaN);
+    return
+end
+ranking_table = table(eligible_indices, ...
+    audit_table.contract_shortfall_p95_kg(eligible_indices), ...
+    audit_table.MAR(eligible_indices), ...
+    -audit_table.h2_soc_p05(eligible_indices), ...
+    audit_table.LCOA_USD_t(eligible_indices), ...
+    string(audit_table.case_id(eligible_indices)), ...
+    'VariableNames', {'source_index', 'contract_shortfall_p95_kg', ...
+    'MAR', 'h2_soc_p05_desc_sort', 'LCOA_USD_t', 'case_id'});
+ranking_table = sortrows(ranking_table, {'contract_shortfall_p95_kg', ...
+    'MAR', 'h2_soc_p05_desc_sort', 'LCOA_USD_t', 'case_id'});
+for rank = 1:height(ranking_table)
+    audit_table.selection_rank(ranking_table.source_index(rank)) = rank;
+end
+selected = table2struct( ...
+    audit_table(ranking_table.source_index(1), :), 'ToScalar', true);
+end
+
+function selection_info = make_selection_info(protocol, data_year, ...
+        reference_case_id, audit_table, selected)
+if isfield(selected, 'case_id') && strlength(string(selected.case_id)) > 0
+    status = "selected";
+    selected_case_id = string(selected.case_id);
+else
+    status = "no_eligible_candidate";
+    selected_case_id = "";
+end
+selection_info = struct( ...
+    'status', status, ...
+    'protocol_version', protocol.ProtocolVersion, ...
+    'protocol_seal', protocol.Seal, ...
+    'data_year', data_year, ...
+    'selection_dataset', protocol.SelectionRule.SelectionDataset, ...
+    'reference_case_id', reference_case_id, ...
+    'selected_case_id', selected_case_id, ...
+    'row_count', height(audit_table), ...
+    'eligible_candidate_count', ...
+        nnz(audit_table.eligible_for_selection), ...
+    'holdout_used_for_selection', false, ...
+    'sort_order', protocol.SelectionRule.SortOrder, ...
+    'tie_break_rule', protocol.SelectionRule.TieBreakRule, ...
+    'full_grid_retained', true);
+end

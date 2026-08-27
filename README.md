@@ -18,9 +18,19 @@ report = run_stage0_quality_gate();
 | `run_full_tests()` | Run every MATLAB test under `test/`. |
 | `run_stage0_quality_gate()` | Generate manifests, environment report, result manifest, constraint audit, and test report. |
 | `run_reproduce_core_results()` | Recompute Stage 1 and Stage 3 core results. |
-| `run_reproduce_full_grid()` | Recompute Stage 4 and Stage 5 grids. |
+| `run_reproduce_full_grid()` | Recompute Stage 4 and Stage 5 grids; optionally apply the v5.2 2024 selection audit. |
 | `export_main_tables()` | Export paper table inputs from manifests and comparison CSV files. |
 | `export_main_figures()` | Collect existing reproducible figures for drafting. |
+
+Run the frozen v5.2 selector on an existing 2024 Stage 5 grid without
+rerunning the expensive grid:
+
+```matlab
+outputs = run_reproduce_full_grid(struct( ...
+    'run_stage4', false, ...
+    'run_stage5', false, ...
+    'run_v52_selection', true));
+```
 
 ## Source Layout
 
@@ -28,7 +38,7 @@ report = run_stage0_quality_gate();
 |---|---|
 | `src/params` | Physical and economic parameter definitions. |
 | `src/protocol` | Frozen protocol and baseline manifests. |
-| `src/results` | KPI, economics, and metric evaluation. |
+| `src/results` | KPI, economics, metric evaluation, and frozen result selection. |
 | `src/reproducibility` | Stage 0 freeze checks, manifests, and constraint audits. |
 | `src/stages` | Scientific experiment stage runners. |
 | `src/pipeline` | User-facing run commands. |

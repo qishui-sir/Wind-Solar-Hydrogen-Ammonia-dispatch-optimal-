@@ -1,5 +1,5 @@
 function model = dispatch_model(params, renewable_data, options)
-%DISPATCH_MODEL Build the shared AEL/HB/H2 dispatch optimization problem.
+% DISPATCH_MODEL Build the shared AEL/HB/H2 dispatch optimization problem.
 % The function defines variables, physics, contract constraints, and the
 % economic objective. It does not solve the problem or read/write files.
 
@@ -728,6 +728,10 @@ model = struct( ...
     'initial_state', initial_state, ...
     'mode', mode);
 end
+
+
+
+%% Function
 
 function restoration = restoration_settings(options)
 restoration = struct( ...

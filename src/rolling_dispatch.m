@@ -1,5 +1,5 @@
 function [result, run_info, metrics] = rolling_dispatch(config)
-%ROLLING_DISPATCH Run forecast planning, realtime recourse, and state handoff.
+% ROLLING_DISPATCH Run forecast planning, realtime recourse, and state handoff.
 % The function reads one input MAT file, plans 72 hours, commits 24 hours,
 % replays those controls against observed renewable power, and repeats.
 

@@ -1,6 +1,6 @@
 # Stage 0 Constraint Audit
 
-Generated: 2026-08-26 15:53:44
+Generated: 2026-08-26 16:39:34
 
 - MAT files scanned: `195`
 - Dispatch results audited: `170`

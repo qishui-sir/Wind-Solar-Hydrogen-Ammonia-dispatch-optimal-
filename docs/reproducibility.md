@@ -86,6 +86,29 @@ outputs = run_reproduce_full_grid();
 
 This recomputes Stage 4 and Stage 5 grids using the current frozen scripts. The command may be computationally expensive.
 
+## v5.2 Selection Audit
+
+After a 2024 Stage 5 grid exists, run the frozen selector without rerunning
+the grid:
+
+```matlab
+outputs = run_reproduce_full_grid(struct( ...
+    'run_stage4', false, ...
+    'run_stage5', false, ...
+    'run_v52_selection', true));
+```
+
+By default this loads
+`runs/stage5/joint_grid/v51_joint_grid_2024_latest.mat` and writes:
+
+- `runs/stage2/v52_selection_audit_2024_latest.mat`
+- `runs/stage2/v52_selection_audit_2024_latest.csv`
+
+The selector rejects any non-2024 `run_info.data_year`, retains failed and
+ineligible rows in the audit table, excludes oracle rows from confirmatory
+selection, and ranks eligible candidates by the frozen v5.2 lexicographic
+order.
+
 ## Paper Outputs
 
 ```matlab

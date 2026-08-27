@@ -687,3 +687,44 @@ contract_shortfall_p95 -> MAR -> h2_soc_p05_desc -> LCOA
 除 `perfect_information_oracle_diagnostic` 外，v5.1 中定义的运行方案均可进入确认性
 筛选。oracle 只用于完美信息上界诊断，不能参与主方案排序，也不能作为 operational
 forecast claim 的证据。
+
+### 11.5 第 2 阶段：2024 选择审计
+
+第 2 阶段不改变模型物理、不重定义指标，也不打开 2025。它只把已有 2024 Stage 5
+候选网格按 v5.2 冻结规则转化为可审计选择结果。执行入口为：
+
+```matlab
+outputs = run_reproduce_full_grid(struct( ...
+    'run_stage4', false, ...
+    'run_stage5', false, ...
+    'run_v52_selection', true));
+```
+
+默认输入为：
+
+```text
+runs/stage5/joint_grid/v51_joint_grid_2024_latest.mat
+```
+
+默认输出为：
+
+```text
+runs/stage2/v52_selection_audit_2024_latest.mat
+runs/stage2/v52_selection_audit_2024_latest.csv
+```
+
+选择器 `select_protocol_v52_candidate` 对每一行保留原始 grid 信息并追加审计字段：
+
+- `status_completed`
+- `hard_feasibility_passed`
+- `lcoa_increase_fraction`
+- `lcoa_cap_passed_v52`
+- `contract_shortfall_noninferior_v52`
+- `oracle_excluded_v52`
+- `eligible_for_selection`
+- `selection_rank`
+- `exclusion_reason`
+
+若 `run_info.data_year` 不是 2024，选择器必须报错并停止。基准行只作为 LCOA 和
+合同短缺参考，不参与候选排名。失败、超 LCOA、合同短缺非劣不通过、硬可行性不通过
+以及 oracle 行均保留在审计表中，不得从报告网格中删除。

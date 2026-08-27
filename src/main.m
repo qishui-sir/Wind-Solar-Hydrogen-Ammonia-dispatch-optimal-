@@ -2,7 +2,7 @@ clear; clc;
 
 source_dir = fileparts(mfilename('fullpath'));
 addpath(fullfile(source_dir, 'utils'), '-begin');
-project_dir = setup_project_paths(source_dir); %#ok<NASGU>
+project_dir = setup_project_paths(source_dir);
 
 data_cfg = struct();
 data_cfg.pv_year = 2022;

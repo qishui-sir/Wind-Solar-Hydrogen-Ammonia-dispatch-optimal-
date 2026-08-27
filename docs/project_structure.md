@@ -21,7 +21,7 @@ This project is organized so that physical modeling, experiment orchestration, r
 | `stages/` | Scientific experiment stages and optimization sweeps. |
 | `params/` | Physical, economic, and system parameter definitions. |
 | `protocol/` | Frozen protocol and baseline manifest definitions. |
-| `results/` | Cost, KPI, freeze, and metric evaluation routines. |
+| `results/` | Cost, KPI, freeze, metric evaluation, and protocol-frozen selection routines. |
 | `figures/` | Legacy or exploratory plotting code. |
 | `utils/` | Generic project bootstrap and small shared helpers. |
 | `reproducibility/` | Stage 0 freeze checks, manifests, and constraint audits. |
