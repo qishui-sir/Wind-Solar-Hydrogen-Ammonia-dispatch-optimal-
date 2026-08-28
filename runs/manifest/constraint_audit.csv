@@ -4,6 +4,7 @@ runs/archive/v52_negative_20260828/runs__rolling__v51_economic_only_2025_latest.
 runs/archive/v52_negative_20260828/runs__stage1__zhou_s2_baseline_2025_latest.mat,audited,1,2.90128809865564e-10,6.82121026329696e-13,1.81898940354586e-12,0,1.72084568816899e-14,1.11022302462516e-15,3.71924713249427e-15,0,17775899.9704726,NaN,NaN
 runs/archive/v52_negative_20260828/runs__stage2__v52_selection_audit_2024_latest.mat,not_dispatch_result,0,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN
 runs/archive/v52_negative_20260828/runs__stage5__joint_grid__v51_joint_grid_2024_latest.mat,not_dispatch_result,0,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN
+runs/feasibility_boundary/feasibility_boundary_latest.mat,not_dispatch_result,0,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN
 runs/manifest/stage0_quality_gate_report.mat,not_dispatch_result,0,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN
 runs/persistence_probe/rolling/v51_contract_plan_and_hb_smoothing_h2q075_l3_soft_cp025_hb010_gate_2022_latest.mat,audited,0,5.47515810467303e-10,1.40971678774804e-11,1.36424205265939e-12,0,0,0,9.68669588985449e-15,0,-48140698.9239491,3084728.32583966,3946540.87099857
 runs/rolling/frozen/v51_contract_plan_and_hb_smoothing_2022_frozen.mat,not_dispatch_result,0,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN

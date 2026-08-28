@@ -21,11 +21,11 @@ This project is organized so that physical modeling, experiment orchestration, r
 | `stages/` | Scientific experiment stages and optimization sweeps. |
 | `params/` | Physical, economic, and system parameter definitions. |
 | `protocol/` | Frozen protocol and baseline manifest definitions. |
-| `results/` | Cost, KPI, freeze, metric evaluation, and protocol-frozen selection routines. |
+| `results/` | Cost, KPI, freeze, metric evaluation, infeasibility classification, and protocol-frozen selection routines. |
 | `figures/` | Legacy or exploratory plotting code. |
 | `utils/` | Minimal generic helpers: project root, path setup, directory creation, and option defaults. |
 | `reproducibility/` | Stage 0 freeze checks, manifests, and constraint audits. |
-| `pipeline/` | User-facing run commands and formal pipeline helpers for tests, quality gate, reproduction, and campaign orchestration. |
+| `pipeline/` | User-facing run commands and formal pipeline helpers for tests, quality gate, reproduction, strict feasibility boundary checks, and campaign orchestration. |
 | `paper/` | Export adapters for manuscript tables and figures. |
 
 ## Stage 0 Consolidation Rule
@@ -45,3 +45,7 @@ New stages should normally extend existing protocol, test, pipeline, and
 manifest files. Add a new source file only when it introduces a stable
 responsibility shared by multiple workflows or when an existing file has become
 too large to review safely.
+
+`run_feasibility_boundary.m` and `classify_infeasibility.m` are stable
+cross-workflow responsibilities. They should be extended in place rather than
+duplicated for each new year, forecast mode, or failure case.

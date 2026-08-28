@@ -87,6 +87,35 @@ outputs = run_reproduce_full_grid();
 
 This recomputes Stage 4 and Stage 5 grids using the current frozen scripts. The command may be computationally expensive.
 
+## Strict Feasibility Boundary
+
+Before claiming an optimized stability improvement, run the strict feasibility
+boundary plan. The default command is safe and does not launch long solves:
+
+```matlab
+report = run_feasibility_boundary();
+```
+
+It writes:
+
+- `runs/feasibility_boundary/feasibility_boundary_latest.mat`
+- `runs/feasibility_boundary/feasibility_boundary_latest.csv`
+
+The three intended layers are annual full-year oracle, rolling observed-oracle
+strict dispatch, and rolling simulated-forecast strict dispatch. Restoration
+continuation is disabled in all boundary cases. Rolling observed-oracle is
+protocol-blocked outside 2022/2023; those rows are retained as
+`protocol_blocked` instead of being silently run.
+
+To execute the expensive boundary cases explicitly:
+
+```matlab
+report = run_feasibility_boundary(struct('execute', true));
+```
+
+Any failed rolling run should save `run_info.infeasibility_diagnosis` and a
+top-level `diagnosis` variable in the failure MAT file.
+
 ## v5.2 Selection Audit
 
 After a 2024 Stage 5 grid exists, run the frozen selector without rerunning

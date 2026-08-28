@@ -77,3 +77,11 @@ This freeze supports a negative v5.2 conclusion: no eligible 2024 candidate
 was selected under the frozen v5.2 criteria. The opened 2025 run is no longer
 a clean blind validation year for a later revised protocol unless that revised
 protocol explicitly treats it as post-hoc stress-test evidence.
+
+As a reviewer-facing claim boundary, this means the project is ready to draft
+the protocol, Methods, reproducibility governance, and negative feasibility
+evidence sections. It is not yet ready to claim that the three-variable
+optimization improves ammonia production stability under realistic forecasts.
+That positive claim requires strict no-restoration feasibility cases and a
+forecast-quality treatment that is not limited to the weakest persistence
+lower bound.
