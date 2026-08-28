@@ -11,7 +11,7 @@ if nargin < 1 || isempty(config)
     config = struct();
 end
 
-project_dir = setup_project_paths(mfilename('fullpath'));
+project_dir = bootstrap_project();
 data_year = option_value(config, 'data_year', 2024);
 verbose = option_value(config, 'verbose', true);
 
@@ -25,6 +25,7 @@ if option_value(config, 'run_stage1', true) && ~isfile(stage1_mat)
     stage1_run_zhou_s2_baseline(struct( ...
         'data_year', data_year, 'save_output', true));
 end
+
 if ~isfile(stage1_mat)
     error('run_2024_calibration_grid:missing_stage1', ...
         'Missing Stage 1 MAT file: %s', stage1_mat);
@@ -95,4 +96,12 @@ if verbose
     fprintf('v5.2 selection: %s | selected case: %s\n', ...
         selection_info.status, string(selection_info.selected_case_id));
 end
+end
+
+function project_dir = bootstrap_project()
+pipeline_dir = fileparts(mfilename('fullpath'));
+src_dir = fileparts(pipeline_dir);
+project_dir = fileparts(src_dir);
+addpath(fullfile(src_dir, 'utils'), '-begin');
+project_dir = setup_project_paths(project_dir);
 end

@@ -724,6 +724,48 @@ verifyTrue(test_case, contains(failed_row.exclusion_reason, ...
     "status_not_completed"));
 end
 
+function testProtocolV52SelectionRejectsRestorationContinuation(test_case)
+grid_table = synthetic_v52_selection_grid();
+grid_table.restoration_day_count = zeros(height(grid_table), 1);
+grid_table.restoration_day_count(grid_table.case_id == "candidate_c") = 2;
+run_info = struct('data_year', 2024);
+
+[selected, audit_table, selection_info] = ...
+    select_protocol_v52_candidate(grid_table, run_info);
+
+restored_row = audit_table(audit_table.case_id == "candidate_c", :);
+verifyFalse(test_case, restored_row.eligible_for_selection);
+verifyTrue(test_case, restored_row.restoration_continuation_used_v52);
+verifyTrue(test_case, contains(restored_row.exclusion_reason, ...
+    "restoration_continuation_diagnostic"));
+verifyEqual(test_case, selected.case_id, "candidate_b");
+verifyEqual(test_case, selection_info.eligible_candidate_count, 2);
+end
+
+function testCampaignUsesValidatedCompletionAndBlocksMissingSelection(test_case)
+source_text = fileread(fullfile(project_root_for_tests(), ...
+    'src', 'pipeline', 'run_full_campaign.m'));
+
+verifyNotEmpty(test_case, regexp(source_text, ...
+    'validate_completed_mat\([^)]*scheme', 'once'));
+verifyNotEmpty(test_case, regexp(source_text, ...
+    'string\(selection_info\.status\)\s*~=\s*"selected"', 'once'));
+verifyNotEmpty(test_case, regexp(source_text, ...
+    'run_full_campaign:no_selected_candidate', 'once'));
+end
+
+function testParallelStage5ResumeUsesSourceYear(test_case)
+source_text = fileread(fullfile(project_root_for_tests(), ...
+    'src', 'stages', 'run_stage5_parallel.m'));
+
+verifyNotEmpty(test_case, regexp(source_text, ...
+    'specs\s*=\s*attach_candidate_year\(specs,\s*source_year_value\)', ...
+    'once'));
+verifyEmpty(test_case, regexp(source_text, ...
+    'candidate_rolling_path\(\s*\.\.\.\s*rolling_output_dir,\s*spec\.year', ...
+    'once'));
+end
+
 function delete_if_file(file_path)
 if isfile(file_path)
     delete(file_path);
@@ -783,4 +825,9 @@ grid_table = table(case_id, status, is_baseline, scheme_name, ...
     strict_delivery_ok, terminal_contract_ok, annual_output_ok, ...
     terminal_h2_ok, annual_co2_ok, annual_sell_ok, annual_curtail_ok, ...
     lcoa_cap_ok);
+end
+
+function project_dir = project_root_for_tests()
+test_dir = fileparts(mfilename('fullpath'));
+project_dir = fileparts(test_dir);
 end

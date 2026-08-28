@@ -14,7 +14,7 @@ if nargin < 1 || isempty(config)
     config = struct();
 end
 
-project_dir = setup_project_paths(mfilename('fullpath'));
+project_dir = bootstrap_project();
 verbose = option_value(config, 'verbose', true);
 outputs = struct();
 
@@ -37,6 +37,14 @@ if option_value(config, 'run_2024_persist', true)
 end
 
 if verbose, fprintf('\n===== Campaign finished =====\n'); end
+end
+
+function project_dir = bootstrap_project()
+pipeline_dir = fileparts(mfilename('fullpath'));
+src_dir = fileparts(pipeline_dir);
+project_dir = fileparts(src_dir);
+addpath(fullfile(src_dir, 'utils'), '-begin');
+project_dir = setup_project_paths(project_dir);
 end
 
 function result = run_grid_year(project_dir, year, forecast_mode, ...

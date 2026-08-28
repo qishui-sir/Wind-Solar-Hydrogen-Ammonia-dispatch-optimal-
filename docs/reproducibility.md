@@ -26,7 +26,8 @@ Stage 0 review-support code is split by responsibility:
 - `src/reproducibility/stage0_manifest.m` generates file, environment, and result manifests.
 - `src/reproducibility/stage0_constraint_audit.m` audits MAT result residuals.
 - `src/pipeline/run_stage0_quality_gate.m` orchestrates the review-facing workflow.
-- `src/utils` is limited to project root and MATLAB path setup.
+- `src/utils` is limited to project root/path bootstrap and tiny shared primitives.
+- Formal helpers used by reproduction or campaign commands live in `src/pipeline`, not `src/utils`.
 
 ## Quality Gate
 

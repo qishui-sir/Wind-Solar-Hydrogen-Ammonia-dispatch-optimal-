@@ -23,9 +23,9 @@ This project is organized so that physical modeling, experiment orchestration, r
 | `protocol/` | Frozen protocol and baseline manifest definitions. |
 | `results/` | Cost, KPI, freeze, metric evaluation, and protocol-frozen selection routines. |
 | `figures/` | Legacy or exploratory plotting code. |
-| `utils/` | Generic project bootstrap and small shared helpers. |
+| `utils/` | Minimal generic helpers: project root, path setup, directory creation, and option defaults. |
 | `reproducibility/` | Stage 0 freeze checks, manifests, and constraint audits. |
-| `pipeline/` | User-facing run commands for tests, quality gate, and reproduction. |
+| `pipeline/` | User-facing run commands and formal pipeline helpers for tests, quality gate, reproduction, and campaign orchestration. |
 | `paper/` | Export adapters for manuscript tables and figures. |
 
 ## Stage 0 Consolidation Rule
@@ -37,7 +37,7 @@ Stage 0 files are not generic utilities. They belong under `src/reproducibility/
 - `stage0_constraint_audit.m` audits existing MAT result residuals.
 - `run_stage0_quality_gate.m` remains in `src/pipeline/` because it is an executable workflow.
 
-This avoids scattering evidence-tracing code across `utils/` while keeping the review-facing audit layer explicit.
+This avoids scattering evidence-tracing code or one-off experiment probes across `utils/` while keeping the review-facing audit layer explicit.
 
 ## Growth Control Rule
 

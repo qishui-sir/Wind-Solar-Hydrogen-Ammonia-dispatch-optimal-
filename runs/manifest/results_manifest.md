@@ -1,8 +1,8 @@
 # Results Manifest
 
-Generated: 2026-08-26 16:39:30
+Generated: 2026-08-28 10:29:56
 
-- MAT result files: `195`
-- Successfully read: `195`
-- Files with LCOA: `170`
-- Files with primary metrics: `170`
+- MAT result files: `366`
+- Successfully read: `366`
+- Files with LCOA: `334`
+- Files with primary metrics: `334`

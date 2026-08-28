@@ -5,7 +5,7 @@ function fallback = build_development_forecast_fallback()
 %   runs must use this external fallback and must not derive it from the
 %   target year (no target-year leakage).
 
-project_dir = setup_project_paths(mfilename('fullpath')); %#ok<NASGU>
+project_dir = bootstrap_project(); %#ok<NASGU>
 
 pv_2022 = load_res_year(struct('year', 2022));
 pw_2022 = load_res_year(struct('year', 2022));
@@ -24,4 +24,12 @@ fallback = struct();
 fallback.source_years = [2022, 2023];
 fallback.pv_power_kw = median(reshape(pv_all, 24, []), 2);
 fallback.pw_power_kw = median(reshape(pw_all, 24, []), 2);
+end
+
+function project_dir = bootstrap_project()
+pipeline_dir = fileparts(mfilename('fullpath'));
+src_dir = fileparts(pipeline_dir);
+project_dir = fileparts(src_dir);
+addpath(fullfile(src_dir, 'utils'), '-begin');
+project_dir = setup_project_paths(project_dir);
 end

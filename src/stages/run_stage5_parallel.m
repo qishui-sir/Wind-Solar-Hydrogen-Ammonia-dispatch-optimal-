@@ -63,6 +63,7 @@ smoothing_values = option_value(config, ...
 
 specs = build_candidate_specs( ...
     reserve_designs, pacing_values, smoothing_values);
+specs = attach_candidate_year(specs, source_year_value);
 candidate_limit = option_value(config, 'candidate_limit', Inf);
 if isfinite(candidate_limit) && candidate_limit < numel(specs)
     specs = specs(1:candidate_limit);
@@ -91,8 +92,8 @@ end
 rows = cell(numel(specs), 1);
 parfor candidate_index = 1:numel(specs)
     rows{candidate_index} = run_one_candidate( ...
-        specs(candidate_index), source_mat_path, forecast_mode, ...
-        gate_mode, soft_reserve, allow_infeasible, ...
+        specs(candidate_index), source_year_value, source_mat_path, ...
+        forecast_mode, gate_mode, soft_reserve, allow_infeasible, ...
         restoration_penalty, rolling_output_dir, resume, fallback);
 end
 
@@ -107,7 +108,7 @@ if include_baseline
     if isempty(rows)
         rows = baseline;
     else
-        rows = [baseline; rows]; %#ok<AGROW>
+        rows = [baseline; rows];
     end
 end
 
@@ -143,9 +144,9 @@ if nargout == 0
 end
 end
 
-function row = run_one_candidate(spec, source_mat_path, forecast_mode, ...
-        gate_mode, soft_reserve, allow_infeasible, restoration_penalty, ...
-        rolling_output_dir, resume, fallback)
+function row = run_one_candidate(spec, data_year, source_mat_path, ...
+        forecast_mode, gate_mode, soft_reserve, allow_infeasible, ...
+        restoration_penalty, rolling_output_dir, resume, fallback)
 row = empty_grid_row();
 row.case_id = spec.case_id;
 row.h2_reserve_quantile = spec.quantile;
@@ -157,14 +158,12 @@ row.h2_reserve_soft = soft_reserve;
 row.is_baseline = false;
 
 candidate_path = candidate_rolling_path( ...
-    rolling_output_dir, spec.year, spec, gate_mode, soft_reserve);
+    rolling_output_dir, data_year, spec, gate_mode, soft_reserve);
 if resume && isfile(candidate_path)
     try
         loaded = load(candidate_path, 'result', 'run_info', 'metrics');
-        if isfield(loaded, 'result') && isfield(loaded, 'run_info') && ...
-                isfield(loaded, 'metrics') && ...
-                isfield(loaded.run_info, 'status') && ...
-                string(loaded.run_info.status) == "completed"
+        if is_completed_candidate_mat( ...
+                loaded, data_year, forecast_mode)
             row = completed_row(row, loaded.result, loaded.run_info, ...
                 loaded.metrics);
             return
@@ -226,6 +225,25 @@ for reserve_index = 1:numel(reserve_designs)
             specs(index).smoothing = smoothing;
         end
     end
+end
+end
+
+function ok = is_completed_candidate_mat(loaded, data_year, forecast_mode)
+ok = isstruct(loaded) && isfield(loaded, 'result') && ...
+    isfield(loaded, 'run_info') && isfield(loaded, 'metrics');
+if ~ok
+    return
+end
+info = loaded.run_info;
+ok = isfield(info, 'status') && string(info.status) == "completed" && ...
+    isfield(info, 'data_year') && double(info.data_year) == data_year && ...
+    isfield(info, 'forecast_mode') && ...
+    string(info.forecast_mode) == forecast_mode;
+end
+
+function specs = attach_candidate_year(specs, data_year)
+for index = 1:numel(specs)
+    specs(index).year = data_year;
 end
 end
 

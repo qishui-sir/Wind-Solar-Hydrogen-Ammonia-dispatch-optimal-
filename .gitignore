@@ -8,11 +8,17 @@ docs/*
 !docs/stage0_environment_report.md
 !docs/stage0_constraint_audit.md
 !docs/stage0_quality_gate_report.md
+!docs/v52_negative_evidence_freeze.md
 !docs/decisions/
 !docs/decisions/*.md
 
 runs/*
 !runs/
+!runs/archive/
+!runs/archive/v52_negative_20260828/
+runs/archive/v52_negative_20260828/*
+!runs/archive/v52_negative_20260828/evidence_manifest.csv
+!runs/archive/v52_negative_20260828/rolling_2024_candidate_hashes.csv
 !runs/manifest/
 !runs/manifest/*.csv
 !runs/manifest/*.json

@@ -41,9 +41,9 @@ outputs = run_reproduce_full_grid(struct( ...
 | `src/results` | KPI, economics, metric evaluation, and frozen result selection. |
 | `src/reproducibility` | Stage 0 freeze checks, manifests, and constraint audits. |
 | `src/stages` | Scientific experiment stage runners. |
-| `src/pipeline` | User-facing run commands. |
+| `src/pipeline` | User-facing run commands and formal pipeline helpers. |
 | `src/paper` | Manuscript table and figure export adapters. |
-| `src/utils` | Generic project root, path setup, and small shared helpers. |
+| `src/utils` | Minimal generic helpers: project root, path setup, directory creation, and option defaults. |
 
 See `docs/project_structure.md` for the full directory contract.
 

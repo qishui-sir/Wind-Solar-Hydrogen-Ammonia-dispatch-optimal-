@@ -1,14 +1,14 @@
 # Stage 0 Quality Gate Report
 
-- Generated: `2026-08-26 16:39:18`
+- Generated: `2026-08-28 10:29:36`
 - Project: `C:\Users\祁水\Desktop\风光氢氨系统\project`
-- Source tree hash: `43abaaba2c48e130b988f9b212dd1adc4bf873cc0b1dc6927689d93b15f328d3`
+- Source tree hash: `9abdae2a825fa9eb416d2343c5d584ce683f4c0139ff635d18b0383fdcadbdae`
 - Freeze check passed: `1`
 - Tests passed: `1`
 - Constraint audit generated without audit errors: `1`
-- Audited dispatch results: `170`
-- Audited results passing hard checks: `107`
-- Audited results flagged for constraint review: `63`
+- Audited dispatch results: `334`
+- Audited results passing hard checks: `111`
+- Audited results flagged for constraint review: `223`
 - Overall passed: `1`
 
 Generated artifacts:

@@ -1,4 +1,4 @@
-function run_full_campaign(config)
+function outputs = run_full_campaign(config)
 %RUN_FULL_CAMPAIGN Full paper compute: 2024 calibration + 2025 lock.
 %   - 2024: Stage 1 + rolling baseline + Stage 5 joint grid (persistence)
 %           + v5.2 selection audit
@@ -31,19 +31,28 @@ cleanup = onCleanup(@() diary('off'));
 fprintf('\n===== Campaign start: %s =====\n', char(datetime('now')));
 
 fallback = build_development_forecast_fallback();
+outputs = struct();
+selection = [];
 
 if option_value(config, 'run_2024', true)
-    run_year_calibration(project_dir, 2024, fallback, config);
+    outputs.year2024 = run_year_calibration( ...
+        project_dir, 2024, fallback, config);
+    selection = outputs.year2024.selection;
 end
 if option_value(config, 'run_2025', true)
-    run_year_lock(project_dir, 2025, fallback, config);
+    if isempty(selection)
+        selection = load_2024_selection(project_dir);
+    end
+    assert_selected_candidate(selection.selection_info);
+    outputs.year2025 = run_year_lock( ...
+        project_dir, 2025, fallback, selection.selected);
 end
 
 fprintf('===== Campaign end: %s =====\n', char(datetime('now')));
 diary off;
 end
 
-function run_year_calibration(project_dir, year, fallback, config)
+function result = run_year_calibration(project_dir, year, fallback, config)
 fprintf('\n----- %d calibration (persistence) -----\n', year);
 stage1_mat = ensure_stage1(project_dir, year);
 baseline_mat = ensure_rolling_baseline(project_dir, year, fallback, stage1_mat);
@@ -83,29 +92,31 @@ save(fullfile(project_dir, 'runs', 'stage2', [base, '.mat']), ...
     'selected', 'audit_table', 'selection_info');
 fprintf('v5.2 selection %d: %s | selected: %s\n', year, ...
     selection_info.status, string(selection_info.selected_case_id));
+
+result = struct( ...
+    'stage1_mat', string(stage1_mat), ...
+    'baseline_mat', string(baseline_mat), ...
+    'grid_table', grid_table, ...
+    'grid_run_info', grid_run_info, ...
+    'selection', struct( ...
+        'selected', selected, ...
+        'audit_table', audit_table, ...
+        'selection_info', selection_info));
 end
 
-function run_year_lock(project_dir, year, fallback, ~)
+function result = run_year_lock(project_dir, year, fallback, selected)
 fprintf('\n----- %d lock (persistence) -----\n', year);
 stage1_mat = ensure_stage1(project_dir, year);
-ensure_rolling_baseline(project_dir, year, fallback, stage1_mat);
-ensure_economic_only(project_dir, year, fallback, stage1_mat);
+baseline_mat = ensure_rolling_baseline(project_dir, year, fallback, stage1_mat);
+economic_mat = ensure_economic_only(project_dir, year, fallback, stage1_mat);
+selected_mat = run_selected_candidate(project_dir, year, fallback, ...
+    stage1_mat, selected);
 
-selection_mat = fullfile(project_dir, 'runs', 'stage2', ...
-    'v52_selection_audit_2024_latest.mat');
-if isfile(selection_mat)
-    loaded = load(selection_mat, 'selected');
-    if isfield(loaded, 'selected') && ...
-            isfield(loaded.selected, 'case_id') && ...
-            strlength(string(loaded.selected.case_id)) > 0
-        run_selected_candidate(project_dir, year, fallback, ...
-            stage1_mat, loaded.selected);
-    else
-        fprintf('No eligible candidate from 2024; skip 2025 selected run.\n');
-    end
-else
-    fprintf('Missing 2024 selection audit; skip 2025 selected run.\n');
-end
+result = struct( ...
+    'stage1_mat', string(stage1_mat), ...
+    'baseline_mat', string(baseline_mat), ...
+    'economic_mat', string(economic_mat), ...
+    'selected_mat', string(selected_mat));
 end
 
 function stage1_mat = ensure_stage1(project_dir, year)
@@ -127,7 +138,8 @@ function baseline_mat = ensure_rolling_baseline(project_dir, year, ...
         fallback, stage1_mat)
 baseline_mat = fullfile(project_dir, 'runs', 'rolling', ...
     sprintf('v51_contract_plan_and_hb_smoothing_%d_latest.mat', year));
-if ~isfile(baseline_mat)
+if ~validate_completed_mat(baseline_mat, year, ...
+        "contract_plan_and_hb_smoothing", "simulated_persistence")
     fprintf('Rolling baseline %d (persistence)...\n', year);
     rolling_dispatch(struct( ...
         'source_mat_path', stage1_mat, ...
@@ -144,13 +156,16 @@ if ~isfile(baseline_mat)
     error('run_full_campaign:missing_baseline', ...
         'Missing rolling baseline MAT file: %s', baseline_mat);
 end
+assert_completed_mat(baseline_mat, year, ...
+    "contract_plan_and_hb_smoothing", "simulated_persistence");
 fprintf('Rolling baseline %d ready.\n', year);
 end
 
-function ensure_economic_only(project_dir, year, fallback, stage1_mat)
+function output = ensure_economic_only(project_dir, year, fallback, stage1_mat)
 output = fullfile(project_dir, 'runs', 'rolling', ...
     sprintf('v51_economic_only_%d_latest.mat', year));
-if isfile(output)
+if validate_completed_mat(output, year, ...
+        "economic_only", "simulated_persistence")
     fprintf('economic_only %d ready.\n', year);
     return
 end
@@ -165,13 +180,15 @@ rolling_dispatch(struct( ...
     'save_output', true, ...
     'verbose', false, ...
     'solver_display', 'none'));
+assert_completed_mat(output, year, "economic_only", ...
+    "simulated_persistence");
 end
 
-function run_selected_candidate(project_dir, year, fallback, ...
+function output = run_selected_candidate(project_dir, year, fallback, ...
         stage1_mat, selected)
 fprintf('Selected candidate %d: %s...\n', year, ...
     string(selected.case_id));
-rolling_dispatch(struct( ...
+[~, selected_info] = rolling_dispatch(struct( ...
     'source_mat_path', stage1_mat, ...
     'scheme', "contract_plan_and_hb_smoothing", ...
     'forecast_mode', "simulated_persistence", ...
@@ -189,4 +206,84 @@ rolling_dispatch(struct( ...
     'save_output', true, ...
     'verbose', false, ...
     'solver_display', 'none'));
+output = char(selected_info.output_path);
+assert_completed_mat(output, year, ...
+    "contract_plan_and_hb_smoothing", "simulated_persistence");
+end
+
+function selection = load_2024_selection(project_dir)
+selection_mat = fullfile(project_dir, 'runs', 'stage2', ...
+    'v52_selection_audit_2024_latest.mat');
+if ~isfile(selection_mat)
+    error('run_full_campaign:missing_selection_audit', ...
+        'Missing 2024 selection audit: %s', selection_mat);
+end
+loaded = load(selection_mat, 'selected', 'selection_info', 'audit_table');
+if ~isfield(loaded, 'selection_info')
+    error('run_full_campaign:bad_selection_audit', ...
+        'Selection audit has no selection_info: %s', selection_mat);
+end
+if ~isfield(loaded, 'selected')
+    loaded.selected = struct('case_id', "");
+end
+if ~isfield(loaded, 'audit_table')
+    loaded.audit_table = table();
+end
+selection = struct( ...
+    'selected', loaded.selected, ...
+    'audit_table', loaded.audit_table, ...
+    'selection_info', loaded.selection_info);
+end
+
+function assert_selected_candidate(selection_info)
+if ~isfield(selection_info, 'status') || ...
+        string(selection_info.status) ~= "selected" || ...
+        ~isfield(selection_info, 'selected_case_id') || ...
+        strlength(string(selection_info.selected_case_id)) == 0
+    error('run_full_campaign:no_selected_candidate', ...
+        ['2024 v5.2 selection did not select a candidate. ', ...
+        'Stop before 2025 lock and report the 2024 negative result.']);
+end
+end
+
+function assert_completed_mat(mat_path, expected_year, expected_scheme, ...
+        expected_forecast_mode)
+if ~validate_completed_mat(mat_path, expected_year, expected_scheme, ...
+        expected_forecast_mode)
+    error('run_full_campaign:incomplete_artifact', ...
+        'Artifact is not a completed %s result for %d: %s', ...
+        expected_scheme, expected_year, mat_path);
+end
+end
+
+function ok = validate_completed_mat(mat_path, expected_year, ...
+        expected_scheme, expected_forecast_mode)
+ok = false;
+if ~isfile(mat_path)
+    return
+end
+try
+    loaded = load(mat_path, 'result', 'run_info', 'metrics');
+catch
+    return
+end
+if ~isfield(loaded, 'result') || ~isfield(loaded, 'run_info') || ...
+        ~isfield(loaded, 'metrics')
+    return
+end
+info = loaded.run_info;
+if ~isfield(info, 'status') || string(info.status) ~= "completed"
+    return
+end
+if ~isfield(info, 'data_year') || double(info.data_year) ~= expected_year
+    return
+end
+if ~isfield(info, 'scheme') || string(info.scheme) ~= expected_scheme
+    return
+end
+if ~isfield(info, 'forecast_mode') || ...
+        string(info.forecast_mode) ~= expected_forecast_mode
+    return
+end
+ok = true;
 end
