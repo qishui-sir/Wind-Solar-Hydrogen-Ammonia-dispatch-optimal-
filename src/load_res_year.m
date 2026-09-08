@@ -1,6 +1,8 @@
 function renewable_data = load_res_year(config)
 %LOAD_RES_YEAR Load full-year PV and wind profiles for Zhou dispatch runs.
 
+addpath(fullfile(fileparts(mfilename('fullpath')), 'utils'), '-begin');
+
 if nargin < 1 || isempty(config)
     config = struct();
 end
@@ -90,14 +92,6 @@ function data_dir = default_data_dir()
 src_dir = fileparts(mfilename('fullpath'));
 project_dir = fileparts(src_dir);
 data_dir = fullfile(project_dir, 'data', 'renewables_ninja');
-end
-
-function value = option_value(config, name, default_value)
-if isfield(config, name) && ~isempty(config.(name))
-    value = config.(name);
-else
-    value = default_value;
-end
 end
 
 function [profile_time, profile_value, stats] = read_profile(file_path)

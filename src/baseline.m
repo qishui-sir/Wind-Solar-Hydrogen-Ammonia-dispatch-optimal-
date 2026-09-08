@@ -1,6 +1,8 @@
 function result = baseline(params, renewable_data, run_options)
 %BASELINE Solve the Zhou S2 annual dispatch model and assemble its results.
 
+addpath(fullfile(fileparts(mfilename('fullpath')), 'utils'), '-begin');
+
 if nargin < 3 || isempty(run_options)
     run_options = struct();
 end
@@ -77,6 +79,9 @@ if contract_enabled
         economic_relative_gap;
 end
 end
+
+
+%% Func
 
 function initial_solution = sanitize_initial_solution(initial_solution)
 removed_fields = {'daily_contract_kg', 'P_AEL_start'};
@@ -159,12 +164,4 @@ else
 end
 disp(['求解状态: ', num2str(exitflag)]);
 disp(output);
-end
-
-function value = option_value(options, name, default_value)
-if isstruct(options) && isfield(options, name) && ~isempty(options.(name))
-    value = options.(name);
-else
-    value = default_value;
-end
 end

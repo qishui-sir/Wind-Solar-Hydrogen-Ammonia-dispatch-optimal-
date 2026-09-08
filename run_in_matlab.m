@@ -10,7 +10,8 @@ project_dir = fileparts(mfilename('fullpath'));
 cd(project_dir);
 
 % Add all source folders to the MATLAB path
-addpath(genpath(fullfile(project_dir, 'src')));
+addpath(fullfile(project_dir, 'src', 'utils'), '-begin');
+setup_project_paths(project_dir);
 
 % Run the full campaign (parallel by default)
 run_full_campaign();

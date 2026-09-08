@@ -3,11 +3,6 @@ docs/*
 !docs/
 !docs/protocol_v5.md
 !docs/reproducibility.md
-!docs/project_structure.md
-!docs/stage0_file_inventory.md
-!docs/stage0_environment_report.md
-!docs/stage0_constraint_audit.md
-!docs/stage0_quality_gate_report.md
 !docs/v52_negative_evidence_freeze.md
 !docs/decisions/
 !docs/decisions/*.md
@@ -27,3 +22,9 @@ runs/archive/v52_negative_20260828/*
 
 paper_outputs/
 *.asv
+
+# Human-readable reports and preserved historical narrative.
+!docs/reports/
+!docs/reports/*.md
+!docs/history/
+!docs/history/*.md

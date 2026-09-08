@@ -1,8 +1,8 @@
 function metrics = evaluate_protocol_v51_metrics(mat_path)
 %EVALUATE_PROTOCOL_V51_METRICS Compute v5.1 metrics from the stage 1 MAT file.
 
-project_dir = project_root();
-add_project_paths(project_dir);
+addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'utils'), '-begin');
+project_dir = setup_project_paths(mfilename('fullpath'));
 
 if nargin < 1 || isempty(mat_path)
     mat_path = fullfile(project_dir, 'runs', 'stage1', ...
@@ -625,19 +625,6 @@ if abs(samples_per_day - samples_per_day_exact) > 1e-9
     error('evaluate_protocol_v51_metrics:bad_time_step', ...
         'Time step must divide 24 hours exactly.');
 end
-end
-
-function project_dir = project_root()
-results_dir = fileparts(mfilename('fullpath'));
-src_dir = fileparts(results_dir);
-project_dir = fileparts(src_dir);
-end
-
-function add_project_paths(project_dir)
-addpath(fullfile(project_dir, 'src'));
-addpath(fullfile(project_dir, 'src', 'params'));
-addpath(fullfile(project_dir, 'src', 'results'));
-addpath(fullfile(project_dir, 'src', 'protocol'));
 end
 
 function print_metrics(metrics)

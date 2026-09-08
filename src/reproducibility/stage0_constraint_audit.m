@@ -15,7 +15,7 @@ project_dir = option_value(config, 'project_dir', ...
 write_outputs = option_value(config, 'write_outputs', true);
 manifest_dir = option_value(config, 'manifest_dir', ...
     fullfile(project_dir, 'runs', 'manifest'));
-docs_dir = option_value(config, 'docs_dir', fullfile(project_dir, 'docs'));
+docs_dir = option_value(config, 'docs_dir', fullfile(project_dir, 'docs', 'reports'));
 
 mat_files = dir(fullfile(project_dir, 'runs', '**', '*.mat'));
 relative_path = strings(0, 1);
@@ -69,8 +69,8 @@ audit_table = table(relative_path, audit_status, hard_constraints_passed, ...
 audit_table = sortrows(audit_table, 'RelativePath');
 
 if write_outputs
-    ensure_dir(manifest_dir);
-    ensure_dir(docs_dir);
+    ensure_directory(manifest_dir);
+    ensure_directory(docs_dir);
     writetable(audit_table, fullfile(manifest_dir, ...
         'constraint_audit.csv'));
     write_audit_doc(fullfile(docs_dir, ...
@@ -214,18 +214,4 @@ else
     rel_path = string(file_path);
 end
 rel_path = replace(rel_path, filesep, "/");
-end
-
-function ensure_dir(dir_path)
-if ~isfolder(dir_path)
-    mkdir(dir_path);
-end
-end
-
-function value = option_value(config, name, default_value)
-if isfield(config, name) && ~isempty(config.(name))
-    value = config.(name);
-else
-    value = default_value;
-end
 end

@@ -77,9 +77,7 @@ if ~run_info.checks.passed
 end
 
 if save_output
-    if ~isfolder(run_dir)
-        mkdir(run_dir);
-    end
+    ensure_directory(run_dir);
     output_path = fullfile(run_dir, ...
         sprintf('zhou_s2_baseline_%d_latest.mat', data_year));
     run_info.output_path = string(output_path);

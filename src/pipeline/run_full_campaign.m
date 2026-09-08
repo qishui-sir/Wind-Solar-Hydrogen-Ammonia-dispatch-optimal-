@@ -16,11 +16,8 @@ if nargin < 1 || isempty(config)
     config = struct();
 end
 
-% Bootstrap the path without relying on any already-added folder.
-pipeline_dir = fileparts(mfilename('fullpath'));
-src_dir = fileparts(pipeline_dir);
-project_dir = fileparts(src_dir);
-addpath(genpath(fullfile(project_dir, 'src')));
+addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'utils'), '-begin');
+project_dir = setup_project_paths(mfilename('fullpath'));
 
 ensure_directory(fullfile(project_dir, 'runs'));
 log_path = fullfile(project_dir, 'runs', 'campaign_log.txt');

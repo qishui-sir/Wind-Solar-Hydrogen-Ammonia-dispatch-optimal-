@@ -53,7 +53,7 @@ write_outputs = option_value(config, 'write_outputs', true);
 manifest_dir = option_value(config, 'manifest_dir', ...
     fullfile(project_dir, 'runs', 'manifest'));
 docs_dir = option_value(config, 'docs_dir', ...
-    fullfile(project_dir, 'docs'));
+    fullfile(project_dir, 'docs', 'reports'));
 
 files = dir(fullfile(project_dir, '**', '*'));
 relative_paths = strings(0, 1);
@@ -97,8 +97,8 @@ inventory = table(relative_paths, categories, roles, extensions, bytes, ...
 inventory = sortrows(inventory, 'RelativePath');
 
 if write_outputs
-    ensure_dir(manifest_dir);
-    ensure_dir(docs_dir);
+    ensure_directory(manifest_dir);
+    ensure_directory(docs_dir);
     writetable(inventory, fullfile(manifest_dir, 'file_inventory.csv'));
 
     source_roles = ["source_code", "test_code", "protocol", ...
@@ -218,7 +218,7 @@ project_dir = option_value(config, 'project_dir', ...
 write_outputs = option_value(config, 'write_outputs', true);
 manifest_dir = option_value(config, 'manifest_dir', ...
     fullfile(project_dir, 'runs', 'manifest'));
-docs_dir = option_value(config, 'docs_dir', fullfile(project_dir, 'docs'));
+docs_dir = option_value(config, 'docs_dir', fullfile(project_dir, 'docs', 'reports'));
 
 environment = struct();
 environment.generated_at = string(datetime('now', 'TimeZone', 'local'));
@@ -233,8 +233,8 @@ environment.intlinprog_options = intlinprog_options_snapshot();
 environment.source_tree_hash = source_tree_hash(project_dir);
 
 if write_outputs
-    ensure_dir(manifest_dir);
-    ensure_dir(docs_dir);
+    ensure_directory(manifest_dir);
+    ensure_directory(docs_dir);
     json_text = jsonencode(environment, PrettyPrint=true);
     write_text(fullfile(manifest_dir, 'environment_manifest.json'), ...
         json_text);
@@ -418,7 +418,7 @@ manifest = table(relative_path, stage, scheme, candidate, data_year, ...
 manifest = sortrows(manifest, 'RelativePath');
 
 if write_outputs
-    ensure_dir(manifest_dir);
+    ensure_directory(manifest_dir);
     writetable(manifest, fullfile(manifest_dir, ...
         'results_manifest.csv'));
     write_manifest_doc(fullfile(manifest_dir, ...
@@ -657,18 +657,4 @@ end
 
 digest = typecast(message_digest.digest(), 'uint8');
 hash = lower(reshape(dec2hex(digest)', 1, []));
-end
-
-function ensure_dir(dir_path)
-if ~isfolder(dir_path)
-    mkdir(dir_path);
-end
-end
-
-function value = option_value(config, name, default_value)
-if isfield(config, name) && ~isempty(config.(name))
-    value = config.(name);
-else
-    value = default_value;
-end
 end

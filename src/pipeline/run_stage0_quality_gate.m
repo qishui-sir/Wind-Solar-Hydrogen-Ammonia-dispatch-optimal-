@@ -5,7 +5,8 @@ if nargin < 1 || isempty(config)
     config = struct();
 end
 
-project_dir = bootstrap_project();
+addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'utils'), '-begin');
+project_dir = setup_project_paths(mfilename('fullpath'));
 test_scope = string(option_value(config, 'test_scope', "quick"));
 assert_success = option_value(config, 'assert_success', true);
 
@@ -62,25 +63,16 @@ report.passed = report.freeze_check_passed && report.tests_passed && ...
     report.constraint_audit_passed;
 
 manifest_dir = fullfile(project_dir, 'runs', 'manifest');
-if ~isfolder(manifest_dir)
-    mkdir(manifest_dir);
-end
+ensure_directory(manifest_dir);
 save(fullfile(manifest_dir, 'stage0_quality_gate_report.mat'), 'report');
-write_quality_gate_doc(fullfile(project_dir, 'docs', ...
+ensure_directory(fullfile(project_dir, 'docs', 'reports'));
+write_quality_gate_doc(fullfile(project_dir, 'docs', 'reports', ...
     'stage0_quality_gate_report.md'), report);
 
 if assert_success && ~report.passed
     error('run_stage0_quality_gate:failed', ...
-        'Stage 0 quality gate failed. Inspect docs/stage0_quality_gate_report.md.');
+        'Stage 0 quality gate failed. Inspect docs/reports/stage0_quality_gate_report.md.');
 end
-end
-
-function project_dir = bootstrap_project()
-pipeline_dir = fileparts(mfilename('fullpath'));
-src_dir = fileparts(pipeline_dir);
-project_dir = fileparts(src_dir);
-addpath(fullfile(src_dir, 'utils'), '-begin');
-project_dir = setup_project_paths(project_dir);
 end
 
 function write_quality_gate_doc(output_path, report)

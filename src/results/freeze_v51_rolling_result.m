@@ -5,8 +5,8 @@ if nargin < 1 || isempty(config)
     config = struct();
 end
 
-project_dir = project_root();
-add_project_paths(project_dir);
+addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'utils'), '-begin');
+project_dir = setup_project_paths(mfilename('fullpath'));
 
 source_mat_path = option_value(config, 'source_mat_path', ...
     fullfile(project_dir, 'runs', 'rolling', ...
@@ -63,9 +63,7 @@ end
 
 if save_output
     output_dir = fileparts(output_path);
-    if ~isfolder(output_dir)
-        mkdir(output_dir);
-    end
+    ensure_directory(output_dir);
     save(output_path, 'frozen_result', 'frozen_run_info', ...
         'frozen_metrics', 'freeze_info', 'params', ...
         'renewable_data', 'source_run_info');
@@ -88,26 +86,5 @@ for index = 1:numel(required_flags)
         error('freeze_v51_rolling_result:failed_feasibility', ...
             'Cannot freeze result because %s is false.', name);
     end
-end
-end
-
-function project_dir = project_root()
-results_dir = fileparts(mfilename('fullpath'));
-src_dir = fileparts(results_dir);
-project_dir = fileparts(src_dir);
-end
-
-function add_project_paths(project_dir)
-addpath(fullfile(project_dir, 'src'));
-addpath(fullfile(project_dir, 'src', 'params'));
-addpath(fullfile(project_dir, 'src', 'results'));
-addpath(fullfile(project_dir, 'src', 'protocol'));
-end
-
-function value = option_value(config, name, default_value)
-if isfield(config, name) && ~isempty(config.(name))
-    value = config.(name);
-else
-    value = default_value;
 end
 end

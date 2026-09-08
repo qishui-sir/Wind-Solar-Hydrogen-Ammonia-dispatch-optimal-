@@ -32,3 +32,14 @@ Rejected for now because the three manifest generators share purpose and helpers
 - Stage 0 source files are fewer and named by responsibility.
 - Tests and pipeline scripts call a smaller public API: `stage0_manifest` and `stage0_constraint_audit`.
 - Core model files remain untouched.
+## 2026-09-07 consolidation
+
+Equivalent local option, directory and root/path helpers now use `src/utils`.
+Minimal entry bootstraps remain so pipeline commands can start independently.
+Empty-preserving field access remains distinct from default-on-empty lookup.
+No scientific equations or protocol seals were changed.
+
+Directory guidance is maintained in `docs/reproducibility.md`; README is the
+command index. Generated Markdown reports live in `docs/reports`; protocols and
+negative evidence retain their paths. The earlier positive manuscript narrative
+is preserved under `docs/history` as superseded material.

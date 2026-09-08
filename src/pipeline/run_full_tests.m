@@ -5,7 +5,8 @@ if nargin < 1 || isempty(config)
     config = struct();
 end
 
-project_dir = bootstrap_project();
+addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'utils'), '-begin');
+project_dir = setup_project_paths(mfilename('fullpath'));
 assert_success = option_value(config, 'assert_success', true);
 
 test_results = runtests(fullfile(project_dir, 'test'), ...
@@ -18,12 +19,4 @@ fprintf('=======================================\n');
 if assert_success && ~all([test_results.Passed])
     error('run_full_tests:failed', 'One or more full tests failed.');
 end
-end
-
-function project_dir = bootstrap_project()
-pipeline_dir = fileparts(mfilename('fullpath'));
-src_dir = fileparts(pipeline_dir);
-project_dir = fileparts(src_dir);
-addpath(fullfile(src_dir, 'utils'), '-begin');
-project_dir = setup_project_paths(project_dir);
 end

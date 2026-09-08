@@ -5,7 +5,8 @@ function fallback = build_development_forecast_fallback()
 %   runs must use this external fallback and must not derive it from the
 %   target year (no target-year leakage).
 
-project_dir = bootstrap_project(); %#ok<NASGU>
+addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'utils'), '-begin');
+project_dir = setup_project_paths(mfilename('fullpath')); %#ok<NASGU>
 
 pv_2022 = load_res_year(struct('year', 2022));
 pw_2022 = load_res_year(struct('year', 2022));
@@ -24,12 +25,37 @@ fallback = struct();
 fallback.source_years = [2022, 2023];
 fallback.pv_power_kw = median(reshape(pv_all, 24, []), 2);
 fallback.pw_power_kw = median(reshape(pw_all, 24, []), 2);
+fallback.residual_library = build_residual_library({pv_2022, pv_2023});
+fallback.residual_method = ...
+    "target_hour_observed_minus_previous_day_same_hour_persistence";
 end
 
-function project_dir = bootstrap_project()
-pipeline_dir = fileparts(mfilename('fullpath'));
-src_dir = fileparts(pipeline_dir);
-project_dir = fileparts(src_dir);
-addpath(fullfile(src_dir, 'utils'), '-begin');
-project_dir = setup_project_paths(project_dir);
+function residual_library = build_residual_library(development_data)
+resource = strings(0, 1);
+month_value = zeros(0, 1);
+hour_value = zeros(0, 1);
+residual_kw = zeros(0, 1);
+
+for data_index = 1:numel(development_data)
+    data = development_data{data_index};
+    target_indices = (25:data.time_count)';
+    previous_indices = target_indices - 24;
+    target_month = month(data.time(target_indices));
+    target_hour = hour(data.time(target_indices)) + 1;
+
+    pv_residual = data.pv_power_kw(target_indices) ...
+        - data.pv_power_kw(previous_indices);
+    pw_residual = data.pw_power_kw(target_indices) ...
+        - data.pw_power_kw(previous_indices);
+
+    row_count = numel(target_indices);
+    resource = [resource; repmat("pv", row_count, 1); ...
+        repmat("pw", row_count, 1)]; %#ok<AGROW>
+    month_value = [month_value; target_month; target_month]; %#ok<AGROW>
+    hour_value = [hour_value; target_hour; target_hour]; %#ok<AGROW>
+    residual_kw = [residual_kw; pv_residual(:); pw_residual(:)]; %#ok<AGROW>
+end
+
+residual_library = table(resource, month_value, hour_value, residual_kw, ...
+    'VariableNames', {'resource', 'month', 'hour', 'residual_kw'});
 end

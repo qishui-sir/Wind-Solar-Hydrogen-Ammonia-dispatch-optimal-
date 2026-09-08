@@ -5,7 +5,8 @@ if nargin < 1 || isempty(config)
     config = struct();
 end
 
-project_dir = bootstrap_project();
+addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'utils'), '-begin');
+project_dir = setup_project_paths(mfilename('fullpath'));
 run_stage4 = option_value(config, 'run_stage4', true);
 run_stage5 = option_value(config, 'run_stage5', true);
 run_v52_selection = option_value(config, 'run_v52_selection', false);
@@ -32,14 +33,6 @@ end
 
 stage0_manifest("results", struct('project_dir', project_dir));
 stage0_constraint_audit(struct('project_dir', project_dir));
-end
-
-function project_dir = bootstrap_project()
-pipeline_dir = fileparts(mfilename('fullpath'));
-src_dir = fileparts(pipeline_dir);
-project_dir = fileparts(src_dir);
-addpath(fullfile(src_dir, 'utils'), '-begin');
-project_dir = setup_project_paths(project_dir);
 end
 
 function selection_output = run_v52_selection_audit( ...

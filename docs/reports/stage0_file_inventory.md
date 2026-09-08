@@ -1,6 +1,6 @@
 # Stage 0 File Inventory
 
-Generated: 2026-08-28 10:50:42
+Generated: 2026-08-28 15:53:18
 
 This inventory separates source, tests, raw input data, generated results, and documentation for reproducible review.
 
@@ -15,7 +15,7 @@ This inventory separates source, tests, raw input data, generated results, and d
 | other | uncategorized | 1 |
 | paper_outputs | generated_paper_output | 7 |
 | project | project_config | 2 |
-| runs | generated_result | 384 |
+| runs | generated_result | 396 |
 | source | source_code | 45 |
 | test | test_artifact | 4 |
 | test | test_code | 7 |
@@ -44,9 +44,9 @@ This inventory separates source, tests, raw input data, generated results, and d
 - `src/params/default.m` [source, source_code] SHA256 `6c67c746c1117ffa637b3c2b6778c4bb021275441896095e5faecff0477e5804`
 - `src/params/h2_storage_limits.m` [source, source_code] SHA256 `01f4fa82bb4f414e2d3a4af66f8bb6bb1d2fe8804cecb5570b004d78951556bf`
 - `src/params/my_system.m` [source, source_code] SHA256 `aabaa6e75a61ee9bc5f1fd7380d51f122768ee8da61fa96ec4be062e05bbd140`
-- `src/pipeline/build_development_forecast_fallback.m` [source, source_code] SHA256 `6c8cd2c20a3d05865765b5e8fbe0aaab6bd62db361cb20b035b963437b4351d7`
+- `src/pipeline/build_development_forecast_fallback.m` [source, source_code] SHA256 `f6618cb77b7e687947933be9a78b5a56c961526bcea76f44bc27713e8e6ef713`
 - `src/pipeline/run_2024_calibration_grid.m` [source, source_code] SHA256 `a25cde2c67e020e01cb50427dd506ca6317ab6fd7f7c14c6369e9372a5162843`
-- `src/pipeline/run_feasibility_boundary.m` [source, source_code] SHA256 `508321b915b1ef7b1d7d5bffae552d93ddff54a1efa0d3edf780d598b0a6db6b`
+- `src/pipeline/run_feasibility_boundary.m` [source, source_code] SHA256 `8b0caaacc2f9c0b6b31114d3fe46a74ac9c6fd97cdc6b9e4810da8962b3addbe`
 - `src/pipeline/run_full_campaign.m` [source, source_code] SHA256 `10e2f04cb3c3476afa6597d75cce0e467c76307d8916d0df39644d8d1f0ced3d`
 - `src/pipeline/run_full_tests.m` [source, source_code] SHA256 `765ef52bc9ce0a7c3d6dde9e2b7b5b6ad54b27006bf8491e8cb7bdda5222dc5e`
 - `src/pipeline/run_paper_campaign.m` [source, source_code] SHA256 `47af14f09e1ac4fad5b160be415b2d696198857e625579bd57089416f8a08869`
@@ -60,13 +60,13 @@ This inventory separates source, tests, raw input data, generated results, and d
 - `src/reproducibility/stage0_freeze_check.m` [source, source_code] SHA256 `e9df9b1cdcfdcad3c22a1cb3395a33b57d07031b35d69f0f358d3f77bb19687a`
 - `src/reproducibility/stage0_manifest.m` [source, source_code] SHA256 `27a374c5b3b521b70e91c15a44b0ece3008a6db2891015d1e06155769583fa08`
 - `src/results/annual_fixed_cost.m` [source, source_code] SHA256 `a7b78fc822b1847a35a7a4e5aaf7806db7b05baa980e8c1f07bb9402cf5f67ad`
-- `src/results/classify_infeasibility.m` [source, source_code] SHA256 `a0e01ae71ed7a75745ece2ce233945e5662f35489ba7e13388fc37804aa62883`
+- `src/results/classify_infeasibility.m` [source, source_code] SHA256 `a14943b9c61dedfcaad7b015d0fed45213b9aa9963e599531e8f10e66b5ad056`
 - `src/results/evaluate_protocol_v51_metrics.m` [source, source_code] SHA256 `4abf9f86a6de08d2846ed813dab28c83c3fc488cff90e72b86fefcc33a6b5b5a`
 - `src/results/freeze_v51_rolling_result.m` [source, source_code] SHA256 `a5bec7cb66d2cac4894670b52b0b3b59c37ecedf3a332be5c11d5d78219ab000`
 - `src/results/result_LCOA.m` [source, source_code] SHA256 `ec8b84ae67025450c909bdb24ab34776e463e5b8501b2db6f649468501540742`
 - `src/results/results.m` [source, source_code] SHA256 `23bf1cdb0ef55d024b0c2216d8d332ce34ca218a8f37979ea3c20301509a8be6`
 - `src/results/select_protocol_v52_candidate.m` [source, source_code] SHA256 `b6b7d53ec699a133553c7aa7d9931b25a20126017f53e69adedd7cdd318f6890`
-- `src/rolling_dispatch.m` [source, source_code] SHA256 `8e23dc725f85b684e3e075935c00b7f5ec75ca77035cbf131930179d9fb7a1ea`
+- `src/rolling_dispatch.m` [source, source_code] SHA256 `d7d52ac9218b21a03a44aba3efe5ad65a59a614bc2de1ef744ce1e9e9ed4ea44`
 - `src/stages/run_stage5_parallel.m` [source, source_code] SHA256 `8ab084ceec2540fbe174803db1cbb83535ba27ad26bc72cccca63b802bd4e7b3`
 - `src/stages/stage1_run_zhou_s2_baseline.m` [source, source_code] SHA256 `90f5343d542bbaadf0858a9dcb50b0e0cb9a993bba26ae1b433e7ec9c46c4251`
 - `src/stages/stage3_run_v51_contract_closed_loop.m` [source, source_code] SHA256 `cceecd4734188e38893de4e87c10298a9842df290d0683445cec27b49e158a70`
@@ -80,6 +80,6 @@ This inventory separates source, tests, raw input data, generated results, and d
 - `test/test_chose_index.m` [test, test_code] SHA256 `f15342914299527034eacc77ca255ed76eed30fc8b38f2a3e9d47a415d61cab4`
 - `test/test_load_res_year.m` [test, test_code] SHA256 `7c8b38915464e3e4756fda1c51156706b5788d261e05163c6171310a0e549700`
 - `test/test_my_system.m` [test, test_code] SHA256 `561d90226361253187a343b0d7c4e030f041e240a7a6f6048b4e525e054141ff`
-- `test/test_protocol_v5.m` [test, test_code] SHA256 `7e95a8b681108a47fa2b9c1ac4e91ce01bc206b517a7e0c0d0f68e6b1689370f`
+- `test/test_protocol_v5.m` [test, test_code] SHA256 `124ada505237c39945deb018fec9716c6cd08ba49fe3c371e027c2fb888d2098`
 - `test/test_stage0_reproducibility.m` [test, test_code] SHA256 `d0aac67052e48a6f78b660fb3c8ecdffbaecf16745b4a43b6881b1c7605250b7`
 - `test/test_stage0_stage1.m` [test, test_code] SHA256 `4edc0918f9cf0aebe5261b033d9028fda90bbee1169a2d26a813eb721c0ac560`

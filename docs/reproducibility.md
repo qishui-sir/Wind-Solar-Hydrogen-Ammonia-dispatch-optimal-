@@ -1,161 +1,116 @@
-# Reproducibility Guide
+# Workflow and Reproducibility
 
-## Scope
+## Environment and startup
 
-This guide documents how to reproduce the Stage 0 quality baseline for the wind-solar-hydrogen-ammonia dispatch project. Stage 0 is an engineering and evidence-tracing layer. It does not change the optimization model, protocol metrics, candidate grid, or scientific claims.
-
-## Required Environment
-
-- MATLAB with Optimization Toolbox.
-- Access to the project folder and the original CSV files under `data/renewables_ninja`.
-- No network access is required for Stage 0 checks.
-
-## Project Setup
+Use MATLAB with Optimization Toolbox and the original `data/renewables_ninja`
+CSV inputs. Parallel Computing Toolbox is optional for parallel campaigns.
+No network is needed for local checks.
 
 ```matlab
 cd('<PROJECT_ROOT>')
-addpath('src/pipeline')
+addpath('src/utils')
+setup_project_paths();
 ```
 
-The project uses `setup_project_paths` to locate the repository root and add `src`, `src/params`, `src/results`, `src/protocol`, `src/utils`, `src/reproducibility`, `src/pipeline`, and `src/paper`.
+`setup_project_paths` owns the source-directory list; `project_root` finds the
+root from an anchor independently of `pwd`. Public pipeline/paper commands
+retain a minimal bootstrap to make `src/utils` discoverable. Avoid `genpath`
+so exploratory or archived code is not automatically added.
 
-## Stage 0 Code Layout
+## Directory responsibilities
 
-Stage 0 review-support code is split by responsibility:
+| Location | Responsibility |
+|---|---|
+| `src/dispatch_model.m`, `baseline.m`, `rolling_dispatch.m` | Shared physics, annual solve and rolling execution. |
+| `src/params`, `src/load_res_year.m` | Physical/economic parameters and renewable inputs. |
+| `src/stages` | Scientific experiments and parameter sweeps. |
+| `src/pipeline` | Workflows and forecast-library preparation. |
+| `src/results` | Economics, metrics, selection, freezing and failure classification. |
+| `src/protocol` | Frozen protocols and baseline manifest. |
+| `src/reproducibility` | Manifests, hashes and constraint audits. |
+| `src/utils` | Shared root/path, option lookup and directory creation. |
+| `src/paper`, `src/figures` | Draft exports and exploratory plotting. |
+| `test` | Existing unit/integration tests and historical indicator tests. |
+| `data` | Original inputs; do not overwrite during runs. |
+| `runs` | Scientific MAT/CSV results and frozen evidence. |
+| `docs/reports` | Generated human-readable audit snapshots. |
+| `docs/history`, `docs/decisions` | Superseded narrative and engineering decisions. |
+| `paper_outputs` | Derived drafting artifacts. |
 
-- `src/reproducibility/stage0_manifest.m` generates file, environment, and result manifests.
-- `src/reproducibility/stage0_constraint_audit.m` audits MAT result residuals.
-- `src/pipeline/run_stage0_quality_gate.m` orchestrates the review-facing workflow.
-- `src/utils` is limited to project root/path bootstrap and tiny shared primitives.
-- Formal helpers used by reproduction or campaign commands live in `src/pipeline`, not `src/utils`.
+Share helpers only when semantics agree: `option_value` defaults missing/empty
+values while preserving zero and false. Field lookup that preserves an explicit
+empty value remains distinct. `ensure_directory` preserves existing contents.
+Keep scientific responsibilities separate rather than combining everything into
+one workflow file.
 
-## Quality Gate
-
-Run:
+## Verification and reports
 
 ```matlab
+run_quick_tests();
+run_full_tests();
 report = run_stage0_quality_gate();
 ```
 
-Generated files:
+The quality gate generates four `stage0_*.md` reports under `docs/reports`.
+Machine-readable file/source/data/result manifests, environment information,
+constraint audits and the gate MAT remain under `runs/manifest`.
+Manifest and constraint-audit functions retain their `docs_dir` override.
+Moved reports retain their original timestamps and hashes; rerun the gate when
+a current snapshot is needed.
 
-- `docs/stage0_file_inventory.md`
-- `docs/stage0_environment_report.md`
-- `docs/stage0_constraint_audit.md`
-- `docs/stage0_quality_gate_report.md`
-- `runs/manifest/file_inventory.csv`
-- `runs/manifest/source_manifest.csv`
-- `runs/manifest/data_manifest.csv`
-- `runs/manifest/environment_manifest.json`
-- `runs/manifest/results_manifest.csv`
-- `runs/manifest/constraint_audit.csv`
-- `runs/manifest/stage0_quality_gate_report.mat`
+A successful engineering gate does not certify every stored scientific result.
+Failed feasibility rows remain in the audit. Tests must not rely on variables
+manually placed in the MATLAB base workspace.
 
-## Tests
-
-Fast deterministic checks:
+## Scientific runs
 
 ```matlab
-test_results = run_quick_tests();
+run_reproduce_core_results();  % Stage 1 annual + Stage 3 fixed contract
+run_reproduce_full_grid();     % Stage 4/5; potentially long computation
 ```
 
-Full test suite:
+Select from an existing 2024 grid without rerunning it:
 
 ```matlab
-test_results = run_full_tests();
+run_reproduce_full_grid(struct('run_stage4',false, ...
+    'run_stage5',false,'run_v52_selection',true));
 ```
 
-Tests must not depend on manually populated base-workspace variables.
+This writes selection audits under `runs/stage2`. Failed/ineligible candidates
+remain visible; the frozen selector excludes oracle cases and requires 2024.
+The negative freeze is authoritative when older narrative differs.
 
-## Core Result Reproduction
-
-Run:
+## Strict boundary diagnostics
 
 ```matlab
-outputs = run_reproduce_core_results();
+run_feasibility_boundary(struct('save_output',false)); % read-only plan
+run_feasibility_boundary(struct('execute',true));      % expensive solves
+run_feasibility_boundary(struct('execute',false, ...
+    'summarize_existing',true));                      % rewrite diagnostic tables
 ```
 
-This recomputes the Stage 1 Zhou S2 annual baseline and the Stage 3 v5.1 fixed-contract dispatch. It then refreshes the result manifest and constraint audit.
+The default `execute=false` does not solve, but `save_output=true` writes a plan;
+use `save_output=false` to avoid replacing an existing summary. Boundary runs
+disable restoration continuation. Rolling oracle is limited to 2022/2023.
+The annual boundary entry uses Stage 1 and does not itself certify the fixed
+contract; use the fixed-contract experiment for that comparison.
 
-## Full Grid Reproduction
+Persistence and residual-scenario inputs are simulations. The residual library
+uses 2022/2023 data grouped by resource, month and hour; `forecast_seed` controls
+sampling. A scenario label establishes neither forecast accuracy nor a
+probability guarantee. Failure classification is rule-based diagnostic evidence,
+not an IIS or a causal proof.
 
-Run only when a long solve is intended:
+## Evidence and exports
 
-```matlab
-outputs = run_reproduce_full_grid();
-```
+Paper export functions collect drafting inputs into `paper_outputs`; they do not
+automatically establish claim eligibility. `test/png` currently supplies legacy
+figure exports and is not disposable cache.
 
-This recomputes Stage 4 and Stage 5 grids using the current frozen scripts. The command may be computationally expensive.
+Preserve raw data, candidate MAT files, strict failure snapshots and
+`runs/archive/v52_negative_20260828`. Candidate hashes do not replace the original
+MAT files. Many results are ignored by Git, so Git alone is not a backup.
+Cite frozen artifacts and hashes instead of mutable `latest` files.
 
-## Strict Feasibility Boundary
-
-Before claiming an optimized stability improvement, run the strict feasibility
-boundary plan. The default command is safe and does not launch long solves:
-
-```matlab
-report = run_feasibility_boundary();
-```
-
-It writes:
-
-- `runs/feasibility_boundary/feasibility_boundary_latest.mat`
-- `runs/feasibility_boundary/feasibility_boundary_latest.csv`
-
-The three intended layers are annual full-year oracle, rolling observed-oracle
-strict dispatch, and rolling simulated-forecast strict dispatch. Restoration
-continuation is disabled in all boundary cases. Rolling observed-oracle is
-protocol-blocked outside 2022/2023; those rows are retained as
-`protocol_blocked` instead of being silently run.
-
-To execute the expensive boundary cases explicitly:
-
-```matlab
-report = run_feasibility_boundary(struct('execute', true));
-```
-
-Any failed rolling run should save `run_info.infeasibility_diagnosis` and a
-top-level `diagnosis` variable in the failure MAT file.
-
-## v5.2 Selection Audit
-
-After a 2024 Stage 5 grid exists, run the frozen selector without rerunning
-the grid:
-
-```matlab
-outputs = run_reproduce_full_grid(struct( ...
-    'run_stage4', false, ...
-    'run_stage5', false, ...
-    'run_v52_selection', true));
-```
-
-By default this loads
-`runs/stage5/joint_grid/v51_joint_grid_2024_latest.mat` and writes:
-
-- `runs/stage2/v52_selection_audit_2024_latest.mat`
-- `runs/stage2/v52_selection_audit_2024_latest.csv`
-
-The selector rejects any non-2024 `run_info.data_year`, retains failed and
-ineligible rows in the audit table, excludes oracle rows from confirmatory
-selection, and ranks eligible candidates by the frozen v5.2 lexicographic
-order.
-
-## Paper Outputs
-
-```matlab
-table_files = export_main_tables();
-figure_files = export_main_figures();
-```
-
-Paper tables and figures should be generated from manifests or locked result files, not by manually copying numbers from MATLAB output.
-
-## Result Versioning Rule
-
-`latest.mat` files are convenience pointers. Final manuscript numbers should cite timestamped or locked files and the corresponding SHA-256 hash in `runs/manifest/results_manifest.csv`.
-
-## Oracle Boundary
-
-`observed_oracle` results are diagnostic upper bounds only. They must not be used as evidence for real operational forecast performance.
-
-## Known Stage 0 Limits
-
-Stage 0 does not validate the final scientific claim. Independent 2025 testing, uncertainty analysis, and robustness analysis belong to later phases.
+Scientific definitions remain in [protocol_v5.md](protocol_v5.md); claim limits
+remain in [v52_negative_evidence_freeze.md](v52_negative_evidence_freeze.md).

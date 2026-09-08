@@ -441,9 +441,7 @@ end
 function save_stage3_output(output_path, result, run_info, metrics, ...
         params, renewable_data, contract, stage1_result, stage1_run_info)
 run_dir = fileparts(output_path);
-if ~isfolder(run_dir)
-    mkdir(run_dir);
-end
+ensure_directory(run_dir);
 save(output_path, 'result', 'run_info', 'metrics', 'params', ...
     'renewable_data', 'contract', 'stage1_result', 'stage1_run_info');
 end

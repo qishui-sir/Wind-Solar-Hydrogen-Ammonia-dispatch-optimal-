@@ -51,3 +51,43 @@ verifyTrue(test_case, all(ismember(["RelativePath", "AuditStatus", ...
     "HardConstraintsPassed"], string(audit_table.Properties.VariableNames))));
 verifyTrue(test_case, height(audit_table) >= 0);
 end
+function testSharedOptionDefaultsPreserveExplicitValues(test_case)
+options = struct('empty', [], 'zero', 0, 'disabled', false, 'value', 7);
+verifyEqual(test_case, option_value(options, 'missing', 9), 9);
+verifyEqual(test_case, option_value(options, 'empty', 9), 9);
+verifyEqual(test_case, option_value(options, 'zero', 9), 0);
+verifyEqual(test_case, option_value(options, 'disabled', true), false);
+verifyEqual(test_case, option_value(options, 'value', 9), 7);
+verifyEqual(test_case, option_value([], 'missing', 9), 9);
+end
+
+function testSharedDirectoryCreationIsIdempotent(test_case)
+target = tempname;
+cleanup = onCleanup(@() rmdir(target, 's')); %#ok<NASGU>
+ensure_directory(target);
+marker = fullfile(target, 'marker.txt');
+fid = fopen(marker, 'w');
+fprintf(fid, 'keep');
+fclose(fid);
+ensure_directory(target);
+verifyEqual(test_case, fileread(marker), 'keep');
+end
+
+function testSetupFromOutsideProjectIsIdempotent(test_case)
+anchor = mfilename('fullpath');
+previous_dir = pwd;
+previous_path = path;
+cleanup = onCleanup(@() restore_environment(previous_dir, previous_path)); %#ok<NASGU>
+cd(tempdir);
+root = setup_project_paths(anchor);
+first_path = path;
+verifyEqual(test_case, setup_project_paths(anchor), root);
+verifyEqual(test_case, path, first_path);
+verifyEqual(test_case, which('option_value'), fullfile(root, 'src', 'utils', 'option_value.m'));
+verifyEqual(test_case, which('ensure_directory'), fullfile(root, 'src', 'utils', 'ensure_directory.m'));
+end
+
+function restore_environment(previous_dir, previous_path)
+cd(previous_dir);
+path(previous_path);
+end

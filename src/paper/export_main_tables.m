@@ -5,12 +5,11 @@ if nargin < 1 || isempty(config)
     config = struct();
 end
 
-project_dir = bootstrap_project();
+addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'utils'), '-begin');
+project_dir = setup_project_paths(mfilename('fullpath'));
 output_dir = option_value(config, 'output_dir', ...
     fullfile(project_dir, 'paper_outputs', 'tables'));
-if ~isfolder(output_dir)
-    mkdir(output_dir);
-end
+ensure_directory(output_dir);
 
 manifest_path = fullfile(project_dir, 'runs', 'manifest', ...
     'results_manifest.csv');
@@ -32,12 +31,4 @@ for file_index = 1:numel(comparison_files)
     copyfile(source_path, target_path);
     output_files(end + 1, 1) = string(target_path); %#ok<AGROW>
 end
-end
-
-function project_dir = bootstrap_project()
-paper_dir = fileparts(mfilename('fullpath'));
-src_dir = fileparts(paper_dir);
-project_dir = fileparts(src_dir);
-addpath(fullfile(src_dir, 'utils'), '-begin');
-project_dir = setup_project_paths(project_dir);
 end
