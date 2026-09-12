@@ -10,42 +10,46 @@ addpath(fullfile(project_dir, 'src', 'params'));
 addpath(fullfile(project_dir, 'src', 'results'));
 end
 
-function testAelStartupPenaltyDefaults(test_case)
-% S1 keeps the unpenalised objective; S2 and S3 carry the Zhou startup/shutdown
-% penalty so the S2 baseline in main.m can enable it without a one-off override.
-s1 = my_system('s1');
+function testAelStartupElectricityIsPhysical(test_case)
+% Startup electricity is a physical load. S2 has it disabled by default; S3 and
+% the main.m baseline enable it at the Zhou value.
 s2 = my_system('s2');
 s3 = my_system('s3');
-verifyEqual(test_case, s1.AEL.common.startup_penalty, 0);
-verifyEqual(test_case, s2.AEL.common.startup_penalty, 0.053);
-verifyEqual(test_case, s3.AEL.common.startup_penalty, 0.053);
+verifyFalse(test_case, s2.AEL.common.startup);
+verifyTrue(test_case, s3.AEL.common.startup);
+verifyEqual(test_case, s3.AEL.common.startup_elec, 0.15);
 end
 
-function testAelStartupPenaltyEnabledInS3(test_case)
-% Zhou S3 enables the startup/shutdown penalty.
-config = my_system('s3');
-verifyGreaterThan(test_case, config.AEL.common.startup_penalty, 0);
-verifyEqual(test_case, config.AEL.common.startup_penalty, 0.053);
+function testNoArtificialStartupPenaltyParameter(test_case)
+% The removed artificial penalty parameter must not come back.
+s3 = my_system('s3');
+verifyFalse(test_case, isfield(s3.AEL.common, 'startup_penalty'));
 end
 
-function testStartupPenaltyEntersObjectiveOnlyWhenEnabled(test_case)
-baseline_source = fileread(fullfile(fileparts(fileparts( ...
-    mfilename('fullpath'))), 'src', 'baseline.m'));
-
-% The penalty must be built from the committed startup power and added to the
-% objective, and it must be skippable via a zero coefficient.
-verifyNotEmpty(test_case, regexp(baseline_source, ...
-    'C_startup\s*\*\s*sum\(P_AEL_start\)\s*\*\s*dt', 'once'));
-verifyNotEmpty(test_case, regexp(baseline_source, ...
-    'startup_penalty_expr', 'once'));
-end
-
-function testDefaultIsStillS2Unpenalised(test_case)
-config = my_system();
-verifyEqual(test_case, config.scenario.id, 's2');
-% S2 default carries the Zhou S3 startup/shutdown penalty (0.053), matching the
-% main.m baseline. The "unpenalised" reference is S1, not S2.
-verifyEqual(test_case, config.AEL.common.startup_penalty, 0.053);
+function testStartupElectricityOnlyUsesPhysicalEnergyAccounting(test_case)
+params = my_system('s2');
+params.AEL.common.startup = true;
+params.solver.relative_gap = 1e-6;
+params.solver.max_time_s = 30;
+params.solver.display = 'off';
+data = struct('time_count', 24, 'time', (1:24)', ...
+    'pv_power_kw', zeros(24, 1), 'pw_power_kw', 60000 * ones(24, 1));
+evalc('built = baseline(params, data);');
+d = built.dispatch;
+starts = sum(max(diff([0; d.N_AEL]), 0));
+verifyGreaterThan(test_case, starts, 0);
+expected_energy = starts * params.AEL.common.startup_elec ...
+    * params.AEL.common.module_power * params.time.step;
+verifyEqual(test_case, built.summary.AEL_start_energy_kwh, ...
+    expected_energy, 'AbsTol', 1e-6);
+verifyLessThan(test_case, built.check.max_power_residual_kw, 1e-5);
+verifyLessThan(test_case, built.check.max_storage_residual_kg, 1e-6);
+verifyEqual(test_case, d.H2_prod, ...
+    d.P_AEL * params.time.step / params.AEL.common.spec_energy ...
+    * params.unit.h2_density, 'AbsTol', 1e-6);
+% With no separate startup charge, objective and financial accounting agree.
+verifyEqual(test_case, built.fval, -built.economics.net_profit, ...
+    'AbsTol', 1e-4);
 end
 
 function testDefaultScenarioIsS2(test_case)
@@ -56,6 +60,8 @@ verifyEqual(test_case, case_config.scenario.mode, 'continuous_flexible');
 verifyEqual(test_case, case_config.AEL.common.capacity, 130);
 verifyEqual(test_case, case_config.h2_storage.capacity, 11.0e4);
 verifyEqual(test_case, case_config.ref.lcoa, 464);
+verifyEqual(test_case, case_config.grid.curtail_penalty, 0);
+verifyEqual(test_case, case_config.grid.curtail_limit, 0.10);
 end
 
 function testH2StoragePressureDefinesPhysicalBounds(test_case)

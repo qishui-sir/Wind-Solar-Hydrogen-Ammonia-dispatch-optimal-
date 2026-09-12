@@ -1,0 +1,2 @@
+scenario,days,rows,elapsed_s,nh3_t,lcoa_usd_t,net_profit_usd,ael_hours,ael_startups,sell_rate,curtail_rate,purchase_rate,co2_intensity,h2_min_abs_soc,h2_min_work_soc,h2_p05_work_soc,nh3_dcv
+s2,7,168,4.3177819,1603.68091731367,24020.2917774341,-37627633.2808339,123.524770256265,26,0.11035136740876,0,0.00452223392043647,0.0316563336751646,0.333333333333333,0,0,0.187560583670436

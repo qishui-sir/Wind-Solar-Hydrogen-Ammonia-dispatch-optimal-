@@ -58,13 +58,6 @@ common.capex = 285;                % Zhou AEL capital cost, USD/kW
 common.om_rate = 0.02;             % Zhou AEL O&M rate, fraction/year
 common.min_stable = 60;            % Zhou AEL minimum stable time, min
 common.startup_elec = 0.15;        % Zhou startup electricity, load fraction/h
-% Zhou S3 startup/shutdown penalty. Startup electricity is charged twice: once
-% in the power balance (it must physically be supplied) and once in the objective
-% as an explicit penalty, so the dispatch has an economic reason to avoid cycling
-% the module fleet. Zero reproduces the S2 behaviour exactly. The coefficient
-% converts startup electricity at the grid purchase price, which is the marginal
-% source of that energy.
-common.startup_penalty = 0.053;    % Startup penalty, USD/kWh of startup electricity
 common.water_use = 28;             % Zhou AEL water use, t/t-H2
 common.seg_num = 12;               % Zhou piecewise segment count
 
@@ -93,17 +86,13 @@ switch scenario_id
     case 's1'
         common.startup = false;    % Enable AEL startup electricity
         common.capacity = 140;     % S1 AEL capacity, MW
-        common.startup_penalty = 0; % S1 keeps the unpenalised objective
     case 's2'
         common.startup = false;
         common.capacity = 130;     % S2 AEL capacity, MW
-        % S2 keeps the Zhou S3 startup/shutdown penalty (the entry point enables
-        % startup electricity separately), so a bare S2 run is not penalised but
-        % the S2 baseline in main.m carries the S3 penalty as requested.
+        % main.m enables startup electricity for the project's modified S2 case.
     case 's3'
         common.startup = true;
         common.capacity = 130;     % S3 AEL capacity, MW
-        % S3 keeps the Zhou startup/shutdown penalty from the common block.
     otherwise
         error('AEL:bad_case', 'scenario_id must be s1, s2, or s3.');
 end

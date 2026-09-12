@@ -72,11 +72,11 @@ config.ammonia.price = 557;         % Ammonia selling price, USD/t
 config.material.water_price = 1.4;  % Water price, USD/t
 config.material.cat_price = 18;     % Catalyst price, USD/t
 
-% Zhou does not publish labor coefficients. The S2 calibration uses the
-% 2022 Inner Mongolia manufacturing wage scale and an integrated-plant crew.
+% Zhou does not publish the labor coefficients. Retain the project's assumed
+% crew and salary; these are not independently verified Zhou parameters.
 config.labor.fte = 200;              % Full-time equivalent employees
 config.labor.salary = 15000;         % Loaded labor cost, USD/(employee year)
-config.labor.note = ['Calibration assumption: 200 FTE at 15,000 USD/FTE-year; ', ...
+config.labor.note = ['Project assumption: 200 FTE at 15,000 USD/FTE-year; ', ...
     'annual labor cost is 3.0 MUSD.'];
 
 config.converter.capex = 43;        % Converter capital cost, USD/kW
@@ -125,7 +125,8 @@ switch scenario_id
         config.environment.co2_enabled = true;
         config.h2_storage.capacity = 11.0e4;
         config.transformer.capacity = 200;
-        config.grid.contract_kw = 30e3; % Calibrated S2 contract demand, kW
+        config.grid.contract_kw = 30e3; % Project billing assumption, not a published Zhou value
+        config.grid.curtail_penalty = 0; % Zhou Eq. (12): no separate curtailment charge
         config.ref.nh3_output = 7.12e4;
         config.ref.lcoa = 464;
         config.ref.net_profit = 6.65e6;

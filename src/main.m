@@ -5,10 +5,6 @@ project_dir = fileparts(source_dir);
 params_dir = fullfile(source_dir, 'params');
 results_dir = fullfile(source_dir, 'results');
 class_dir = fullfile(source_dir, 'class');
-
-% Path setup: add the project's own folders. 'src' itself is the working folder
-% when main.m is run normally, but add it explicitly so running from anywhere is
-% safe.
 addpath(source_dir, params_dir, results_dir, class_dir);
 
 data_cfg = struct();
@@ -19,14 +15,13 @@ data_cfg.pw_capacity_kw = 200000;
 renewable_data = load_res_year(data_cfg);
 
 params = my_system('s2');
-params.AEL.common.startup = true;                    % startup electricity
-params.AEL.common.startup_penalty = 0.053;           % Zhou S3 penalty (USD/kWh)
-params.solver.relative_gap = 1e-3;
+params.AEL.common.startup = true;   % S2 baseline with the S3 startup electricity
+params.solver.relative_gap = 0.02;
 
-ael_output = qi_ael_model(2000, 0, params.AEL.detail);
+ael_output = qi_ael_model(2000, 0, params.AEL.detail); 
 
-fprintf('[main] AEL startup=%d, startup penalty=%.4f USD/kWh\n', ...
-    params.AEL.common.startup, params.AEL.common.startup_penalty);
+fprintf('[main] AEL startup electricity=%d (%.2f load fraction/h), no extra charge\n', ...
+    params.AEL.common.startup, params.AEL.common.startup_elec);
 fprintf('[main] solver gap=%.4f\n', params.solver.relative_gap);
 
 results = baseline(params, renewable_data);

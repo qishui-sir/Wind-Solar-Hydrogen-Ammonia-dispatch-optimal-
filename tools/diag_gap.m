@@ -33,7 +33,6 @@ fprintf('[diag] rows=%d\n', renewable_data.time_count);
 
 params = my_system('s2');
 params.AEL.common.startup = true;
-params.AEL.common.startup_penalty = 0.053;
 params.solver.relative_gap = 1e-4;
 if max_nodes > 0
     params.solver.max_nodes = max_nodes;
@@ -67,7 +66,6 @@ fprintf('  NH3 income      : %12.2f USD\n', results.economics.INC.ammonia);
 fprintf('  grid sell       : %12.2f USD\n', results.economics.INC.grid_sell);
 fprintf('  annual fixed    : %12.2f USD\n', results.economics.total_cost);
 fprintf('  net (objective) : %12.2f USD\n', results.fval);
-fprintf('  AEL starts      : %d (penalty %.2f USD)\n', ...
-    sum(results.dispatch.N_AEL(:) > 0 & [0; diff(results.dispatch.N_AEL(:))] > 0), ...
-    results.cost.startup_penalty);
+fprintf('  AEL startup     : %12.2f MWh/a (physical, no penalty)\n', ...
+    results.summary.AEL_start_energy_kwh / 1000);
 end
