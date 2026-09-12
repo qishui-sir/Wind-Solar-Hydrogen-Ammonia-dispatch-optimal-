@@ -1,0 +1,165 @@
+﻿### QUERY: curtailment grid interaction green ammonia plant electricity market | total=3502773 | shown=25
+
+TITLE   : 5 Market System for electricity and gas
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-39
+ABSTRACT: 
+---
+TITLE   : High Renewable Electricity Penetration: Marginal Curtailment and Market Failure Under “Subsidy-Free” Entry
+AUTHORS : David Newbery
+JOURNAL : 
+YEAR    : 2023  | CITED: 1 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4343013
+ABSTRACT: 
+---
+TITLE   : Electricity Spot Market Trading Mechanism Considering Renewable Energy Curtailment and Peak Shaving Compensation
+AUTHORS : Binjie Wu; Yue Fu; Ying Wu; Yi Zhou
+JOURNAL : 2025 2nd International Conference on Smart Grid and Artificial Intelligence (SGAI)
+YEAR    : 2025  | CITED: 2 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/sgai64825.2025.11009756
+ABSTRACT: 
+---
+TITLE   : Analysis of China's Green Electricity Trading Issues and a Market Clearing Model Considering Green Electricity Participation
+AUTHORS : Chenghui Tang
+JOURNAL : 2024 8th International Conference on Smart Grid and Smart Cities (ICSGSC)
+YEAR    : 2024  | CITED: 1 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/icsgsc62639.2024.10813859
+ABSTRACT: 
+---
+TITLE   : Deregulated Electricity Market Structure
+AUTHORS : Baseem Khan
+JOURNAL : Deregulated Electricity Market
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1201/9781003277231-2
+ABSTRACT: 
+---
+TITLE   : European Energy Law
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : 
+YEAR    : 2022  | CITED: 1 | TYPE: monograph
+DOI     : https://doi.org/10.5771/9783748913627
+ABSTRACT: This book deals with the European Union energy law. It contains an introduction (terms, overview), the market system for electricity and gas (e.g. equal treatment, network access), the regulatory institutions (ACER, requirements for the national regulatory authorities) and the European coordination institutions (ENTSO for Electricity etc). A separate chapter is dedicated to the security of supply for electricity and gas (risk-preparedness plan [electricity], emergency plan and solidarity principle [gas]). In addition the book deals with renewable energies, energy efficiency, storage, decentralisation (energy communities) and digitalisation (Smart Meters). It closes with the chapter “Energy System of the Future” (Green Smart Grid).
+---
+TITLE   : Developing effective market-based policies to incentivise fair and efficient European electricity transmission grid expansion
+AUTHORS : Sam Vandezande; Richard Green; Raphael Slade
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.6678966
+ABSTRACT: European electricity transmission grids require unprecedented investment driven by growing electricity demand, ageing infrastructure and new load patterns from renewables and distributed generation. This large expansion has triggered National Regulatory Agencies (NRA) to review the policies that they set on Transmission System Operators (TSOs) remuneration and transmission tariffs which allocate the costs and benefits of investments between grid users and investors. Many alternative incentives and market-signal mechanisms have been introduced in recent years that aim to ensure that grids are developed and used efficiently. While these evolutions undoubtedly confer improvements, they also pose efficiency and fairness challenges. Drawing on in-depth interviews with NSO and TSO experts, we explore how policies can support efficient, fair and future-proof grid development. We find that whilst there is no optimal portfolio of TSO incentives, transmission tariffs and policies should provide users with time &amp; locational signals based on their abilities to respond. We also find a need for better alignment between transmission tariffs and TSO remuneration policies to unlock synergies in targeting expansion, security and decarbonisation objectives. Further evolution in transmission policies is required to balance efficiency and fairness. This evolution will require not only an increase in the granularity of policies with more targeted project incentives and user tariffs but also require increased collaboration between market players such as TSO, Distribution System Operators, energy retailers and grid users for the efficient development and use of the transmission grid.
+---
+TITLE   : Sector Coupling of Green Ammonia Production to Australia’s Electricity Grid
+AUTHORS : 
+JOURNAL : Computer Aided Chemical Engineering 14th International Symposium on Process Systems Engineering
+YEAR    : 2022  | CITED: 4 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-323-85159-6.50317-1
+ABSTRACT: 
+---
+TITLE   : Register
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-161
+ABSTRACT: 
+---
+TITLE   : 14 Storage
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-146
+ABSTRACT: 
+---
+TITLE   : What is curtailment? An electricity market expert explains why states sometimes have too much wind or solar power
+AUTHORS : Theodore Kury
+JOURNAL : 
+YEAR    : 2022  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.64628/aai.ksjdd7du9
+ABSTRACT: 
+---
+TITLE   : 12 Decentralisation
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-133
+ABSTRACT: 
+---
+TITLE   : Titelei/Inhaltsverzeichnis
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-1
+ABSTRACT: 
+---
+TITLE   : 6 ACER
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-56
+ABSTRACT: 
+---
+TITLE   : 1 Introduction
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-15
+ABSTRACT: 
+---
+TITLE   : 11 Energy efficiency
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-127
+ABSTRACT: 
+---
+TITLE   : 10 Renewable energy
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 1 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-110
+ABSTRACT: 
+---
+TITLE   : List of abbreviations
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-13
+ABSTRACT: 
+---
+TITLE   : 3 Overview of legislation
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-20
+ABSTRACT: 
+---
+TITLE   : 8 National regulatory authorities
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-81
+ABSTRACT: 
+---
+TITLE   : 9 Security of supply
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-88
+ABSTRACT: 
+---
+TITLE   : 13 Digitalisation – smart meters
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-141
+ABSTRACT: 
+---
+TITLE   : 2 Fundamentals of Energy Law
+AUTHORS : Renate Pirstner-Ebner
+JOURNAL : European Energy Law
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.5771/9783748913627-17
+ABSTRACT: 
+---
+(filtered-in: 23)
+

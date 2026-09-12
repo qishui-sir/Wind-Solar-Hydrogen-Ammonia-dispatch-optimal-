@@ -1,0 +1,123 @@
+﻿### QUERY: indicator selection framework redundancy prioritization sustainability assessment | total=3425709 | shown=25
+
+TITLE   : Development of an indicator-based framework for farm sustainability assessment
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: edited-book
+DOI     : https://doi.org/10.4060/cd3597en
+ABSTRACT: 
+---
+TITLE   : Implementation of an indicator-based framework for farm sustainability assessment in Ecuador
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: edited-book
+DOI     : https://doi.org/10.4060/cd5444en
+ABSTRACT: 
+---
+TITLE   : Life cycle sustainability decision-making framework for the prioritization of electrochemical energy storage under uncertainties
+AUTHORS : Sen Guo
+JOURNAL : Life Cycle Sustainability Assessment for Decision-Making
+YEAR    : 2020  | CITED: 4 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-12-818355-7.00014-2
+ABSTRACT: 
+---
+TITLE   : Risk Assessment of Grid-Integrated Energy Service Projects: A Hybrid Indicator-Based Fuzzy-Entropy-BP Evaluation Framework
+AUTHORS : Haoran Du; Yaling Sun
+JOURNAL : Sustainability
+YEAR    : 2026  | CITED: 1 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/su18021002
+ABSTRACT: Grid-integrated energy service (GIES) projects are characterized by strong cross-energy coupling and long investment horizons, resulting in multidimensional and nonlinear risk profiles. To address these challenges, this study develops an indicator-based risk evaluation framework by integrating an entropy–back-propagation (BP) combined weighting method with fuzzy matter-element theory. A 30-indicator system covering economic, environmental, and safety and reliability dimensions is constructed to support systematic risk assessment. The entropy–BP scheme combines data-driven objectivity with nonlinear correction, producing stable and interpretable indicator weights, as confirmed through robustness tests based on indicator removal and data perturbation. A real-world GIES project in East China is used as a case study. The results show clear risk grade differentiation among alternative scenarios and identify key risk drivers related to renewable energy integration, investment structure, and energy supply reliability. The proposed framework provides effective decision support for GIES project planning and risk management.
+---
+TITLE   : Sustainability assessment framework for the prioritization of urban sewage treatment technologies
+AUTHORS : Jingzheng Ren; Xusheng Ren; Yue Liu; Yi Man
+JOURNAL : Waste-to-Energy
+YEAR    : 2020  | CITED: 6 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-12-816394-8.00006-9
+ABSTRACT: 
+---
+TITLE   : Artificial Land as a Candidate Indicator of Structural Territorial Constraint: A Parsimonious Framework for Regional Sustainability Assessment in Italy
+AUTHORS : Federica Cucchiella; Marianna Rotilio; Muhammad Ehtsham; Chiara Marchionni
+JOURNAL : Sustainability
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/su18178739
+ABSTRACT: The availability of environmental indicators at the NUTS-2 level remains limited in European statistical sources, often resulting in regional sustainability analyses that reflect short-term policy dynamics rather than long-term conditions. To address this gap, this paper proposes a parsimonious framework based on a spatial stock indicator measuring the share of artificial land within each region (ENV_ARTIFICIAL_LAND), derived from CORINE Land Cover data and aggregated at the NUTS-2 level. Rather than serving as a short-term metric of policy performance, the indicator describes an inherited territorial stock reflecting historical land-use trajectories, consistent with path-dependent development processes. Using the Italian NUTS-2 regions as a case study, the indicator is analysed alongside key socio-economic variables covering economic capacity, social vulnerability, and human capital formation through a non-aggregative, quadrant-based trade-off framework. The results suggest pronounced regional asymmetries and structural mismatches, demonstrating that territorial rigidities and socio-economic outcomes follow differentiated, non-linear alignments. From a policy perspective, the analysis highlights the limits of uniform benchmarking and underscores the necessity of place-based strategies tailored to inherited spatial constraints. Future developments will include integration into territorialised lifecycle frameworks, to account for the cumulative effects of land occupation and environmental debt. While this framework offers a transparent screening tool for regional spatial rigidity, its convergent validity against high-resolution spatial datasets (such as HRL Imperviousness) and disaggregated land-use subclasses remains to be formally tested in future empirical research.
+---
+TITLE   : Developing a risk-informed sustainability indicator for resilient prioritization of urban low-impact development systems
+AUTHORS : Shahrokh Soltaninia; Mehrtash Eskandaripour
+JOURNAL : Environmental and Sustainability Indicators
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.indic.2026.101336
+ABSTRACT: 
+---
+TITLE   : A Quantitative Indicator-Based Framework for Sustainability-Driven Selection of Conventional and Smart Materials in the Built Environment
+AUTHORS : Paolo Trucillo; Fatah Fatehi Peikani
+JOURNAL : Materials
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/ma19173712
+ABSTRACT: The transition towards sustainable cities requires material selection strategies capable of balancing environmental, economic and social performance while accounting for the emerging functionalities offered by smart materials. This work proposes a sustainability-driven methodology based on normalized multi-dimensional indicators for the objective comparison of functionally equivalent conventional and smart materials in the built environment and demonstrates its application through the parametric design of an urban bench. The quantitative assessment showed substantial differences among the investigated materials: Shape Memory Polymers (SMPs) resulted in a panel mass of 5 kg, CO2 emissions of 2.4 kg CO2/kg, and embodied energy of 37 MJ/kg, compared with 32 kg, 13 kg CO2/kg, and 260 MJ/kg for NiTi, and 40 kg, 15 kg CO2/kg, and 320 MJ/kg for magnetic Shape Memory Alloys, respectively. Finite element analysis further demonstrated the influence of structural design, with the maximum principal stress decreasing from approximately 0.073 MPa at a panel thickness of 10 mm to 0.015 MPa at 50 mm, corresponding to a reduction of approximately 79%. The results demonstrate that smart materials do not inherently represent more sustainable alternatives than conventional materials; rather, their adoption should be justified when their adaptive functionalities provide measurable benefits capable of compensating for their environmental and economic burdens. The proposed framework provides a practical decision-support tool that shifts material selection from property-driven choices toward function-oriented, sustainability-based design, supporting more informed decisions for next-generation urban infrastructure.
+---
+TITLE   : Developing a Sustainability Reporting Framework for Construction Companies: Prioritization of Themes with Delphi Study Approach
+AUTHORS : Sinem Dağılgan; Tuğçe Ercan
+JOURNAL : Sustainability
+YEAR    : 2025  | CITED: 7 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/su17073014
+ABSTRACT: In the contemporary business environment, there is an increasing demand for companies to disclose information regarding their corporate sustainability practices. An increasing number of construction companies transparently publish their sustainability practices through corporate sustainability reports under the headings of economic, environmental, social and governance. In the context of current practices, construction companies publish corporate sustainability reports by using different reporting frameworks, especially in areas beyond financial aspects, including standards established by the Global Reporting Initiative (GRI) as well as various legal obligations such as the Corporate Sustainability Reporting Standard (CSRS). This diversity makes it difficult to compare reported data and draw meaningful conclusions. Therefore, this research aims to simplify the reported information by reducing corporate sustainability themes to the most relevant ones for construction companies. Sustainability reporting frameworks and guidelines were examined through thematic analysis; then, the materiality and validity of sustainability themes for construction “companies were assessed using the Delphi analysis technique. Themes such as “Energy” in the environmental dimension, “Health and safety issues” in the social dimension, “Financial performance” in the economic dimension and “Board structure” in the governance dimension were identified as the corporate sustainability themes with the highest degree of impact, with an acceptable consistency ratio as a result of the analyses. As a result of the study, a reporting framework was developed consisting of a total of twenty-six themes for construction companies. The identification of material themes facilitates the integration of construction companies into the corporate sustainability reporting process and provides benefits for the innovation and sustainability of the sector
+---
+TITLE   : Formulating indicator selection and composite index validation and application system for agricultural sustainability assessment
+AUTHORS : Naser Valizadeh; Dariush Hayati
+JOURNAL : Results in Engineering
+YEAR    : 2025  | CITED: 10 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.rineng.2025.106978
+ABSTRACT: 
+---
+TITLE   : Harmonizing environmental KPIs in maritime ports: A framework for core indicator selection and reporting
+AUTHORS : Seyedeh Azadeh Alavi-Borazjani; Muhammad Noman Shafique; Fátima Lopes Alves; José Moreira
+JOURNAL : Environmental and Sustainability Indicators
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.indic.2026.101362
+ABSTRACT: 
+---
+TITLE   : A sustainability indicator framework for the funeral sector: Identification, interrelationship analysis, and performance assessment
+AUTHORS : Chin-Cheng Yang; Huai-Wei Lo; Kai-Yu Tang; Chih-Wei Lin
+JOURNAL : Environmental and Sustainability Indicators
+YEAR    : 2025  | CITED: 1 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.indic.2025.100889
+ABSTRACT: 
+---
+TITLE   : Enhancing Sustainable Traffic Safety Through Machine Learning: A Risk Assessment and Feature Selection Framework Using NGSIM Data
+AUTHORS : Meltem Aslantas; Fatma Kutlu Gündoğdu
+JOURNAL : Sustainability
+YEAR    : 2026  | CITED: 1 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/su18052423
+ABSTRACT: Precisely assessing driving danger is essential for various applications, including the advancement of autonomous driving systems and traffic engineering decisions. This study presents a driving risk analysis framework based on the Next-Generation Simulation (NGSIM) dataset. First, vehicles were classified into four risk classes using the Fuzzy C-Means algorithm using five key risk indicators. Subsequently, comprehensive driving behavior features representing vehicle movements were extracted and evaluated for both risk class prediction and driving behavior feature selection. A new driving risk score was developed using Spearman’s rho coefficient weights, which reflect the relationship of each risk indicator to risk levels. This score was observed to exhibit an increasing trend consistent with the sequential structure of the Fuzzy C-Means (FCM) clustering based on risk labels, thus confirming that it accurately reflects the labeling process. Furthermore, the findings show that the 26 key driving behavior features selected can predict the driving risk score developed using the XGBoost algorithm with over 85% accuracy. Moreover, feature importance analysis reveals that the following distances and inter-vehicle distance variability are particularly effective in determining driving risk. The study discusses the limitations of driving risk assessment based solely on vehicle dynamics and highlights the importance of developing enriched datasets that include multidimensional data sources such as environmental conditions, infrastructure features, traffic density, and autonomous vehicles in future risk prediction studies. Ultimately, this framework contributes to the development of safer and more efficient transportation systems, supporting environmental sustainability by reducing accident-related congestion and promoting resource-efficient traffic management.
+---
+TITLE   : A protocol-sensitivity indicator framework for reusable sustainability evidence tables
+AUTHORS : Jincheng Li
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.6517459
+ABSTRACT: Reusable sustainability evidence tables are increasingly reused in environmental management and policy settings, but there is no compact indicator framework showing how strongly headline conclusions depend on reasonable analytical protocol choices. We benchmarked eight plausible protocols across six public evidence tables spanning agricultural soils, coastal wetlands, and forest reforestation, and compared linear, mixed-effects, and gradient-boosted models. Across 27 benchmark-model combinations, protocol choice changed implied percent effects by a median of 11.7 percentage points and, in the nitrification-inhibitor ammonia benchmark, reversed the direction of the inferred effect. Protocol feasibility was itself informative: complete-case filtering became infeasible for saltmarsh restoration and unstable for forest reforestation. For agricultural soil organic carbon benchmarks, the same evidence table also yielded materially different illustrative carbon-value ranges under identical deployment assumptions. We interpret these outputs as a compact protocol-sensitivity indicator set spanning coverage, feasibility, headline swing, sign reversal, and decision-translation range. Together, the results show that protocol choice is not a minor technical detail but a measurable source of indicator instability in reusable evidence tables. We therefore propose a lightweight reporting panel that records split design, weighting, missing-data policy, feasible protocol set, and headline-range outputs for management and policy use.
+---
+TITLE   : eLife Assessment: Self-association enhances early attentional selection through automatic prioritization of socially salient signals
+AUTHORS : Xilin Zhang
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.7554/elife.100932.3.sa0
+ABSTRACT: 
+---
+TITLE   : eLife Assessment: Self-association enhances early attentional selection through automatic prioritization of socially salient signals
+AUTHORS : Xilin Zhang
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.7554/elife.100932.2.sa3
+ABSTRACT: 
+---
+TITLE   : eLife Assessment: Self-association enhances early attentional selection through automatic prioritization of socially salient signals
+AUTHORS : Xilin Zhang
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.7554/elife.100932.1.sa3
+ABSTRACT: 
+---
+(filtered-in: 17)
+

@@ -1,0 +1,130 @@
+﻿### QUERY: curtailment electricity market participation wind solar hydrogen ammonia plant revenue | total=83711 | shown=25
+
+TITLE   : What is curtailment? An electricity market expert explains why states sometimes have too much wind or solar power
+AUTHORS : Theodore Kury
+JOURNAL : 
+YEAR    : 2022  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.64628/aai.ksjdd7du9
+ABSTRACT: 
+---
+TITLE   : Assessing the dynamics of power curtailment in China: Market insights from wind, solar, and nuclear energy integration
+AUTHORS : Hongli Zhao; Chen Cui; Zibin Zhang
+JOURNAL : International Journal of Hydrogen Energy
+YEAR    : 2025  | CITED: 28 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijhydene.2025.03.160
+ABSTRACT: 
+---
+TITLE   : Potential Revenue from Reserve Market Participation in Wind Power‐ and Solar Power‐Dominated Electricity Grids: The Near‐Term, Mid‐Term, and Long‐Term
+AUTHORS : Jonathan Ullmark; Lisa Göransson; Filip Johnsson
+JOURNAL : International Journal of Energy Research
+YEAR    : 2024  | CITED: 2 | TYPE: journal-article
+DOI     : https://doi.org/10.1155/2024/8470441
+ABSTRACT: As electricity systems become increasingly dominated by variable inverter‐based generation (such as wind and solar photovoltaics (PV)), additional sources of variability appear, while the share of dispatchable thermal power plants decreases. Maintaining a stable grid frequency requires new sources of inertia to slow the frequency changes, as well as new sources of reserve power to counter the imbalances. This work uses a linear optimization modeling approach to analyze the reserve market of the electricity system during the transition to a carbon‐free system with high shares of variable electricity generation. The modeling is performed for three regional contexts and with varying degrees of available flexibility technologies. As for the reserve supply, batteries, electrolyzers, electric boilers and heat pumps for district heating, curtailed wind and solar power, and hydropower and thermal power plants are all included. The results indicate that of these suppliers of reserves, the introduction of grid‐scale batteries into the system drastically reduces the reserve market size. Only early in the transition is revenue from the reserve market greater than 5% of the total revenue for any technology. While the demand for reserves increases as the share of solar PV and wind power increases, the modeling reveals that access to flexible loads, storage units, and emulated inertia from wind power also increases. Depending on the choice of flexibility measures available, demand‐side participation could play a major role in minimizing the cost of grid stability in the future.
+---
+TITLE   : How flexible electricity demand stabilizes wind and solar market values: The case of hydrogen electrolyzers
+AUTHORS : Oliver Ruhnau
+JOURNAL : Applied Energy
+YEAR    : 2022  | CITED: 83 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.apenergy.2021.118194
+ABSTRACT: 
+---
+TITLE   : Effects of released solar curtailment in intraday electricity market: an empirical study in Japan
+AUTHORS : Teng Ma; Yimeng Du
+JOURNAL : Applied Economics
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1080/00036846.2026.2665335
+ABSTRACT: 
+---
+TITLE   : Impact of Electricity Exchange Restrictions on Wind and Solar Powered Hydrogen and Ammonia Production Systems
+AUTHORS : Ningbo Zhang; Lei Zhou; Yiwei Qiu; Yi Zhou
+JOURNAL : 2025 IEEE 8th International Electrical and Energy Conference (CIEEC)
+YEAR    : 2025  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/cieec64805.2025.11116025
+ABSTRACT: 
+---
+TITLE   : High Renewable Electricity Penetration: Marginal Curtailment and Market Failure Under “Subsidy-Free” Entry
+AUTHORS : David Newbery
+JOURNAL : 
+YEAR    : 2023  | CITED: 1 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4343013
+ABSTRACT: 
+---
+TITLE   : FarmConners Market Showcases Results: Wind farm flow control considering electricity prices and revenue
+AUTHORS : Konstanze Kölle; Tuhfe Göçmen; Irene Eguinoa; Leonardo Andrés Alcayaga Román
+JOURNAL : 
+YEAR    : 2022  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.5194/wes-2022-25
+ABSTRACT: Abstract. The EU and UK have made ambitious commitments to decarbonise their economies by 2050 under the Net Zero plans. For this, offshore wind will play a major role, significantly contributing to a paradigm shift in the power generation and greater volatility of electricity prices. The operating strategy of wind farms should therefore move from a power maximisation to revenue maximisation design. Wind farm flow control (WFFC) is a key enabler for this shift through mitigation of wake effects in the design and operation phases. The results of the FarmConners market showcases presented here are the first attempt to economically assess WFFC strategies with respect to electricity market prices and revenue. Here, we present a conceptual simulation study starting from individual turbine control, and extend it to layouts with 10 and 32 turbines operated with WFFC based on the results of five participants. Each participant belonged to a different research group with their respective simulation environments, flow models and WFFC strategies. Via a comparative analysis of relative WFFC benefits estimated per participant, the implications of wind farm size, the applied control strategy and the overall model fidelity are discussed in zero-subsidy scenarios. For all the participants, it is seen that the income gain can differ significantly from the power gain depending on the electricity price under the same inflow, and a favourable control strategy for dominant wind directions can pay off. However, a strong correlation between income and power gain is also observed for the analysed high electricity prices scenarios underlining the need for additional modelling capabilities to carry out a more comprehensive revenue/value optimisation including lower prices and system requirements driven cases.
+---
+TITLE   : Method for decomposing medium and long-term contracts of combined hydro-wind-solar power participation in electricity market
+AUTHORS : Yunhua Du; Jingping Peng; Xingyao He; Xiaotian Xu
+JOURNAL : International Conference on Electrical Engineering and Intelligent Systems (IC2EIS 2026)
+YEAR    : 2026  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1117/12.3112908
+ABSTRACT: 
+---
+TITLE   : The Role of Machine Learning-based Surrogate Models for Wind Power Curtailment Prediction From Electricity Market Data
+AUTHORS : Silvia Iuliano; Fabrizio De Caro; Alfredo Vaccaro
+JOURNAL : 2024 International Conference on Smart Energy Systems and Technologies (SEST)
+YEAR    : 2024  | CITED: 2 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/sest61601.2024.10694498
+ABSTRACT: 
+---
+TITLE   : Optimal revenue sharing model of a wind–solar-storage hybrid energy plant under the green power trading market
+AUTHORS : Zhuo Zeng; Xiang Gao; Baling Fang; Tao Zhang
+JOURNAL : Frontiers in Energy Research
+YEAR    : 2024  | CITED: 1 | TYPE: journal-article
+DOI     : https://doi.org/10.3389/fenrg.2024.1459090
+ABSTRACT: In the current model, the unclear and unreasonable method of revenue sharing among wind-solar-storage hybrid energy plants may a lso hinder the effective measurement of energy storage power station costs. This lack of clarity discourages energy storage from effectively collaborating with renewable energy stations for greenpower trading and spot trading.Therefore, this study proposes an optimal revenue sharing model of wind-solar-storage hybrid energy plant under medium and long-term green power trading market to facilitate the coordinated operation and equitable revenue allocation. Firstly, a method for decomposing transaction volume of green power is introduced by considering the uncertainty of spot market prices and physical delivery characteristics of green power trading. Then, a coordinated scheduling strategy of hybrid renewable energy plant is proposed to maximize revenues generated from both the green power and spot markets. Consequently, a cost-benefit contribution index system is developed to quantify the contribution of energy storage in the wind-solar-storage hybrid power plant. The revenue sharing model based on the minimum cost-remaining savings (MCRS) method can significantly increase overall revenue for renewable energy plants by reducing deviation penalties. It also enhances the operating revenue of energy storage power stations by considering the contributions of both energy storage and renewable energy plant in the green power market. The superiority of the proposed cooperation revenue sharing m odel for profitability enhancement of energy storage is v alidated through comparative case studies.
+---
+TITLE   : Macroscopic Considerations of Curtailment Behaviour of Wind and Solar Sources for Great Britain’s Green Hydrogen Production
+AUTHORS : Thomas Storey; Rohit Rao; Michael Walsh; Sudhagar Pitchaimuthu
+JOURNAL : Applied Sciences
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/app16073411
+ABSTRACT: Great Britain’s substantial growth in wind and solar power has created surplus renewable energy. However, intermittency and variable demand cause demonstrable curtailment. This study analyses wind and solar curtailment trends across Great Britain using derived wind and modelled solar data to explore the potential for green hydrogen production. An economic analysis establishes the Levelised Cost of Hydrogen (LCOH), considering potential revenue streams and future market evolution. Key findings indicate that based on our macroscopic proxy data, combining wind and solar sources potentially enhances energy capture by up to 2.26 times in specific regions compared to single-source generation. Furthermore, scenario-dependent projections indicate LCOH reduction trajectory reaching £3/kg by 2060 under optimal, zero-marginal cost conditions, together with rendering hydrogen from curtailed energy competitive with current market averages. This research offers a holistic understanding of the economic viability of repurposing curtailed energy, contributing to a sustainable energy transition.
+---
+TITLE   : Impact of Price Cap Policy on Concentrating Solar Power Plant Revenue in Electricity Markets
+AUTHORS : María Berbey-Burgos; Darío Pardillos-Pobo; Marta Laporte-Azcué; Pedro Ángel González-Gómez
+JOURNAL : 2024 20th International Conference on the European Energy Market (EEM)
+YEAR    : 2024  | CITED: 1 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/eem60825.2024.10608926
+ABSTRACT: 
+---
+TITLE   : Future Economic Perspective and Potential Revenue of Non-Subsidized Wind Turbines in Germany
+AUTHORS : Lucas Blickwedel; Freia Harzendorf; Ralf Schelenz; Georg Jacobs
+JOURNAL : 
+YEAR    : 2020  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.5194/wes-2020-30
+ABSTRACT: Abstract. Thanks to the German Renewable Energy Act todays wind turbine operator are dealing with low risk on the revenue side in Germany. Fixed feed-in compensation ensures planning security and high system utilisation. Anyhow, the level of financial support is being reduced consecutively. Therefore, tomorrow’s plant operators have to trade self-sufficiently on European electricity markets hence generate revenue only by marketing electricity. Against the background of uncertain future market developments as well as stagnation in the expansion of renewable energies in Germany, it is of interest to estimate future revenue potentials of those non-subsidized wind turbines. This way investment risks can be reduced and development goals for tomorrow’s wind turbine technology can be deduced. To address this topic, a model has been developed using a modified merit-order approach to forecast long-term day-ahead prices on European electricity markets at an hourly resolution. The model is solely based on open access data. The results show how changes in the German power generation landscape like dismantling of coal and nuclear power plants as well as different emission prices impact the wind turbines potential revenue. A scenario analysis highlights that most of today’s wind turbines are not able to yield financial profit over their lifetime without guaranteed subsidies in Germany. This underlines an urgent need for technical development and new business models. Possible business models could be Power Purchase Agreements (PPA) for which the model results can be used for setting and negotiating appropriate terms, such as an energy price schedule or penalties. Moreover, the results can be used as input for investment calculation and analysis. Hence, the given forecasting model can help to reduce risks on revenue side for plant operators and finally support the expansion of wind energy as a whole.
+---
+TITLE   : Research on the revenue prospect for energy storage participation in electricity spot and FM auxiliary service markets —Considering capacity market mechanisms
+AUTHORS : Junfeng Hu; Qianqian Zhao; Deyu Zhang; Mingxuan Chang
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.21203/rs.3.rs-4194987/v1
+ABSTRACT: Abstract The vigorous development of energy storage is significant in supporting new energy consumption and enhancing the power system regulation capability. The spot and auxiliary service markets are the core ways for energy storage to realize commercial value. This paper establishes a revenue prediction model for energy storage participation in the electricity spot and FM auxiliary service market from the perspective of the revenue outlook of energy storage investment, including electric energy spot revenue, spot response incentive revenue considering capacity market price, and FM capacity revenue and FM mileage revenue. Specifically, the BP neural network prediction model, the FM clearing prediction model, and the capacity market supply and demand model are used to combine a variety of influencing factors to predict the spot price spread of electric energy, the FM mileage price, and the capacity price, which are then solved by substituting other parameters into the model. The results show that the method proposed in this paper is favorable for energy storage investment cost recovery and has good economics.
+---
+TITLE   : Optimal Configuration and Operation of Wind-Photovoltaic-Thermal System Based on Ammonia Energy Storage in the Electricity Market
+AUTHORS : Wenteng Yuan; Liang Chen; Zhongrui Wang; Chunbo Wang
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4672058
+ABSTRACT: 
+---
+TITLE   : Intermittency and Uncertainty in Wind and Solar Energy: Impacts on the French Electricity Market
+AUTHORS : Maurice  K. Ekoue; Matt Woerman; Cédric Clastres
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4906729
+ABSTRACT: 
+---
+TITLE   : Impacts of green hydrogen for steel, ammonia, and long-distance transport on the cost of meeting electricity, heat, cold, and hydrogen demand in 145 countries running on 100% wind-water-solar
+AUTHORS : Mark Z. Jacobson; Anna-Katharina von Krauland; Kevin Song; Alyssa N. Krull
+JOURNAL : Smart Energy
+YEAR    : 2023  | CITED: 39 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.segy.2023.100106
+ABSTRACT: 
+---
+(filtered-in: 18)
+

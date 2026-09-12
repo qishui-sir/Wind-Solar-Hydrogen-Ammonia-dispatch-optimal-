@@ -1,0 +1,137 @@
+﻿### QUERY: dynamic simulation load flexible Haber-Bosch ammonia plant wind power | total=282873 | shown=25
+
+TITLE   : Dynamic simulation of a highly load-flexible Haber–Bosch plant
+AUTHORS : Steffen Fahr; Robert Kender; Jan-Peter Bohn; Sebastian Rehfeldt
+JOURNAL : International Journal of Hydrogen Energy
+YEAR    : 2025  | CITED: 26 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijhydene.2025.01.039
+ABSTRACT: 
+---
+TITLE   : Optimisation and Robust Control of a Load-Flexible Haber-Bosch Ammonia Synthesis Loop
+AUTHORS : Joachim Weel Rosbo; Anker Degn Jensen; Sigurd Skogestad; John Jørgensen
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5379004
+ABSTRACT: 
+---
+TITLE   : How sensitive is a dynamic ammonia synthesis process? Global sensitivity analysis of a dynamic Haber-Bosch process (for flexible seasonal energy storage)
+AUTHORS : Kevin Verleysen; Alessandro Parente; Francesco Contino
+JOURNAL : Energy
+YEAR    : 2021  | CITED: 63 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2021.121016
+ABSTRACT: 
+---
+TITLE   : How does a resilient, flexible ammonia process look? Robust design optimization of a Haber-Bosch process with optimal dynamic control powered by wind
+AUTHORS : Kevin Verleysen; Alessandro Parente; Francesco Contino
+JOURNAL : Proceedings of the Combustion Institute
+YEAR    : 2023  | CITED: 29 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.proci.2022.06.027
+ABSTRACT: 
+---
+TITLE   : Optimisation and robust control of a load-flexible Haber–Bosch ammonia synthesis loop
+AUTHORS : Joachim Weel Rosbo; Anker Degn Jensen; Sigurd Skogestad; John Bagterp Jørgensen
+JOURNAL : Computers &amp; Chemical Engineering
+YEAR    : 2026  | CITED: 5 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.compchemeng.2026.109614
+ABSTRACT: 
+---
+TITLE   : Review for "Optimal design of decentralized ammonia production via electric Haber–Bosch"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d5gc06782k/v1/review1
+ABSTRACT: 
+---
+TITLE   : Review for "Optimal design of decentralized ammonia production via electric Haber–Bosch"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d5gc06782k/v2/review1
+ABSTRACT: 
+---
+TITLE   : Review for "Optimal design of decentralized ammonia production via electric Haber–Bosch"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d5gc06782k/v1/review2
+ABSTRACT: 
+---
+TITLE   : Decision letter for "Optimal design of decentralized ammonia production via electric Haber–Bosch"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d5gc06782k/v2/decision1
+ABSTRACT: 
+---
+TITLE   : Author response for "Optimal design of decentralized ammonia production via electric Haber–Bosch"
+AUTHORS :  Lorenzo Rosa;  Davide Tonelli
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d5gc06782k/v2/response1
+ABSTRACT: 
+---
+TITLE   : Decision letter for "Optimal design of decentralized ammonia production via electric Haber–Bosch"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d5gc06782k/v1/decision1
+ABSTRACT: 
+---
+TITLE   : Review for "Haber–Bosch 2.0 for low-carbon ammonia production: A global techno-economic and environmental assessment"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d6ee01125j/v2/review2
+ABSTRACT: 
+---
+TITLE   : Review for "Haber–Bosch 2.0 for low-carbon ammonia production: A global techno-economic and environmental assessment"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d6ee01125j/v1/review3
+ABSTRACT: 
+---
+TITLE   : Review for "Haber–Bosch 2.0 for low-carbon ammonia production: A global techno-economic and environmental assessment"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d6ee01125j/v1/review2
+ABSTRACT: 
+---
+TITLE   : Review for "Haber–Bosch 2.0 for low-carbon ammonia production: A global techno-economic and environmental assessment"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d6ee01125j/v1/review1
+ABSTRACT: 
+---
+TITLE   : Review for "Haber–Bosch 2.0 for low-carbon ammonia production: A global techno-economic and environmental assessment"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d6ee01125j/v2/review1
+ABSTRACT: 
+---
+TITLE   : Integrated Design and Optimization Framework for a Traditional Haber–Bosch Plant Toward Cleaner Ammonia Production
+AUTHORS : Frank Katjipaha; Manjur  Raj Basnet; Daniel Wendt; Kyuha Lee
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.7331488
+ABSTRACT: Ammonia is an important chemical product and a promising carbon-free energy carrier for future energy systems. As the Haber-Bosch (H-B) process is increasingly integrated with renewable and nuclear energy sources, there is a need to reassess traditional operating pressures and reactor designs. This study develops an Aspen Plus-Python optimization framework to investigate the impact of operating pressure on ammonia synthesis performance. Four design pressures (125, 180, 240, and 292 bar) were evaluated using validated ammonia synthesis kinetics and optimized reactor inlet temperatures and bedsizes.Several design criteria, including constant conversion yield, constant reactor size, targeted percentage toward equilibrium, and reactor pressure drop effects, were examined in both open-loop and closed-loop H-B systems. Results show that optimal reactor inlet temperatures increase with pressure. Reactor sizing based on a fixed percentage toward equilibrium provides a more consistent design approach than maintaining a constant conversion yieldacross different pressures. When pressure drop is considered, low-pressure systems experience the greatest performance penalty. In contrast, intermediate pressures of 180–240 bar generally provide lower electricity consumption per tonne of ammonia while maintaining reasonable reactor bed sizes. Higher pressures improve single-pass conversion and allow higher ammonia production capacities. Overall, the results indicate that intermediate-pressure Haber-Bosch systems offer a favorable balance between energy efficiency, reactor size and production performance.
+---
+TITLE   : Novel Integrated System for Power, Hydrogen and Ammonia Production Using Direct Oxy-Combustion Sco2 Power Cycle with Automatic Co2 Capture, Water Electrolyzer and Haber-Bosch Process
+AUTHORS : Ahmad  K. Sleiti; Wahib  A. Al-Ammari; Farayi Musharavati
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4471730
+ABSTRACT: 
+---
+TITLE   : Review for "Impact of process flexibility and imperfect forecasting on the operation and design of Haber-Bosch green ammonia"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d3su00067b/v2/review2
+ABSTRACT: 
+---
+(filtered-in: 19)
+

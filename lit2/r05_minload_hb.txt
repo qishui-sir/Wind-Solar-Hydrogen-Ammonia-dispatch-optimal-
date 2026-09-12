@@ -1,0 +1,88 @@
+﻿### QUERY: ammonia synthesis minimum load turndown partial load operation cost | total=3237837 | shown=25
+
+TITLE   : Partial-Load and Dynamic Operation of Methane Synthesis Reactors Using Sorption-Enhanced Catalysis
+AUTHORS : Andrea Barbaresi; Florian Kiefer; Mirko Morini; Panayotis Dimopoulos Eggenschwiler
+JOURNAL : 36th International Conference on Efficiency, Cost, Optimization, Simulation and Environmental Impact of Energy Systems (ECOS 2023)
+YEAR    : 2023  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.52202/069564-0086
+ABSTRACT: 
+---
+TITLE   : Computational Study of Pump Turbine \u2013 Partial Load Operation
+AUTHORS : Muhannad Altimemy; Justin Caspar; Alparslan Oztekin
+JOURNAL : 
+YEAR    : 2021  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.1115/1.0001571v
+ABSTRACT: 
+---
+TITLE   : PROTECTION OF ELECTRICAL CONSUMERS AGAINST MICROSECOND HIGH-VOLTAGE SURGES UNDER PARTIAL LOAD OPERATION
+AUTHORS : V.O. Pavlovskyi; P.Yu. Herasymenko; V.K. Gurin; O.M. Yurchenko
+JOURNAL : Tekhnichna Elektrodynamika
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.15407/techned2026.03.003
+ABSTRACT: The paper considers features of consumer protection against microsecond high-voltage surges from the power grid under consumer’s partial load operation. A typical protection circuit containing a cascade-connected voltage limiter and a two-stage LC low-pass filter (LPF) is analyzed. Theoretical calculations and simulation studies of the response of the L-shaped LPF to an input voltage surge under the partial load operation of the electrical consumer were carried out, which showed an increase in the response amplitude. To reduce the response of the LPF, it is proposed to introduce resistors in series with each capacitor of the LPF. The results of simulation and experimental verification confirmed the effectiveness of the proposed addition – the maximum voltage surge at the consumer’s AC input decreased by up to 2 times. References 17, figures 12.
+---
+TITLE   : Boiler &amp; Aqcs Load Cycling and Low Load Operation
+AUTHORS : Brian Vitalis
+JOURNAL : 
+YEAR    : 2021  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.1115/1.0000607v
+ABSTRACT: 
+---
+TITLE   : Increasing the Accessibility of Rural Microgrid's Load to Resources in Multi‐Microgrid System with Considering Minimum Operation Cost
+AUTHORS : Hamed Babanezhad; Alireza Ghafouri
+JOURNAL : IEEJ Transactions on Electrical and Electronic Engineering
+YEAR    : 2022  | CITED: 4 | TYPE: journal-article
+DOI     : https://doi.org/10.1002/tee.23588
+ABSTRACT: In rural areas due to the low capacity of resources on the one hand and the increase in demand, on the other hand, the use of load management will be a little different. In this paper, load energy management programs considering three modes are used to minimize the cost of operating a rural multi‐microgrid system and increase the accessibility of its controllable load. Consumers in this paper are divided into two sets of controllable and uncontrollable loads, and microgrids will respond economically to the energy management system due to the capacity of renewable resources and distributed generation. Consumption coordination in the form of an optimization program with a mixed‐integer nonlinear programming mathematical model is designed to reduce the overall operating costs in the microgrid. For microgrid's lowest cost, three different scenarios including only the use of uncontrollable loads, simultaneous use of uncontrollable and controllable loads, and the use of adjustable generation sources with considering generation ceiling of distributed generation have been used. Simulations have been performed in different scenarios in a modified IEEE 33 bus system in the GAMS environment with different solvers to achieve the best response, which shows a significant reduction by LINDO and DECOPT solver. © 2022 Institute of Electrical Engineers of Japan. Published by Wiley Periodicals LLC.
+---
+TITLE   : Improving the partial load operation regimes for cogeneration/trigeneration systems
+AUTHORS : Liviu Ruieneanu
+JOURNAL : 2021 International Conference on Applied and Theoretical Electricity (ICATE)
+YEAR    : 2021  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/icate49685.2021.9465038
+ABSTRACT: 
+---
+TITLE   : Assessment of the operation of a pre-chamber marine engine fuelled by ammonia-hydrogen mixtures at full and partial load
+AUTHORS : G. D’Antuono; D. Lanni; E. Galloni; G. Fontana
+JOURNAL : Journal of Physics: Conference Series
+YEAR    : 2025  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1088/1742-6596/3143/1/012098
+ABSTRACT: Abstract Carbon-free fuels can play a crucial role in the decarbonization of the maritime sector. This research examines the operation of a pre-chamber marine engine fuelled with ammonia-hydrogen mixtures. The study is carried out by means of a previously validated three-dimensional computational fluid dynamics model. Both full and partial load conditions have been assessed. At full load with 15% hydrogen in the fuel mixture, a spark angle of 716° is necessary to avoid knocking. The engine can achieve an IMEP H of 29 bar, approximately 43% efficiency, and a gross power output of 1.1 MW per cylinder. In these conditions, unburned ammonia and NO 2 emissions are relatively low, N 2 O emissions are zero, while NO remains the main pollutant. At partial load conditions, a fuel mixture that contains 15% hydrogen by volume does not enable acceptable engine operation, whereas a 30% hydrogen content results in suitable operating conditions.
+---
+TITLE   : Efficiency Optimization for Partial Load Operation of Interleaved Converters
+AUTHORS : Jens Friebe; Leon Fauth
+JOURNAL : 2020 23rd International Conference on Electrical Machines and Systems (ICEMS)
+YEAR    : 2020  | CITED: 2 | TYPE: proceedings-article
+DOI     : https://doi.org/10.23919/icems50442.2020.9290823
+ABSTRACT: 
+---
+TITLE   : Partial load operation characteristics of supercritical CO2 coal-fired power generation system
+AUTHORS : Haonan Zheng; Zheng Miao; Jinliang Xu
+JOURNAL : Energy
+YEAR    : 2024  | CITED: 13 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2024.130415
+ABSTRACT: 
+---
+TITLE   : A Load Adaptive Hybrid DPS Control for DAB to Secure Minimum Current Stress and Full ZVS Operation Over Wide Load and Voltage Conversion Ratio
+AUTHORS : Saran Chaurasiya; Bhim Singh
+JOURNAL : IEEE Transactions on Industry Applications
+YEAR    : 2023  | CITED: 40 | TYPE: journal-article
+DOI     : https://doi.org/10.1109/tia.2022.3219806
+ABSTRACT: 
+---
+TITLE   : Beyond code-minimum U-values: building-scale energy, peak-load and cost trade-offs for wall insulation across Spanish climates
+AUTHORS : Iván Felis Enguixa; Carmen Álvarez García
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.7284914
+ABSTRACT: Minimum U-value requirements secure a baseline level of envelope performance, but they do not identify when more insulation remains useful after compliance. This study develops a building-scale, code-constrained decision framework that separates regulatory, energy, peak-load and economic thicknesses. A 48 m^2 single-zone dwelling was simulated hourly under official Spanish residential schedules in five climates. Seven wall configurations from traditional, lightweight and prefabricated families were evaluated from their exact local CTE minimum to 200 mm of expanded polystyrene, producing 576 designs. A physics-based finite-volume state-space model represented layer order and thermal storage; its 20 mm production mesh differed from a 5 mm reference by at most 0.068% in annual electricity and 0.42% in peak loads. Four above-code criteria were compared: a 1% marginal energy knee, 95% energy-savings saturation, a normalized energy–peak–thickness compromise, and a 30-year material-only life-cycle-cost minimum. The marginal knee added 0"-" 58 mm and saved 0–10.6% relative to code-minimum designs. In contrast, 95% saturation frequently required 170"-" 190 mm, while cooling peaks changed by only -3.3% to +3.0% and free-running summer overheating increased by up to 27.6%. Under the deliberately favourable material-only cost boundary, economic additions were only 0"-" 18 mm; the maximum supportable marginal installed cost was 2.04 € m^(-2) cm^(-1). Across 1,024 economic scenarios, the code minimum retained the lowest cost in 75.3–100% of representative cases. The results reject a universal optimal thickness: code compliance must be followed by climate-, operation- and objective-specific appraisal, with economic conclusions reported as transparent break-even thresholds rather than fixed market prices.
+---
+TITLE   : Steam turbine design for load-following capability and highly efficient partial operation
+AUTHORS : Akinori Tani
+JOURNAL : Advances in Steam Turbines for Modern Power Plants
+YEAR    : 2022  | CITED: 1 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-12-824359-6.00005-6
+ABSTRACT: 
+---
+(filtered-in: 12)
+

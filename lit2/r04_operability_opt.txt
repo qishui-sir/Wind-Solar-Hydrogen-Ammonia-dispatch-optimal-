@@ -1,0 +1,46 @@
+﻿### QUERY: operational constraints ammonia synthesis optimisation scheduling flexibility | total=2536756 | shown=25
+
+TITLE   : Multi-Fidelity Aerodynamic Optimisation of Fixed-Geometry UAV Systems Under Operational Design Constraints
+AUTHORS : Oluwamayokun Adetoro; Daniel Ronen
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.6750142
+ABSTRACT: Unmanned aerial systems are increasingly deployed in low-infrastructure environments, where long-range beyond-visual-line-of-sight missions must be performed with variable payloads and across multiple operational roles. For aircraft already in service, aerodynamic improvement must often be achieved without changing the underlying architecture. In such contexts, optimisation is not an unconstrained configuration design problem, but a constrained performance-improvement problem in which geometric freedom is limited by structural, integration, and operational requirements.This paper establishes aerodynamic optimisation for fixed-geometry UAV systems as a constrained performance-improvement problem and develops a structured multi-fidelity optimisation framework aligned with this class of problem. The approach is motivated by the limitations of existing methods, in which low-order models do not capture local aerodynamic interactions required for meaningful refinement, while high-fidelity methods are computationally prohibitive when applied across broad design spaces. The proposed framework separates global exploration and local refinement according to the structure of the problem, combining low-order wing-shape exploration with targeted high-fidelity fuselage optimisation.The methodology is applied to the HANSARD UAV developed by UAVAid Ltd. The optimised wing and fuselage are integrated into a final aircraft configuration and assessed using RANS simulations. For the final configuration, the lift-to-drag ratio increased from 13.503 to 16.09 under the evaluated operating conditions, corresponding to a 19.18\% improvement in aerodynamic efficiency. The approach is also relevant to other fixed-geometry aircraft systems, including retrofit and incremental development contexts in both unmanned and manned aviation, where performance improvements must be achieved within constrained design spaces.
+---
+TITLE   : Optimisation of Well Scheduling with Loading and Minimum Turn-Down Constraints
+AUTHORS : Peter Jones
+JOURNAL : SPE Offshore Europe Conference &amp; Exhibition
+YEAR    : 2023  | CITED: 1 | TYPE: proceedings-article
+DOI     : https://doi.org/10.2118/215501-ms
+ABSTRACT: Abstract Breagh, a moderately tight gas field in the Southern North Sea started production in 2013. Until compression is available, Breagh has been constrained by minimum turn-down constraints and the need to keep wells flowing above their loading rates leading to complicated well scheduling optimisation. This paper describes a tool that makes hourly forecasts for cycling and non-cycling wells used to rapidly assess a proposed well scheduling for loading and minimum turn-down compliance. The Breagh short term forecasting tool uses empirical equations to match historical pressures and production rates. Parameter values have been found for each of the existing nine flowing wells which match build-up pressures, predict the initial gas rate via a pseudo-PI approach and decline the gas rate over its flowing period. By matching the wells’ hourly rates over multiple months, these same parameters are then used to predict future well flows and display the results in a number of graphics for easy history matching and well scheduling assessments. Due to the steep decline of the cycling wells, an hourly forecast was required. Excellent matches were obtained over multiple month periods. A single framework was found to be sufficient for both cycling and non-cycling wells, but with different sets of parameters: the Breagh short term forecasting tool was born and has proved to be very useful for: short term forecasting over a few months; rapid assessment of well schedules, including cases where a well issue has required a well to be closed in at short notice and alternative well schedules devised to enable uninterrupted production; and to assess the need for additional production tests to further lower minimum turn-down. A new framework is provided for the performance forecasting of cycling gas wells, some with significant declines on an hourly basis, thus enabling rapid response times to well schedule optimisation issues. The following are the key findings:Hourly data rather than  ...[truncated]
+---
+TITLE   : Value-Drivers and Constraints of Operational Flexibility: A Text-Mining-Based Literature Review
+AUTHORS : Harald Puhr
+JOURNAL : SSRN Electronic Journal
+YEAR    : 2021  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.2139/ssrn.4173112
+ABSTRACT: 
+---
+TITLE   : Machine scheduling with soft precedence constraints
+AUTHORS : An Zhang; Xiangtong Qi; Guanhua Li
+JOURNAL : European Journal of Operational Research
+YEAR    : 2020  | CITED: 13 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ejor.2019.09.041
+ABSTRACT: 
+---
+TITLE   : Energy-aware production scheduling in the flow shop environment under sequence-dependent setup times, group scheduling and renewable energy constraints
+AUTHORS : Masoumeh Ghorbanzadeh; Mohammad Ranjbar
+JOURNAL : European Journal of Operational Research
+YEAR    : 2023  | CITED: 47 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ejor.2022.09.034
+ABSTRACT: 
+---
+TITLE   : Terminal inventory level constraints for online production scheduling
+AUTHORS : Yachao Dong; Christos T. Maravelias
+JOURNAL : European Journal of Operational Research
+YEAR    : 2021  | CITED: 14 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ejor.2021.02.029
+ABSTRACT: 
+---
+(filtered-in: 6)
+

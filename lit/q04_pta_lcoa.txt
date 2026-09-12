@@ -1,0 +1,158 @@
+﻿### QUERY: techno-economic optimization green ammonia levelized cost renewable | total=3873481 | shown=25
+
+TITLE   : Levelized cost analysis for renewable ammonia production in Chile
+AUTHORS : David Pozo; Enzo Sauma; Ricardo Bolado-Lavín
+JOURNAL : Energy
+YEAR    : 2025  | CITED: 3 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2025.137554
+ABSTRACT: 
+---
+TITLE   : Techno-Economic Analysis of Renewable Energy-Powered Ammonia Production
+AUTHORS : M.R. Jahanbakhsh
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5166467
+ABSTRACT: This paper presents a comprehensive techno-economic analysis of renewable energy-powered ammonia production in Denmark. The study employs numerical simulation to optimize the design parameters of an integrated system consisting of wind turbines, photovoltaic arrays, electrolyzers, batteries, and hydrogen storage. The objective is to minimize the Levelized Cost of Ammonia (LCOA) while maintaining system reliability. Utilizing meteorological data for renewable resource assessment, the model evaluates multiple system configurations through parametric optimization. Results demonstrate that a well-balanced system with 212,923 kW of wind capacity, 85,169 kW of solar capacity, 145,370 kW of electrolyzer capacity, 19,096 kWh of battery storage, and 237,339 kg of hydrogen storage capacity can achieve an LCOA of 103.79 USD/ton. This research contributes to the ongoing efforts to decarbonize the ammonia industry, providing valuable insights for policy makers and industrial stakeholders interested in renewable-based ammonia production.
+---
+TITLE   : Levelized Cost of Energy Analysis for Power Generation Technologies in Afghanistan: A Comparative Techno-Economic Assessment
+AUTHORS : Sayed Lamsoon Sayedi; Zakirhussian Farhad; Sayed Habibullah Hashemi
+JOURNAL : International Journal of Current Science Research and Review
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.47191/ijcsrr/v9-i7-21
+ABSTRACT: Afghanistan faces significant challenges in achieving reliable, affordable, and sustainable electricity supply while remaining heavily dependent on imported electricity. Despite possessing abundant renewable energy resources, including solar, wind, and hydropower, comprehensive economic assessments of electricity generation technologies under Afghan conditions remain limited. This study presents a comparative Levelized Cost of Energy (LCOE) analysis of six power generation technologies relevant to Afghanistan’s energy sector: Solar Photovoltaic (PV), Wind, Hydropower, Combined Cycle Gas Turbine (CCGT), Coal-Fired Power Plants, and Biomass. A discounted cash flow methodology is employed using technology-specific technical and economic parameters representative of Afghanistan. The analysis incorporates capital expenditure, operation and maintenance costs, fuel costs, capacity factors, plant lifetimes, and financing conditions. Sensitivity analysis is performed across a range of weighted average cost of capital (WACC) values from 5% to 18% to evaluate the impact of financing risk on generation costs. Results indicate that hydropower exhibits the lowest LCOE, followed by utility-scale solar PV and wind power. Renewable technologies demonstrate strong economic competitiveness while simultaneously achieving near-zero operational carbon emissions. The findings highlight the importance of low-cost financing and provide evidence-based guidance for future energy planning, investment prioritization, and sustainable electricity sector development in Afghanistan.
+---
+TITLE   : Predictive modeling for levelized cost of green ammonia
+AUTHORS : Ayşe Özmen; Szu Hui Ng
+JOURNAL : Applied Energy
+YEAR    : 2025  | CITED: 8 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.apenergy.2025.126399
+ABSTRACT: 
+---
+TITLE   : Techno-economic evaluation of green ammonia synthesis for renewable energy storage using rigorous models
+AUTHORS : Ruitao Sun; Li Sun; Jie Li
+JOURNAL : Energy
+YEAR    : 2025  | CITED: 17 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2025.138068
+ABSTRACT: 
+---
+TITLE   : Techno-Economic Analysis of Green Hydrogen Storage in Salt Caverns: Evaluating Cycling Effects and Cavern Scaling on the Levelized Cost of Hydrogen Storage in Ireland's Power-to-X Landscape
+AUTHORS : Ali Saberi Mehr; James  G. Carton
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5129869
+ABSTRACT: 
+---
+TITLE   : Techno-Economic Challenges of Green Ammonia as an Energy Vector
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2021  | CITED: 7 | TYPE: edited-book
+DOI     : https://doi.org/10.1016/c2019-0-01417-3
+ABSTRACT: 
+---
+TITLE   : Flexible Green Ammonia Production: Impact of Process Design on the Levelized Cost of Ammonia
+AUTHORS : Cecilia Pistolesi; Alberto Giaconia; Claudia Bassano; Marcello De Falco
+JOURNAL : Fuels
+YEAR    : 2025  | CITED: 15 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/fuels6020039
+ABSTRACT: This study evaluates the economic feasibility of flexible, renewable ammonia production in Italy through a comprehensive sensitivity analysis of the levelized cost of ammonia (LCOA). Ammonia is produced through Haber–Bosch synthesis from green hydrogen and nitrogen coming from alkaline electrolysis and cryogenic air separation, respectively. The analysis examines the impact of key parameters such as renewable source peak power, Haber–Bosch reactor flexibility, energy mix, electrochemical and hydrogen storage, on the final production cost. The location considered for the PV and wind power output is Southern Italy. The results show that a wind-driven system with minimal battery storage and a flexibility factor (ratio between the minimum operating capacity and the nominal capacity of the plant) of 20% offers the most cost-effective solution, but production is scaled down to 64 tpd. With the 2030 cost structure, battery storage offers better integration with wind systems and flexible operation, even at low levels of turndown. For different combinations of process design choices and flexibility, the optimal LCOA for a green ammonia production is approximately 0.59 USD/kgNH3 in 2050. This cost of production could be competitive with grey ammonia, provided that a carbon emission allowance of USD 0.12/kgCO2 is applied.
+---
+TITLE   : Green ammonia: A techno-economic supply chain optimization
+AUTHORS : Lucien Genge; Felix Müsgens
+JOURNAL : Journal of Cleaner Production
+YEAR    : 2026  | CITED: 3 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.jclepro.2026.148592
+ABSTRACT: 
+---
+TITLE   : Techno-Economic Aspects of the Use of Ammonia as Energy Vector
+AUTHORS : Z. Cesaro; J. Thatcher; R. Bañares-Alcántara
+JOURNAL : Techno-Economic Challenges of Green Ammonia as an Energy Vector
+YEAR    : 2021  | CITED: 8 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-12-820560-0.00009-6
+ABSTRACT: 
+---
+TITLE   : TECHNICAL ECONOMIC ANALYSIS OF OPTIMIZATION OF RENEWABLE HYDROGEN PRODUCTION CHAIN FOR USE IN AMMONIA PRODUCTION IN MINAS GERAIS
+AUTHORS : 
+JOURNAL : International Symposium on Energy: Energy Transition, Green Hydrogen and Sustainable Industry
+YEAR    : 2024  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.55592/ise.v2i1.11167
+ABSTRACT: 
+---
+TITLE   : Copyright
+AUTHORS : 
+JOURNAL : Techno-Economic Challenges of Green Ammonia as an Energy Vector
+YEAR    : 2021  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-12-820560-0.12001-6
+ABSTRACT: 
+---
+TITLE   : Acknowledgements
+AUTHORS : 
+JOURNAL : Techno-Economic Challenges of Green Ammonia as an Energy Vector
+YEAR    : 2020  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-12-820560-0.04001-7
+ABSTRACT: 
+---
+TITLE   : Green ammonia as a hydrogen carrier: Advances in production, storage, cracking, utilization, and techno-economic analysis
+AUTHORS : Ali Abbas Khan; Dawood Majeed
+JOURNAL : Renewable and Sustainable Energy Reviews
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.rser.2026.117290
+ABSTRACT: 
+---
+TITLE   : Development and Evaluation of Techno-Economic Levelized Cost of Electricity (TELCOE) for the Planning, Design, and Development of Commercially Viable Mini-Grid Hybrid Renewable Energy Power Generation in Sub-Saharan Africa: A Case Study of Southwest Nigeria a
+AUTHORS : Christian Okwori; Olawale Saheed Ismail
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5292461
+ABSTRACT: 
+---
+TITLE   : Techno-Economic Feasibility Analysis and Levelized Cost of Solar Photovoltaic Electricity
+AUTHORS : Chun Sing Lai
+JOURNAL : Photovoltaic Sustainability and Management
+YEAR    : 2021  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1063/9780735423152_002
+ABSTRACT: There is a possibility for mass-scale deployment of photovoltaic (PV) technology in stand-alone and grid-connected power systems. To deal with the technical constraints of PV, electrochemical energy storage (EES) will be a crucial asset to support the increasingly high penetrations of intermittent renewables and to provide means for energy arbitrage. The challenge arises in analyzing the economic projections on PV and EES systems. Commonly, the cost of a generating asset or the power system is evaluated using the levelized cost of electricity (LCOE). From the investment perspective, the economics of energy systems with EES can be challenging to appraise due to EES not being an electrical generator. Here, a Kenyan energy system consisting of PV, an anaerobic digestion (AD) biogas power plant, and EES is used as a case study with an EES energy capital cost at $200 /kWh. Sensitivity analysis is conducted for various PV and EES capacities to examine the system's LCOE with and without energy storage degradation cost. Degradation cost needs to be accounted for in techno-economic analysis to inform system investors. Finally, the chapter introduces an ongoing standard development for PV system techno-economic appraisal: IEEE P2814–Recommended Practice on Techno-economic Metrics for Hybrid Energy and Storage Systems.
+---
+TITLE   : Techno-economic optimization of flexible distributed green ammonia production
+AUTHORS : Matthew  J. Palys; Taylor Moot; Sameer Parvathikar; Kun Zhang
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5527555
+ABSTRACT: 
+---
+TITLE   : Techno-Economic Optimization of Renewable Power to Ammonia System Based on Flexible Process
+AUTHORS : Xiaomeng Zhang; Limei Wen; Chao Huang; Heping Jin
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4894107
+ABSTRACT: 
+---
+TITLE   : Multi-factor optimization of thermo-economic performance of coaxial borehole heat exchanger geothermal system based on Levelized Cost of Energy analysis
+AUTHORS : Zhenhua Xia; Siyu Qin; Zeyu Tao; Guosheng Jia
+JOURNAL : Renewable Energy
+YEAR    : 2023  | CITED: 28 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.renene.2023.119513
+ABSTRACT: 
+---
+TITLE   : Front Matter
+AUTHORS : 
+JOURNAL : Techno-Economic Challenges of Green Ammonia as an Energy Vector
+YEAR    : 2020  | CITED: 2 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-12-820560-0.01001-8
+ABSTRACT: 
+---
+TITLE   : Pathways for Green Ammonia
+AUTHORS : R.M. Nayak-Luke; Z. Cesaro; R. Bañares-Alcántara
+JOURNAL : Techno-Economic Challenges of Green Ammonia as an Energy Vector
+YEAR    : 2021  | CITED: 3 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-12-820560-0.00003-5
+ABSTRACT: 
+---
+TITLE   : Cost accounting and economic competitiveness evaluation of photovoltaic power generation in China —— based on the system levelized cost of electricity
+AUTHORS : Shijia Chong; Jing Wu; I-Shin Chang
+JOURNAL : Renewable Energy
+YEAR    : 2024  | CITED: 40 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.renene.2024.119940
+ABSTRACT: 
+---
+(filtered-in: 22)
+

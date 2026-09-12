@@ -1,0 +1,88 @@
+﻿### QUERY: hydrogen buffer storage sizing hours autonomy ammonia plant design | total=4884783 | shown=25
+
+TITLE   : Integrated Plant Design for Green Hydrogen Production and Power Generation in Photovoltaic Systems: Balancing Electrolyzer Sizing and Storage
+AUTHORS : Alessandro Franco; Carlo Carcasci; Andrea Ademollo; Mattia Calabrese
+JOURNAL : Hydrogen
+YEAR    : 2025  | CITED: 17 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/hydrogen6010007
+ABSTRACT: This study evaluates the performance and feasibility of hybrid photovoltaic–hydrogen systems integrated with 4.2 MW PV installations, focusing on the interplay between electrolyzer capacity, energy storage, and hydrogen production. Key findings reveal that downsizing electrolyzers, such as using a 1 MW unit instead of a 2 MW model, increases operational efficiency by extending nominal power usage, though it reduces total hydrogen output by approximately 50%. Meanwhile, expanding energy storage systems show diminishing returns, with added capacity offering minimal gains in hydrogen production and raising economic concerns. The system’s performance is highly weather-dependent, with daily hydrogen production ranging from 26 kg on cloudy winter days to 375 kg during sunny summer conditions. Surplus energy export to the grid peaks at 3300 kWh during periods of high solar generation but is minimal otherwise. For economic and operational viability, the system design must prioritize directing a majority of PV energy to hydrogen production while minimizing grid export, requiring a minimum of 50% PV energy allocation to the hydrogen value chain. Cost analysis estimates a Levelized Cost of Hydrogen (LCOH) as low as €6/kg with an optimized configuration of a 2 MW electrolyzer and 2 MWh battery. Although high production costs challenge economic sustainability, careful component optimization and supportive policies can enable competitive hydrogen pricing and a positive net present value (NPV) over the system’s lifetime.
+---
+TITLE   : Integrated Plant Design for Green Hydrogen Production and Power Generation in PV Systems: Balancing Electrolyzer Sizing and Storage
+AUTHORS : Alessandro Franco; Carlo Carcasci; Andrea Ademollo; Mattia Calabrese
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.20944/preprints202412.1994.v1
+ABSTRACT: This study evaluates the performance and feasibility of hybrid photovoltaic-hydrogen systems in-tegrated with 4.2 MW PV installations, focusing on the interplay between electrolyzer capacity, energy storage, and hydrogen production. Key findings reveal that downsizing electrolyzers, such as using a 1 MW unit instead of a 2 MW model, increases operational efficiency by extending nominal power usage, though it reduces total hydrogen output by approximately 50%. Meanwhile, expanding energy storage systems show diminishing returns, with added capacity offering minimal gains in hydrogen production and raising economic concerns. The system&amp;#039;s performance is highly weather-dependent, with daily hydrogen production ranging from 26 kg on cloudy winter days to 375 kg during sunny summer conditions. Surplus energy export to the grid peaks at 3300 kWh during periods of high solar generation but is minimal otherwise. For economic and operational viability, the system design must prioritize directing a majority of PV energy to hydrogen production while minimizing grid export, requiring a minimum of 50% PV energy allocation to the hydrogen value chain. Cost analysis estimates a Levelized Cost of Hydrogen (LCOH) as low as €6/kg with an optimized configuration of a 2 MW electrolyzer and 2 MWh battery. Although high production costs challenge economic sustainability, careful component optimization and supportive policies can enable competitive hydrogen pricing and a positive net present value (NPV) over the system&amp;#039;s lifetime.
+---
+TITLE   : 215Methane and Ammonia: Reactor Configuration and Design
+AUTHORS : Aldana Regina Chini; Henar Olmedo Gómez
+JOURNAL : Hydrogen Production, Storage and Utilization Technologies
+YEAR    : 2025  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1515/9783111635064-007
+ABSTRACT: 
+---
+TITLE   : 258259Process Design and Operation for Green Hydrogen and Derivatives
+AUTHORS : Dominik Bongartz
+JOURNAL : Hydrogen Production, Storage and Utilization Technologies
+YEAR    : 2025  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1515/9783111635064-008
+ABSTRACT: 
+---
+TITLE   : A Design and Safety Analysis of the “Electricity-Hydrogen-Ammonia” Energy Storage System: A Case Study of Haiyang Nuclear Power Plant
+AUTHORS : Lingyue Shi; Cheng Ye; Hong Huang; Qinglun He
+JOURNAL : Energies
+YEAR    : 2024  | CITED: 4 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/en17215500
+ABSTRACT: With the development of modernization, traditional fossil energy reserves are decreasing, and the power industry, as one of the main energy consumption forces, has begun to pay attention to increasing the proportion of clean energy generation. With the deepening of electrification, the peak-valley difference of residential electricity consumption increases, but photovoltaic and wind power generation have fluctuations and are manifested as reverse peak regulation. Thermal power plants as the main force of peak regulation gradually reduce the market share, making nuclear power plants bear the heavy responsibility of participating in peak regulation. The traditional method of adjusting operating power by inserting and removing control rods has great safety risks and wastes resources. Therefore, this paper proposes a new energy storage system that can keep the nuclear power plant running at full power and produce hydrogen to synthesize ammonia from excess power. A comprehensive evaluation model of energy storage based on z-score data standardization and objective parameter assignment AHP (analytic hierarchy process) analysis method was established to evaluate energy storage systems according to a multi-index system. With an AP1000 daily load tracking curve as the input model, the simulation model built by Aspen Plus V14 was used to calculate the operating conditions of the system. In order to provide a construction basis for practical engineering use, Haiyang Nuclear Power Plant in Shandong Province is taken as an example. The system layout scheme is proposed according to the local environmental conditions. The accident tree analysis method is combined with ALOHA 5.4.1.2 (Areal Locations of Hazardous Atmospheres) hazardous chemical analysis software and MARPLOT 5.1.1 geographic information technology. A qualitative and quantitative assessment of risk factors and the consequences of leakage, fire, and explosion accidents caused by hydrogen and ammonia storage processes i ...[truncated]
+---
+TITLE   : Buffer Sizing Experiments at Facebook
+AUTHORS : Neda Beheshti; Petr Lapukhov; Yashar Ganjali
+JOURNAL : Proceedings of the 2019 Workshop on Buffer Sizing
+YEAR    : 2019  | CITED: 7 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1145/3375235.3375244
+ABSTRACT: 
+---
+TITLE   : Multi-Objective Optimal Sizing and Design of Renewable and Diesel-Based Autonomous Microgrids with Hydrogen Storage Considering Economic, Environmental, and Social Uncertainties
+AUTHORS : OLADIMEJI OYEWOLE; Nnamdi Nwulu; Ewaoche Okampo
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4796231
+ABSTRACT: 
+---
+TITLE   : Quantifying the role of process flexibility in power-to-ammonia: Hierarchical rule-based scheduling for dispatch optimization and plant sizing
+AUTHORS : Cecilia Pistolesi; Marco Facchino; Claudia Bassano; Alberto Giaconia
+JOURNAL : International Journal of Hydrogen Energy
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijhydene.2026.155281
+ABSTRACT: 
+---
+TITLE   : Design of a Fuel Cell/Battery Hybrid Power System for a Micro Vehicle: Sizing Design and Hydrogen Storage Evaluation
+AUTHORS : Zayd Aslam; Adrian Felix; Christos Kalyvas; Mahmoud Chizari
+JOURNAL : Vehicles
+YEAR    : 2023  | CITED: 12 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/vehicles5040085
+ABSTRACT: This work focuses on the design of a hybrid proton exchange membrane fuel cell (PEMFC) solution for any micro vehicle such as an unmanned aerial vehicle (UAV). A hydrogen fuel cell can provide extended operation, low emissions, and a highly efficient form of energy storage compared with alternative methods, while a battery can be used as an additional energy storage system to support the transient and higher loads required by the UAV, which are not suitable for normal fuel cell operation. The choice of hydrogen storage is one of the main challenges in using hydrogen as an energy carrier. The current study discusses a range of hydrogen storage technologies and provides a methodology for selection for a given application. A sizing design methodology for a hybrid fuel cell system is proposed. Then, it is applied to a case study to demonstrate its implementation.
+---
+TITLE   : Techno-economic optimal sizing of hydrogen–ammonia hybrid storage for residential building multi-source energy systems via enhanced chaotic antlion optimization
+AUTHORS : Mengyi Xu; Congxiang Tian; Haining Tian
+JOURNAL : Case Studies in Thermal Engineering
+YEAR    : 2026  | CITED: 2 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.csite.2026.107704
+ABSTRACT: 
+---
+TITLE   : Peak Shaving System of Nuclear Power Plant Based on the New Energy Storage Scheme of Hydrogen Production and Ammonia Synthesis
+AUTHORS : Lingyue Shi; Qinglun He; Cheng Ye; Hong Huang
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4851106
+ABSTRACT: 
+---
+TITLE   : 
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2022  | CITED:  | TYPE: grant
+DOI     : https://doi.org/10.3030/101058643
+ABSTRACT: 
+---
+(filtered-in: 12)
+

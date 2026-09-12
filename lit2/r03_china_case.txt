@@ -1,0 +1,81 @@
+﻿### QUERY: China wind solar hydrogen ammonia demonstration project investment cost | total=3924130 | shown=25
+
+TITLE   : Intelligent Optimization of On/Off Grid Wind Solar Hydrogen Synthesis Green Ammonia System Based on Big Data Analysis
+AUTHORS : Lei YAO; Zhen ZHANG; Zhenyu DENG; Gang XU
+JOURNAL : 13th International Symposium on Project Management (ISPM2025)
+YEAR    : 2025  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.52202/081497-0108
+ABSTRACT: 
+---
+TITLE   : Management of Combination Solar-Wind Systems is Improving Efficacy, Hydrogen Generation, &amp; Cost Reduction
+AUTHORS : Hind Alofaysan
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5136284
+ABSTRACT: 
+---
+TITLE   : Solar PV and Wind Powered Green Hydrogen Production Cost for Selected Locations
+AUTHORS : 
+JOURNAL : International Journal of Renewable Energy Research
+YEAR    : 2021  | CITED: 2 | TYPE: journal-article
+DOI     : https://doi.org/10.20508/ijrer.v11i4.12516.g8327
+ABSTRACT: 
+---
+TITLE   : Impacts of green hydrogen for steel, ammonia, and long-distance transport on the cost of meeting electricity, heat, cold, and hydrogen demand in 145 countries running on 100% wind-water-solar
+AUTHORS : Mark Z. Jacobson; Anna-Katharina von Krauland; Kevin Song; Alyssa N. Krull
+JOURNAL : Smart Energy
+YEAR    : 2023  | CITED: 39 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.segy.2023.100106
+ABSTRACT: 
+---
+TITLE   : Clean technology cost projections: investment and levelized costs of solar, wind, battery, and hydrogen
+AUTHORS : Hadi Vatankhah Ghadim; Jannik Haas; Christian Breyer; Hans Christian Gils
+JOURNAL : Scientific Data
+YEAR    : 2025  | CITED: 11 | TYPE: journal-article
+DOI     : https://doi.org/10.1038/s41597-025-05951-4
+ABSTRACT: Abstract Reliable cost projection data is critical for energy system modelling, guiding policy and investment decisions that underpin the global energy transition. In this work, we compile and standardise a broad dataset from over 110 existing regional and global studies to provide an organised and spatio-temporally granular dataset of cost projections for major clean energy technologies. The dataset covers Capital Expenditures (CAPEX) and Levelised Costs of Electricity or Hydrogen (LCOE or LCOH) for utility-scale and rooftop photovoltaics, onshore and offshore wind power, grid-scale Li-ion batteries, concentrated solar thermal power, and large-scale alkaline and PEM electrolysers. The data span national, continental, and global scales, with annual granularity through 2050 and metadata for source type and region. Values under various scenarios are provided to enable risk and uncertainty assessments. This resource supports scenario modelling, investment planning, policy design, and benchmarking in the context of decarbonisation pathways. While the data are drawn entirely from existing sources, the novelty lies in the structured harmonisation, metadata processing, and comprehensive coverage, making it suitable for techno-economic evaluation and robust energy system modelling.
+---
+TITLE   : Dynamic analysis of a new solar-wind energy- based cascaded system for hydrogen to ammonia
+AUTHORS : H. Ishaq; I. Dincer
+JOURNAL : International Journal of Hydrogen Energy
+YEAR    : 2020  | CITED: 38 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijhydene.2020.04.149
+ABSTRACT: 
+---
+TITLE   : Geospatial simulation and decision optimization towards identifying the layout suitability and priority for wind-photovoltaic-hydrogen-ammonia project: An empirical study in China
+AUTHORS : Jianli Zhou; Dandan Liu; Ru Sha; Jingbing Sun
+JOURNAL : Energy
+YEAR    : 2024  | CITED: 31 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2023.129489
+ABSTRACT: 
+---
+TITLE   : Design and cost analysis of green hydrogen and ammonia production from hybrid offshore wind and floating photovoltaic systems
+AUTHORS : Mikail Rıza Onat; Murat Emre Demir
+JOURNAL : International Journal of Hydrogen Energy
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijhydene.2026.156753
+ABSTRACT: 
+---
+TITLE   : Multi-Time-Scale Coordinated Optimization Scheduling Strategy for Wind–Solar–Hydrogen–Ammonia Systems
+AUTHORS : Ziyun Xie; Yanfang Fan; Junjie Hou; Xueyan Bai
+JOURNAL : Electronics
+YEAR    : 2026  | CITED: 2 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/electronics15040795
+ABSTRACT: To address the inherent mismatch between the fluctuating power output of renewable energy and the continuous production requirements of ammonia in off-grid wind–solar–hydrogen–ammonia systems, this paper proposes a “day-ahead–intraday–real-time” multi-time-scale coordinated optimization scheduling strategy. In the day-ahead layer, Wasserstein Distributionally Robust Optimization (WDRO) is employed to determine a conservative and stable baseline plan for ammonia load under high uncertainty of wind and solar output. The intraday layer utilizes Model Predictive Control (MPC) with a 2-h prediction horizon and 15-min rolling steps to correct short-term forecast deviations. The real-time layer achieves minute-level power balancing through priority dispatch and deadband control. Furthermore, hydrogen storage tanks serve as a material buffer between hydrogen production and ammonia synthesis, with their state variables transmitting across layers to achieve flexible multi-time-scale coupling. Simulation results demonstrate that, although this strategy slightly reduces the theoretical maximum ammonia yield, it completely avoids load-shedding risks. Compared with the deterministic scheduling (Scheme 1), which suffers a net loss due to severe penalty costs, the proposed strategy achieves a positive daily profit of CNY 277,700, representing an absolute increase of CNY 429,300. Furthermore, it provides an additional daily profit of CNY 65,800 compared to the stochastic optimization approach (Scheme 2), demonstrating superior economic robustness in off-grid environments.
+---
+TITLE   : Flexible production of green hydrogen and ammonia from variable solar and wind energy: Case study of Chile and Argentina
+AUTHORS : Julien Armijo; Cédric Philibert
+JOURNAL : International Journal of Hydrogen Energy
+YEAR    : 2020  | CITED: 568 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijhydene.2019.11.028
+ABSTRACT: 
+---
+TITLE   : Optimization Modeling and Performance Evaluation of Wind-Solar-Coupled Hydrogen-Ammonia Systems with Storage: A Full-Year Operational Simulation and Cost-Benefit Analysis
+AUTHORS : Hekai Zhan; Wenguang Wang; Sheng Zhou; Ziping Dai
+JOURNAL : Applied and Computational Engineering
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.54254/2755-2721/2026.35696
+ABSTRACT: Against global warming and the need to reduce reliance on fossil fuels, green ammonia produced from renewable hydrogen has emerged as a promising energy carrier for integrating intermittent wind and solar power. This study develops an integrated wind–solar–storage–hydrogen–ammonia optimization model based on phased linear programming, simulating 8,760 hours of annual operation while incorporating renewable generation, energy storage, water electrolysis, hydrogen storage, and ammonia synthesis under operational constraints. Results show that an optimal 7:3 wind-to-photovoltaic ratio combined with 15%/4 h energy storage reduces the green ammonia production cost to approximately 2,800 CNY/ton, achieves an internal rate of return of 12–15%, and shortens the payback period to 8–10 years. The optimized configuration also lowers the levelized cost of electricity to 0.15 CNY/kWh, limits renewable curtailment to below 3%, and demonstrates that a 300,000 Nm³ hydrogen storage system can effectively stabilize ammonia synthesis. Sensitivity analysis across nine representative locations, categorized as wind-dominant, photovoltaic-dominant, and wind–solar complementary regions, reveals that system performance is most sensitive to wind power cost, followed by photovoltaic, energy storage, power storage, and hydrogen storage costs. Wind-dominant regions are particularly affected by wind cost fluctuations, photovoltaic-dominant regions benefit most from energy storage optimization, while complementary regions exhibit balanced sensitivity due to resource complementarity. The proposed phased linear programming framework provides an effective approach for dynamic optimization of integrated renewable-hydrogen-ammonia systems and offers a practical techno-economic benchmark for region-specific green ammonia deployment and cost reduction.
+---
+(filtered-in: 11)
+

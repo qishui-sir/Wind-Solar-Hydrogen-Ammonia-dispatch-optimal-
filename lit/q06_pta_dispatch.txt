@@ -1,0 +1,137 @@
+﻿### QUERY: optimal scheduling dispatch power-to-ammonia electrolyzer hydrogen storage MILP | total=3392895 | shown=25
+
+TITLE   : Day-Ahead Optimal Scheduling of a Microgrid with Hydrogen Storage and Gas Turbine: MILP Versus Genetic Algorithm
+AUTHORS : Junqi Wen
+JOURNAL : 2026 8th International Conference on Energy Systems and Electrical Power (ICESEP)
+YEAR    : 2026  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/icesep70386.2026.11607967
+ABSTRACT: 
+---
+TITLE   : Day-ahead optimal scheduling of an integrated wind–solar hydrogen production system with battery and hydrogen storage considering electrolyzer start-up dynamics
+AUTHORS : Nuo Xu; Qiao He; Xiaorui Zhang; Lixin Wei
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.7197893
+ABSTRACT: Day-ahead scheduling of renewable-powered hydrogen production systems requires an accurate representation of electrolyzer operating dynamics, storage interactions, and grid electricity use. This study develops a mixed-integer linear programming framework for the day-ahead scheduling of an integrated wind–solar–grid hydrogen production system. Electrolyzer operation is represented by three discrete states, namely cold, start-up, and hot states. Cold-start and hot-start processes are distinguished by different start-up durations, and minimum continuous operating-time constraints are enforced to reflect practical operation. Group-level electrolyzer coordination, battery storage, hydrogen storage, and time-varying electricity prices are incorporated to coordinate electricity, hydrogen, and storage resources. The proposed framework is validated using a real wind–solar hydrogen production system in an oilfield application and is further tested under representative operating conditions, including grid-connected and off-grid operation, high and low downstream hydrogen demand, equipment maintenance, and photovoltaic outage scenarios. In the baseline case, compared with the current operating strategy, the optimized schedule reduces electrolyzer operating cost by 24.96% and total electricity-related operating cost by 17.31% while maintaining stable hydrogen supply. The results demonstrate that the proposed framework can improve the economic operation and operational flexibility of renewable-powered hydrogen production systems under diverse practical conditions.
+---
+TITLE   : Optimal Dispatch of Offshore Wind-Hydrogen-Ammonia System Considering Three-tier Ammonia Reserve Mechanism
+AUTHORS : Qikun He; Yuxuan Zhao; Ke Tan; Zhaoxia Jing
+JOURNAL : 2026 11th Asia Conference on Power and Electrical Engineering (ACPEE)
+YEAR    : 2026  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/acpee69242.2026.11524780
+ABSTRACT: 
+---
+TITLE   : Day-ahead optimal scheduling strategy for electrolytic water to hydrogen production in zero-carbon parks type microgrid for optimal utilization of electrolyzer
+AUTHORS : Wentao Huang; Bohan Zhang; Leijiao Ge; Jun He
+JOURNAL : Journal of Energy Storage
+YEAR    : 2023  | CITED: 92 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.est.2023.107653
+ABSTRACT: 
+---
+TITLE   : Optimal Scheduling of Weak-Grid Green Ammonia Systems Based on ALK–PEM Electrolyzer Coordination
+AUTHORS : Limin Cheng; Xu Ji
+JOURNAL : Energies
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/en19122807
+ABSTRACT: Green ammonia systems provide an important pathway for converting fluctuating renewable electricity into transportable chemical products. To address the coupled challenges of renewable power variability, heterogeneous electrolyzer dynamics, hydrogen storage constraints, and continuous ammonia synthesis under weak-grid conditions, this paper develops a mixed-integer linear programming scheduling model considering the coordination and start–stop characteristics of ALK–PEM hybrid electrolyzers. The model uses a 15 min resolution over a two-day horizon and integrates renewable power supply, grid electricity purchase, electrolysis, hydrogen storage, and flexible ammonia synthesis in a unified framework. The off, hot-standby, and running states of ALK and PEM electrolyzers are explicitly represented. The case results show that, under the high-renewable-resource scenario, ammonia production reaches 494.93 t, with a curtailment ratio of 3.23% and a grid electricity share of 0.68%, indicating strong renewable-energy conversion capability. Under the low-renewable-resource scenario, ammonia production decreases to 180.09 t and the grid electricity share increases to 40%, showing that the operating priority shifts to maintaining continuous production and safe hydrogen inventory. The ALK hydrogen production share decreases from 93.96% in the high-resource scenario to 75.66% in the low-resource scenario, while the PEM share increases from 6.04% to 24.34%. This indicates that ALK mainly supports large-scale base-load hydrogen production under abundant renewable resources, whereas PEM provides fast compensation and marginal regulation when renewable resources are limited and more volatile. The results demonstrate that ALK base-load production, PEM fast regulation, hydrogen storage buffering, and platform-like flexible ammonia operation jointly provide the main flexibility sources in the studied weak-grid green ammonia system.
+---
+TITLE   : Optimal sizing and dynamic dispatch of hybrid electrolyzer for industrial-scale renewable hydrogen integration​
+AUTHORS : Hexu Sun; Yuyang Zhao; Wentao Sun; Yumei Liang
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5592993
+ABSTRACT: 
+---
+TITLE   : Optimal Planning of Zero-Carbon Off-Grid Ammonia-Hydrogen-Based Microgrids Considering Hybrid Types of Electrolyzer Modules
+AUTHORS : Junhao Gu; Longyan Li; Chao Ning
+JOURNAL : 2024 4th Power System and Green Energy Conference (PSGEC)
+YEAR    : 2024  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/psgec62376.2024.10721092
+ABSTRACT: 
+---
+TITLE   : The Impact of Hydrogen Energy Storage Aqua Electrolyzer Fuels Cell on Automatic Generation Control of Power System using optimal fuzzy PI controller
+AUTHORS : Ankur Rai; DUSHMANTA KUMAR KUMAR DAS
+JOURNAL : 
+YEAR    : 2022  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.21203/rs.3.rs-1827606/v1
+ABSTRACT: Abstract The influence of energy storage hydrogen aqua electrolyzer (HAE)-fuel cell (FC) units on automated generation control (AGC) of linked power systems is investigated in this study. In today's fast-paced world, AGC plays a critical role in ensuring that the power supply meets high-quality requirements. This study proposes a novel fuzzy gain scheduling (FGS) PI controller as an intelligent control approach for enhancing AGC power system performance with or without HAE-FC units. The FGS-PI controller's input scaling factors (SFs) and output SFs are tuned using a class topper optimization. The suggested FGS-PI controller's sensitivity analysis is shown to evaluate its performance. Due to changes in system parameters and multi-step load disturbances, the suggested controller performs well.
+---
+TITLE   : Optimal Scheduling of Off-Grid Wind-Solar-Hydrogen-Ammonia Integrated System Considering Coordination of Electrolyzer and Energy Storage
+AUTHORS : Dandan Li; Zhen Li; Xiuyu Yang; Wenyuan Zhang
+JOURNAL : Lecture Notes in Electrical Engineering The Proceedings of 2025 Annual National Conference of Electrical Theory and New Technologies
+YEAR    : 2026  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1007/978-981-95-6841-3_8
+ABSTRACT: 
+---
+TITLE   : Optimal Power Dispatch with Renewable Energy Integration Using a MILP Model: A Case Study of Western India
+AUTHORS : Nikhil Venkataramana; Venkatasailanathan Ramadesigan; Tejal Kanitkar; Rangan Banerjee.
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.46855/energy-proceedings-11474
+ABSTRACT: 
+---
+TITLE   : Optimal scheduling of Wind-Solar-Hydrogen-Storage Integrated Energy System Considering Internal Mechanism of PEM Electrolyzer
+AUTHORS : Yangqihang Liu; Mei Su; Xubin Liu; Haozheng Huang
+JOURNAL : 2024 IEEE 8th Conference on Energy Internet and Energy System Integration (EI2)
+YEAR    : 2024  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/ei264398.2024.10991930
+ABSTRACT: 
+---
+TITLE   : Optimal Sizing of Power and Hydrogen Storage Systems Considering Electrolyzer Efficiency and Start-Up Dynamics
+AUTHORS : Cancheng Qiu; Zhong Wen; Guofeng He; Ke Zhang
+JOURNAL : Energies
+YEAR    : 2026  | CITED: 3 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/en19071712
+ABSTRACT: To reduce renewable output volatility and improve system integration efficiency, this study constructs a coordinated wind–solar–storage–hydrogen framework. The proposed MILP model innovatively integrates electrolyzer power-dependent efficiency and start-up dynamics into a coupled capacity-sizing and dispatch framework and differs from existing MILP models in refined dynamic constraint construction, multi-energy flow coupling, and practical engineering logic constraints. Refined mathematical models are formulated for core components, including wind and photovoltaic units, battery energy storage systems (BESS), and electrolyzers with power-dependent hydrogen production efficiency and operational dynamics. The electrolyzer efficiency peak at 0.25 p.u. input power is calibrated by industrial test data, and the optimization results show strong robustness to the slight deviation of this peak point. Independent control strategies are designed for each electrolyzer, and a capacity optimization model is formulated to maximize system performance. Simulation tests using wind and solar profiles from Northwest China show that the optimized system achieves a renewable energy utilization rate of 96.7%, a BESS capacity of 7 MWh, and a hydrogen storage tank of 3500 kg. Adopting a time-of-use (TOU) electricity pricing mechanism combined with hydrogen sales significantly enhances system efficiency, while expanding power and hydrogen transmission capacities further improves renewable energy integration. These results demonstrate the practical potential of the proposed integrated system for large-scale renewable energy deployment.
+---
+TITLE   : A MILP-Based Joint Dispatch Optimization Model for Nuclear-Wind-Storage Power Systems
+AUTHORS : Rui Huang; Lei Yao
+JOURNAL : 2026 5th International Conference on Smart Grid and Energy Systems (SGES)
+YEAR    : 2026  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/sges70879.2026.11662601
+ABSTRACT: 
+---
+TITLE   : Quantifying the role of process flexibility in power-to-ammonia: Hierarchical rule-based scheduling for dispatch optimization and plant sizing
+AUTHORS : Cecilia Pistolesi; Marco Facchino; Claudia Bassano; Alberto Giaconia
+JOURNAL : International Journal of Hydrogen Energy
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijhydene.2026.155281
+ABSTRACT: 
+---
+TITLE   : Day-Ahead Scheduling of Green Hydrogen Production:  Coordinating Multi-Electrolyzer System, Shared Auxiliary Units  and Battery Energy Storage System
+AUTHORS : Jiawei Yu; Wangli He; Feng Qian
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.7120226
+ABSTRACT: Chemical process industries are transitioning toward green energy systems, where renewablepowered alkaline water electrolysis is essential for decarbonizing hydrogen supply and accommodating wind and photovoltaic generation. Coordinating multiple electrolyzers remains challenging as shared lye circulation and thermal coupling govern nonlinear state transitions and hydrogen production efffciency in utility-scale power-to-hydrogen plants. This study proposes a thermodynamic-aware day-ahead scheduling strategy for multi-electrolyzer systems coordinated with a battery energy storage system (BESS). A scheduling-oriented electrolyzer model is developed that explicitly captures lye circulation, multi-state transitions, and thermodynamic nonlinearity. Historical cumulative operating time balances electrolyzer utilization, while BESS coordination enhances ffexibility and reduces thermal-cycling stress. A scalable two-stage optimization framework addresses large-scale deployment. Case studies show that renewable energy consumption rate gains of 2.88%, 3.14%, and 2.31% over simple start-stop, cycle rotation, and fast start-stop strategies, respectively, with a 6 MWh BESS identiffed as an ideal conffguration for the proposed system.
+---
+TITLE   : An iterative MILP-based model for optimal V2G scheduling considering battery degradation and thermal dynamics
+AUTHORS : Hamid Reza Hemmati; Hossein Farzin; Mehdi Monadi
+JOURNAL : Journal of Energy Storage
+YEAR    : 2026  | CITED: 2 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.est.2026.121551
+ABSTRACT: 
+---
+TITLE   : Optimal scheduling of a RES – Electrolyzer aggregator in electricity, hydrogen and green certificates markets
+AUTHORS : X. Voulkopoulos; C.N. Dimitriadis; M.C. Georgiadis
+JOURNAL : International Journal of Hydrogen Energy
+YEAR    : 2024  | CITED: 38 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijhydene.2024.06.379
+ABSTRACT: 
+---
+TITLE   : Optimal Dispatch of Micro Energy Grid with Solidstate Hydrogen Storage
+AUTHORS : Jianing Pan; Wendi Zheng; Rui Chen; Youzhe Zhu
+JOURNAL : 2025 5th International Conference on Energy, Power and Electrical Engineering (EPEE)
+YEAR    : 2025  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/epee67527.2025.11428500
+ABSTRACT: 
+---
+TITLE   : A hierarchical scheduling framework for optimal dispatch of AEL-PEM hybrid electrolyzer arrays
+AUTHORS : Jintao Wu; Tian Zhao; Qun Chen
+JOURNAL : Journal of Physics: Conference Series
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1088/1742-6596/3218/1/012029
+ABSTRACT: Abstract Renewable energy-driven hydrogen production systems are pivotal for decarbonization. However, individual electrolyzer technologies often struggle to reconcile high-frequency renewable volatility with long-term operational economy. This paper proposes a hierarchical optimal scheduling framework for a hybrid system integrating alkaline (AEL) and proton exchange membrane (PEM) electrolyzers. First, a renewable power decomposition strategy based on the moving average envelope is developed to decouple the fluctuating renewable energy input into high- and low-frequency components. The low-frequency renewable power is absorbed by AEL units, while high-frequency residuals are absorbed by PEM units to leverage their superior flexibility and mitigate the degradation risk associated with AEL load cycling. Second, to handle the intricate non-linearities of the electrochemical-thermal-gas coupling, the high-precision convex hull linearization is introduced to transform the nonlinear constraints into linear ones with binary variables. A two-stage solution strategy is further developed for acceleration. Case studies demonstrate that the proposed framework achieves a synergistic unit dispatch that optimizes economic revenue, maximizes system durability, increases computational efficiency, and thus provides a robust solution for large-scale hybrid hydrogen production.
+---
+(filtered-in: 19)
+

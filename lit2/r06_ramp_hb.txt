@@ -1,0 +1,95 @@
+﻿### QUERY: ammonia synthesis load change rate ramp constraint reactor dynamic | total=4861340 | shown=25
+
+TITLE   : Dynamic operation of two-stage CO2 methanation reactor: Start-up by H2 combustion and load change by independent control of heat-carrier flow rate
+AUTHORS : Shogo Sayama; Seiji Yamamoto
+JOURNAL : Renewable Energy
+YEAR    : 2025  | CITED: 4 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.renene.2025.122548
+ABSTRACT: 
+---
+TITLE   : Analytical Relationship Between GFL Active-Power Step-Response Rise Time and Dynamic-Load Ramp-Rate Compensation
+AUTHORS : Ahmad F. Abdelhadi; Simon Y. Foo
+JOURNAL : 2026 IEEE Texas Power and Energy Conference (TPEC)
+YEAR    : 2026  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/tpec67884.2026.11513088
+ABSTRACT: 
+---
+TITLE   : Simultaneous Design and Part-Load Optimization of an Industrial Ammonia Synthesis Reactor
+AUTHORS : Steffen  R. Fahr; Matthias Schiedeck; Michael Reinke; Jan-Peter Bohn
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4594033
+ABSTRACT: 
+---
+TITLE   : Dual-Level Optimization for Hybrid Energy Storage with Photovoltaic Integration Considering Power Ramp-Rate Constraint
+AUTHORS : Xiangqiang Wu; Zhongting Tang; Daniel-Ioan Stroe; Tamas Kerekes
+JOURNAL : 
+YEAR    : 2022  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4213450
+ABSTRACT: Ramp-rate constraint has been introduced in many grid codes to limit the fluctuating power injected into the grid. In recent years, hybrid energy storage systems have been widely used in ramp-rate control applications due to their versatility. However, proper allocation of the hybrid PV and energy storage system is a challenge to achieve high energy autonomy and low cost. Furthermore, the power management between the battery and supercapacitor is another challenge regarding the battery lifespan extension. In this paper, a dual-level optimization strategy for the grid-connected PV system is proposed. On the upper level, a sizing methodology is proposed to determine the capacity share ratio of the PV and the hybrid energy storage elements. By trading off the self-sufficiency&amp;nbsp;and the energy throughput between the PV system and the grid, the optimal allocation of battery and supercapacitor can be obtained. On the lower level, an adaptive ramp-rate control strategy is implemented that dynamically distributes the power between the battery and supercapacitor to reduce the battery cycles. The results show that the proposed optimization strategy reduces the battery cycles by nearly 10% over a one-year period without affecting the self-sufficiency of the PV system.
+---
+TITLE   : Shifting towards dynamic and load-flexible ammonia synthesis via polytropic fixed-bed reactors
+AUTHORS : Lukas Gottheil; Jens Bremer
+JOURNAL : Chemical Engineering Journal
+YEAR    : 2025  | CITED: 4 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.cej.2025.170927
+ABSTRACT: 
+---
+TITLE   : Electrocatalytic Nitrogen Reduction Reaction for Ammonia Synthesis
+AUTHORS : Mohammadreza Nazemi; Mostafa A. El-Sayed
+JOURNAL : Photo-Electrochemical Ammonia Synthesis
+YEAR    : 2021  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1201/9781003141808-3
+ABSTRACT: 
+---
+TITLE   : Sampling-Based Planning and Predictive Control for Energy Management of a Shipboard Integrated Power System With High Ramp Rate Load
+AUTHORS : Cary L. Butler; Andrew G. Alleyne
+JOURNAL : Journal of Dynamic Systems, Measurement, and Control
+YEAR    : 2025  | CITED: 1 | TYPE: journal-article
+DOI     : https://doi.org/10.1115/1.4070027
+ABSTRACT: Abstract Integrated power systems (IPS) aboard electrified ships require energy management strategies that ensure safe, autonomous operation. Next-generation platforms are expected to make such decisions with minimal human oversight. However, the complex, multidomain, multitimescale dynamics of IPS—combined with high ramp rate loads like electronic warfare systems—pose significant challenges. Additionally, these systems often face uncertain, time-varying, mission-specific constraints that create nonconvex feasible regions, limiting the effectiveness of conventional energy management approaches. This work presents a hierarchical, two-stage framework for safe and adaptive energy management in shipboard IPS. At the upper level, a sampling-based rapidly exploring random tree (RRT) algorithm identifies feasible long-term power and energy trajectories within nonconvex constraint spaces. At the lower level, a robust model predictive control (MPC) scheme ensures accurate trajectory tracking with bounded error, accommodating the dynamics of major components while maintaining constraint satisfaction. The framework is demonstrated on a two-zone IPS model with a high ramp rate load. Simulation results show the proposed planner efficiently generates feasible mission plans that adapt to evolving constraints, while the MPC controller ensures reliable tracking and constraint adherence. By bridging long-term planning with short-term control, this architecture enables safe, flexible, and autonomous operation of complex shipboard power systems. It addresses key limitations of existing strategies in managing nonconvex constraints and dynamic mission contexts, making it well-suited for resilient autonomy in future maritime platforms.
+---
+TITLE   : Ammonia
+AUTHORS : Mohammadreza Nazemi; Mostafa A. El-Sayed
+JOURNAL : Photo-Electrochemical Ammonia Synthesis
+YEAR    : 2021  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1201/9781003141808-1
+ABSTRACT: 
+---
+TITLE   : Performance Targets and Opportunities for Green Ammonia Synthesis
+AUTHORS : Mohammadreza Nazemi; Mostafa A. El-Sayed
+JOURNAL : Photo-Electrochemical Ammonia Synthesis
+YEAR    : 2021  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1201/9781003141808-9
+ABSTRACT: 
+---
+TITLE   : Ammonia Detection
+AUTHORS : Mohammadreza Nazemi; Mostafa A. El-Sayed
+JOURNAL : Photo-Electrochemical Ammonia Synthesis
+YEAR    : 2021  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1201/9781003141808-7
+ABSTRACT: 
+---
+TITLE   : 
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2022  | CITED:  | TYPE: grant
+DOI     : https://doi.org/10.3030/101059643
+ABSTRACT: 
+---
+TITLE   : Electrochemical Reactor Design
+AUTHORS : Mohammadreza Nazemi; Mostafa A. El-Sayed
+JOURNAL : Photo-Electrochemical Ammonia Synthesis
+YEAR    : 2021  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1201/9781003141808-4
+ABSTRACT: 
+---
+TITLE   : Impact of injection rate ramp-up on nucleation and arrest of dynamic fault slip
+AUTHORS : Federico Ciardo; Antonio Pio Rinaldi
+JOURNAL : 
+YEAR    : 2022  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.31223/x52g8w
+ABSTRACT: Fluid injection into underground formations reactivates preexisting geological discontinuities such as faults or fractures. In this work, we investigate the impact of injection rate ramp-up present in many standard injection protocols on the nucleation and potential arrest of dynamic slip along a planar pressurized fault. We assume a linear increasing function of injection rate with time, up to a given time tc after which a maximum value Qm is achieved. Under the assumption of negligible shear-induced dilatancy and impermeable host medium, we solve numerically the coupled hydro-mechanical model and explore the different slip regimes identified via scaling analysis. We show that in the limit when fluid diffusion time scale tw is much larger than the ramp-up time scale tc, slip on an ultimately stable fault is essentially driven by pressurization at constant rate. Vice versa, in the limit when tc/tw ≫ 1, the pressurization rate, quantified by the dimensionless ratio (Qm tw / tc Q∗), does impact both nucleation time and arrest distance of dynamic slip. Indeed, for a given initial fault loading condition and frictional weakening property, lower pressurization rates delay the nucleation of a finite-sized dynamic event and increase the corresponding run-out distance approximately proportional to (Qm tw / tc Q∗)^(-0.472). On critically stressed faults, instead, the ramp-up of injection rate activates quasi-static slip which quickly turn into a run-away dynamic rupture. Its nucleation time decreases non-linearly with increasing value of (Qm tw / tc Q∗) and it may precede (or not) the one associated with fault pressurization at constant rate only.
+---
+(filtered-in: 13)
+

@@ -1,0 +1,179 @@
+﻿### QUERY: capacity configuration optimization wind solar hydrogen ammonia integrated system | total=6814914 | shown=25
+
+TITLE   : Capacity Configuration and Control Optimization of Off-Grid Wind Solar Hydrogen Storage System
+AUTHORS : Yuyang Zhao; Yuhuan Zhao; Song Cao; Zhengzheng Zhu
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5049417
+ABSTRACT: 
+---
+TITLE   : Capacity Optimization Configuration of Wind-Solar Hydrogen Production Hybrid Energy Storage System
+AUTHORS : Chengyi Yue; Chaojie Li; Haoxin Dong
+JOURNAL : 2024 International Conference on Neuromorphic Computing (ICNC)
+YEAR    : 2024  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/icnc64304.2024.10987575
+ABSTRACT: 
+---
+TITLE   : Capacity configuration and optimization of an off-grid wind-solar-hydrogen integrated system considering hybrid hydrogen production with alkaline electrolyzers and proton exchange membrane electrolyzers
+AUTHORS : Shujing Shi; Yuzhe Pan; Yihang Li; Hao Wang
+JOURNAL : Renewable Energy
+YEAR    : 2026  | CITED: 7 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.renene.2025.124814
+ABSTRACT: 
+---
+TITLE   : Capacity configuration and control optimization of off-grid wind solar hydrogen storage system
+AUTHORS : Yuyang Zhao; Yuhuan Zhao; Song Cao; Zhengzheng Zhu
+JOURNAL : Energy
+YEAR    : 2025  | CITED: 18 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2025.136002
+ABSTRACT: 
+---
+TITLE   : Two-layer capacity optimization configuration of wind-photovoltaic-hydrogen-ammonia coupling system based on Kriging, NSGA-III algorithm, and stochastic MCDM
+AUTHORS : Wanying Li; Zhengsen Ji; Yongli Wang
+JOURNAL : Energy
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2026.142307
+ABSTRACT: 
+---
+TITLE   : Day-Ahead Scheduling and Capacity Configuration Optimization of Wind-Solar Hybrid Hydrogen Production System Based on Power Scenario Division
+AUTHORS : Wei Su; Qi Li; Wenjin Zheng; Yunyi Han
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4590807
+ABSTRACT: 
+---
+TITLE   : Capacity Configuration and Economic Analysis of Integrated Wind-Solar-Hydrogen-Storage System
+AUTHORS : Zhuan Zhou; Xingang Wang; Zhiyong Yu; Jiayu Bian
+JOURNAL : 2024 3rd International Conference on Energy, Power and Electrical Technology (ICEPET)
+YEAR    : 2024  | CITED: 1 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/icepet61938.2024.10626286
+ABSTRACT: 
+---
+TITLE   : Capacity Allocation of Integrated Wind-Photovoltaic-Hydrogen Microgrid System Considering Hydrogen Production Efficiency Optimization
+AUTHORS : jianlin li; Zelin Shi; Ying QIAO; Xiaoxia JIANG
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5116971
+ABSTRACT: 
+---
+TITLE   : Digital intelligence-driven synergistic optimization of capacity configuration for wind-solar-hydrogen multi-energy systems integrated with shared energy storage
+AUTHORS : Jianli Zhou; Jia Ran; Jiayi Ren; Ruige Zhao
+JOURNAL : Energy
+YEAR    : 2025  | CITED: 13 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2025.139497
+ABSTRACT: 
+---
+TITLE   : Capacity Configuration Optimization of Wind-Solar Combined Power Generation System Based on Improved Grasshopper Algorithm
+AUTHORS : Liang Chunhui; Ding Chao; Zuo Xiaoyang; Li Jinfa
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4417028
+ABSTRACT: 
+---
+TITLE   : Operating characteristics analysis and capacity configuration optimization of wind-solar-hydrogen hybrid multi-energy complementary system
+AUTHORS : Wei Su; Qi Li; Shuoshuo Wang; Wenjin Zheng
+JOURNAL : Frontiers in Energy Research
+YEAR    : 2023  | CITED: 9 | TYPE: journal-article
+DOI     : https://doi.org/10.3389/fenrg.2023.1305492
+ABSTRACT: Wind and solar energy are the important renewable energy sources, while their inherent natures of random and intermittent also exert negative effect on the electrical grid connection. As one of multiple energy complementary route by adopting the electrolysis technology, the wind-solar-hydrogen hybrid system contributes to improving green power utilization and reducing its fluctuation. Therefore, the moving average method and the hybrid energy storage module are proposed, which can smooth the wind-solar power generation and enhance the system energy management. Moreover, the optimization of system capacity configuration and the sensitive analysis are implemented by the MATLAB program platform. The results indicate that the 10-min grid-connected volatility is reduced by 38.7% based on the smoothing strategy, and the internal investment return rate can reach 13.67% when the electricity price is 0.04 $/kWh. In addition, the annual coordinated power and cycle proportion of the hybrid energy storage module are 80.5% and 90%, respectively. The developed hybrid energy storage module can well meet the annual coordination requirements, and has lower levelized cost of electricity. This method provides reasonable reference for designing and optimizing the wind-solar-hydrogen complementary system.
+---
+TITLE   : Optimal capacity configuration of the wind-solar-hydrogen multi-energy system for green data computing centers: An integrated AI forecasting and improved multi-objective optimization approach
+AUTHORS : Jianli Zhou; Zhemei Ma; Xinya Sun; Zihan Xu
+JOURNAL : Journal of Cleaner Production
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.jclepro.2026.148096
+ABSTRACT: 
+---
+TITLE   : Capacity Configuration and Economic Analysis of Integrated Wind–Solar–Thermal–Storage System Based on Concentrated Solar Power Plant
+AUTHORS : Ruishen Guo; Dongqiang Lei; Hantao Liu; Yanwen Guo
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4739203
+ABSTRACT: 
+---
+TITLE   : Two-layer Optimal Scheduling and Capacity Configuration of Wind-Solar Hydrogen Production to Methanol Synthesis System
+AUTHORS : Rui Wang; Zhuorui Wu; Bowen Wang; Weijia Wang
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5759779
+ABSTRACT: 
+---
+TITLE   : Capacity Optimization And Multi-Time Scale Coordinated Scheduling Of Wind-Solar-Hydrogen-Storage Coupled System
+AUTHORS : Chen Wang; Yi Tang; Zesen Li; Jing Shi
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4946852
+ABSTRACT: 
+---
+TITLE   : Integrated Configuration and Dispatch Optimization for Standalone Wind–Solar–Hydrogen-to-Methanol Systems with Maintenance-Aware Thermal-Ready Methanol Synthesis
+AUTHORS : Yani Wang; Jianbao Wang; Xiaobei Li; Zhenyu Zhao
+JOURNAL : 2026 5th International Conference on New Energy System and Power Engineering (NESP)
+YEAR    : 2026  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/nesp70395.2026.11622181
+ABSTRACT: 
+---
+TITLE   : Capacity Optimization of a Wind-Solar Integrated Oxygen Production and Pure Oxygen Combustion Carbon Reduction System Using Typical Wind-Solar-Load Scenario Generation
+AUTHORS : Ying Ding; Weiqing Wang; Ming Ding; Dianlei Han
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.21203/rs.3.rs-5166276/v1
+ABSTRACT: Abstract In response to the growing need for carbon reduction and enhanced integration of renewable energy into the power grid, this paper introduces a capacity optimization approach for a wind-solar integrated system that combines oxygen production with pure oxygen combustion to achieve carbon reduction. The method incorporates the generation of typical wind-solar-load scenarios to account for variability and interdependencies across multiple energy sources and demand loads. A Dirichlet Process Mixture Model with Markov Chain Monte Carlo (DPMM-MCMC) is employed to generate representative daily scenarios, capturing the uncertainties and correlations among energy sources and loads. Based on these scenarios, a capacity optimization model is formulated for the wind-solar integrated system. Simulations and comparative analyses, using annual data from a region in Northwest China, demonstrate the effectiveness of the proposed method. The results highlight the significant impact of pure oxygen combustion technology, which not only increases carbon capture efficiency but also reduces capture costs by approximately 27.8%. Additionally, the optimal wind power share is identified within 60% to 80%, with load penetration further enhancing energy utilization efficiency. These findings underscore the potential of the proposed system to improve renewable energy absorption and reduce carbon emissions.
+---
+TITLE   : Capacity-Operation Collaborative Optimization of the System Integrated with Wind/ Photovoltaic/ Concentrating Solar Power with S-Co2 Brayton Cycle
+AUTHORS : Yangdi Hu; Rongrong Zhai; Lintong Liu
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4358467
+ABSTRACT: In this paper, a new power generation system is proposed, which is integrated with wind power (WP), photovoltaic (PV), a trough concentrating solar power (CSP) with S-CO2 Brayton, thermal energy storage (TES) and electric heater (EH) subsystems. The WP-PV-CSP (S-CO2) system is entirely driven by renewable energy. In order to achieve simultaneous optimization of system capacity and load distribution, a bi-level capacity-operation collaborative optimization model is constructed, and a non-dominated sorting genetic algorithm-II (NSGA-II) nested linear programming (LP) algorithm is proposed to solve this optimization problem, aiming to obtain a set of optimal capacity configurations that balance carbon emissions, economic and operation scheduling. Then, Zhangbei, China, is applied as a practical application case, the bi-level optimization model is used to optimize the capacity and annual load scheduling of the system, respectively. Three reference systems are set up to compare the yearly operating characteristics with the PV-WP-CSP (S-CO2) system, demonstrating the advantages of using the S-CO2 Brayton cycle and equipping the system with EH. Compared with the reference system without optimization, the LCOE and carbon emissions of the PV-WP-CSP (S-CO2) system are reduced by 14.9 $/MW and 4337 t/y, respectively, after capacity-operation collaborative optimization.
+---
+TITLE   : Two-Stage Robust Optimization Model for Capacity Configuration of Biogas-Solar-Wind Integrated Energy System
+AUTHORS : Xiaoqing Li; Lizhi Zhang; Ruiqi Wang; Bo Sun
+JOURNAL : IEEE Transactions on Industry Applications
+YEAR    : 2023  | CITED: 68 | TYPE: journal-article
+DOI     : https://doi.org/10.1109/tia.2022.3217229
+ABSTRACT: 
+---
+TITLE   : Capacity Optimization Configuration of Wind-Solar IES Considering Hydrogen Energy Storage
+AUTHORS : Guiping Zhou; Zhihong Wang; Shitao Wang; Wenjia Jiang
+JOURNAL : 2022 IEEE 2nd International Conference on Mobile Networks and Wireless Communications (ICMNWC)
+YEAR    : 2022  | CITED: 2 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/icmnwc56175.2022.10031916
+ABSTRACT: 
+---
+TITLE   : A Preference Adjustable Capacity Configuration Optimization Method for Hydrogen-Containing Integrated Energy System Considering Dynamic Energy Efficiency Improvement and Load Fast Tracking
+AUTHORS : Huirong Zhao; Yuqi Yao; Daogang Peng
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4804422
+ABSTRACT: 
+---
+TITLE   : Optimization Configuration of Wind Photovoltaic Hydrogen Storage System Capacity Considering Load Distribution
+AUTHORS : Xiaofeng Wu; Guozhong Liu; Zhicong Huang
+JOURNAL : 2024 7th International Conference on Energy, Electrical and Power Engineering (CEEPE)
+YEAR    : 2024  | CITED: 1 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/ceepe62022.2024.10586445
+ABSTRACT: 
+---
+TITLE   : Research on Multi-Objective Capacity Configuration and Electrolyzer Cluster Coordinated Scheduling of Grid-Connected Wind-Solar-Hydrogen Storage System Based on Double-Layer Optimization
+AUTHORS : Judong Xiao; Yujie Chen; Zhenqiang Tang; Feng Wang
+JOURNAL : 2026 3rd International Symposium on New Energy Technologies and Power Systems (NETPS)
+YEAR    : 2026  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/netps70564.2026.11650561
+ABSTRACT: 
+---
+TITLE   : Capacity configuration optimization of port multi-energy system integrating wind turbine/photovoltaic/battery/hydrogen
+AUTHORS : Zhe Chen; Xinping Yan; Yupeng Yuan
+JOURNAL : 2023 7th International Conference on Transportation Information and Safety (ICTIS)
+YEAR    : 2023  | CITED: 2 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/ictis60134.2023.10243833
+ABSTRACT: 
+---
+TITLE   : Capacity configuration optimization of multi-energy system integrating wind turbine/photovoltaic/hydrogen/battery
+AUTHORS : Yi Zhang; Hexu Sun; Jianxin Tan; Zheng Li
+JOURNAL : Energy
+YEAR    : 2022  | CITED: 173 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2022.124046
+ABSTRACT: 
+---
+(filtered-in: 25)
+

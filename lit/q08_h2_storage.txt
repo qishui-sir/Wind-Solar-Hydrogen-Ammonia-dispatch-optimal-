@@ -1,0 +1,124 @@
+﻿### QUERY: hydrogen storage buffer sizing power-to-X flexible operation criterion | total=3341450 | shown=25
+
+TITLE   : A general criterion for the design and operation of flexible hydrogen storage in Power-to-X processes
+AUTHORS : Andrea Isella; Davide Manca
+JOURNAL : International Journal of Hydrogen Energy
+YEAR    : 2025  | CITED: 14 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijhydene.2024.12.228
+ABSTRACT: 
+---
+TITLE   : Optimal planning and operation of hybrid renewable energy system with flexible hydrogen-battery storage
+AUTHORS : Jiale Wang; Su Guo
+JOURNAL : 2023 3rd International Conference on Intelligent Power and Systems (ICIPS)
+YEAR    : 2023  | CITED: 9 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/icips59254.2023.10404440
+ABSTRACT: 
+---
+TITLE   : A hybrid optimization framework for cost-effective sizing and operation of off-grid hybrid power systems integrated with different storage units
+AUTHORS : Hoda Abd El-Sattar; Salah Kamel; Mohamed H. Hassan
+JOURNAL : International Journal of Hydrogen Energy
+YEAR    : 2025  | CITED: 4 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijhydene.2025.05.329
+ABSTRACT: 
+---
+TITLE   : Flexible Coal Power Plant Operation with Thermal Energy Storage
+Utilizing Thermosiphons and Cementitious Materials
+AUTHORS : Sudhakar Neti
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: report
+DOI     : https://doi.org/10.2172/1970242
+ABSTRACT: 
+---
+TITLE   : Thermal Storage Power Plants (TSPP) - Operation modes for flexible renewable power supply
+AUTHORS : Franz Trieb; Pai Liu; Gerrit Koll
+JOURNAL : Journal of Energy Storage
+YEAR    : 2022  | CITED: 29 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.est.2022.104282
+ABSTRACT: 
+---
+TITLE   : A Flexible Operation and Sizing of Battery Energy Storage System Based on Butterfly Optimization Algorithm
+AUTHORS : Basit Olakunle Alawode; Umar Taiwo Salman; Muhammad Khalid
+JOURNAL : Electronics
+YEAR    : 2021  | CITED: 16 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/electronics11010109
+ABSTRACT: There is a surge in the total energy demand of the world due to the increase in the world’s population and the ever-increasing human dependence on technology. Conventional non-renewable energy sources still contribute a larger amount to the total energy production. Due to their greenhouse gas emissions and environmental pollution, the substitution of these sources with renewable energy sources (RES) is desired. However, RES, such as wind energy, are uncertain, intermittent, and unpredictable. Hence, there is a need to optimize their usage when they are available. This can be carried out through a flexible operation of a microgrid system with the power grid to gradually reduce the contribution of the conventional sources in the power system using energy storage systems (ESS). To integrate the RES in a cost-effective approach, the ESS must be optimally sized and operated within its safe limitations. This study, therefore, presents a flexible method for the optimal sizing and operation of battery ESS (BESS) in a wind-penetrated microgrid system using the butterfly optimization (BO) algorithm. The BO algorithm was utilized for its simple and fast implementation and for its ability to obtain global optimization parameters. In the formulation of the optimization problem, the study considers the depth of discharge and life-cycle of the BESS. Simulation results for three different scenarios were studied, analyzed, and compared. The resulting optimized BESS connected scenario yielded the most cost-effective strategy among all scenarios considered.
+---
+TITLE   : Power-to-gas utilization in optimal sizing of hybrid power, water, and hydrogen microgrids with energy and gas storage
+AUTHORS : Hasan Mehrjerdi; Hedayat Saboori; Shahram Jadid
+JOURNAL : Journal of Energy Storage
+YEAR    : 2022  | CITED: 87 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.est.2021.103745
+ABSTRACT: 
+---
+TITLE   : Bi-level Collaborative Capacity Planning for Wind-Solar-Hydrogen-Storage Microgrids Considering Short-term Flexible Operation
+AUTHORS : Minghan Ma; Shuaibing Li; Yang Li
+JOURNAL : 2026 5th International Conference on Energy and Electrical Power Systems (ICEEPS)
+YEAR    : 2026  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/iceeps70377.2026.11662684
+ABSTRACT: 
+---
+TITLE   : Cost-optimal Power-to-Methanol: Flexible operation or intermediate storage?
+AUTHORS : Simone Mucci; Alexander Mitsos; Dominik Bongartz
+JOURNAL : Journal of Energy Storage
+YEAR    : 2023  | CITED: 75 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.est.2023.108614
+ABSTRACT: 
+---
+TITLE   : Optimization of Sizing Parameters and Operation Strategy for Residential Metal Hydride-Based Hydrogen Storage Systems
+AUTHORS : Huan Ye; Fengxiang Chen; Mei Li; Fenglai Pei
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5736170
+ABSTRACT: 
+---
+TITLE   : Optimization of Sizing Parameters and Operation Strategy for Residential Metal Hydride-Based Hydrogen Storage Systems
+AUTHORS : Huan Ye; Fengxiang Chen; Mei Li; Fenglai Pei
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5616732
+ABSTRACT: 
+---
+TITLE   : 
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2020  | CITED:  | TYPE: grant
+DOI     : https://doi.org/10.3030/884229
+ABSTRACT: 
+---
+TITLE   : Integrated Plant Design for Green Hydrogen Production and Power Generation in Photovoltaic Systems: Balancing Electrolyzer Sizing and Storage
+AUTHORS : Alessandro Franco; Carlo Carcasci; Andrea Ademollo; Mattia Calabrese
+JOURNAL : Hydrogen
+YEAR    : 2025  | CITED: 17 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/hydrogen6010007
+ABSTRACT: This study evaluates the performance and feasibility of hybrid photovoltaic–hydrogen systems integrated with 4.2 MW PV installations, focusing on the interplay between electrolyzer capacity, energy storage, and hydrogen production. Key findings reveal that downsizing electrolyzers, such as using a 1 MW unit instead of a 2 MW model, increases operational efficiency by extending nominal power usage, though it reduces total hydrogen output by approximately 50%. Meanwhile, expanding energy storage systems show diminishing returns, with added capacity offering minimal gains in hydrogen production and raising economic concerns. The system’s performance is highly weather-dependent, with daily hydrogen production ranging from 26 kg on cloudy winter days to 375 kg during sunny summer conditions. Surplus energy export to the grid peaks at 3300 kWh during periods of high solar generation but is minimal otherwise. For economic and operational viability, the system design must prioritize directing a majority of PV energy to hydrogen production while minimizing grid export, requiring a minimum of 50% PV energy allocation to the hydrogen value chain. Cost analysis estimates a Levelized Cost of Hydrogen (LCOH) as low as €6/kg with an optimized configuration of a 2 MW electrolyzer and 2 MWh battery. Although high production costs challenge economic sustainability, careful component optimization and supportive policies can enable competitive hydrogen pricing and a positive net present value (NPV) over the system’s lifetime.
+---
+TITLE   : Stochastic economic sizing of hydrogen storage-based renewable off-grid system with smart charge of electric vehicles according to combined hydrogen and power model
+AUTHORS : Rujia Wang; Ehsan Akbari; Leila Bagherzadeh; Sasan Pirouzi
+JOURNAL : Journal of Energy Storage
+YEAR    : 2025  | CITED: 65 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.est.2024.115171
+ABSTRACT: 
+---
+TITLE   : Flexible and efficient renewable-power-to-methane concept enabled by liquid CO2 energy storage: Optimization with power allocation and storage sizing
+AUTHORS : Meng Qi; Jaewon Lee; Seokyoung Hong; Jeongdong Kim
+JOURNAL : Energy
+YEAR    : 2022  | CITED: 31 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2022.124583
+ABSTRACT: 
+---
+TITLE   : Collaborative Response of Data Center Coupled with Hydrogen Storage System for Renewable Energy Absortion: A Global Interval Optimization Approach
+AUTHORS : Yuanzheng Li; Yang Li; Zhigang Zeng
+JOURNAL : Power Systems Flexible Load Control for Enhancing Renewable Power System Operation
+YEAR    : 2024  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1007/978-981-97-0312-8_4
+ABSTRACT: 
+---
+TITLE   : 
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2020  | CITED:  | TYPE: grant
+DOI     : https://doi.org/10.3030/864537
+ABSTRACT: 
+---
+(filtered-in: 17)
+

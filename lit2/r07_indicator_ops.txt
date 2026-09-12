@@ -1,0 +1,151 @@
+﻿### QUERY: operational flexibility indicator definition quantification energy conversion plant | total=4514227 | shown=25
+
+TITLE   : Assessing and improving the operational flexibility of grate-fired cogeneration power plants
+AUTHORS : Johannes Lips; Hendrik Lens
+JOURNAL : Energy Conversion and Management: X
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ecmx.2026.101757
+ABSTRACT: 
+---
+TITLE   : Optimal dispatch of distributed energy systems for energy flexibility provision adopting physics-guided acceleration and operational constraints
+AUTHORS : Xingyu Zang; Hangxin Li; Shengwei Wang
+JOURNAL : Energy Conversion and Management
+YEAR    : 2026  | CITED: 2 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.enconman.2026.121839
+ABSTRACT: 
+---
+TITLE   : Multi-timescale coordination of hydro–wind–PV systems with pumped storage for enhanced operational flexibility
+AUTHORS : Chenchunyang Tian; Guohua Fang; Ziyu Ding; Wenyuan Jiang
+JOURNAL : Energy Conversion and Management
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.enconman.2026.122051
+ABSTRACT: 
+---
+TITLE   : Building cluster demand flexibility: An innovative characterization framework and applications at the planning and operational levels
+AUTHORS : Ali Amadeh; Zachary E. Lee; K. Max Zhang
+JOURNAL : Energy Conversion and Management
+YEAR    : 2023  | CITED: 19 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.enconman.2023.116884
+ABSTRACT: 
+---
+TITLE   : Stochastic Flexibility Quantification for Urban Integrated Energy Systems: Definition, Modeling, and Computation
+AUTHORS : Linjuehao Mei; Lei Yan; Junzhe Huang; keyi chen
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.7199502
+ABSTRACT: Urban integrated energy systems (UIESs) couple electricity, heating, and natural-gas systems; consequently, quantifying their ability to accommodate stochastic net power demand (NPD) forecast errors—i.e., their stochastic flexibility (SF)—differs from the corresponding task for conventional power systems. Accurate SF quantification faces two challenges. First, different conversion efficiencies of multi-energy coupling units may cause capacity-oriented methods to overexploit extremely low-probability scenarios and thereby deviate from practical needs. Second, the city-wide scale accentuates delay in gas and heating networks; neglecting the risk of state-limit violations beyond the scheduling period may bias SF estimates. To address these issues, this paper proposes an accommodable error range (AER) whose computation explicitly accounts for cross-period network safety constraints and develops probability—capacity SF metrics. The probability metric measures the likelihood that a prescribed error distribution can be accommodated, whereas, once this distribution is fully covered, the remaining physical regulation margin is reported by the capacity metric. A probability-prioritized two-stage robust optimization model is formulated to align the resulting quantification with actual forecast-error demand while retaining physical regulation margin. For cross-period constraints caused by network delay, an effective delay influence horizon is identified from the decay of response upper bounds, thereby incorporating post-period state limits into the metric model. To reduce the computational burden of the resulting large-scale, long-horizon model, a redundant-boundary reduction algorithm is developed from local dependence relations among nodal states. Case studies verify the effectiveness and computational efficiency of the proposed method.
+---
+TITLE   : Direct quantification of multiple-source energy flexibility in a residential building using a new model predictive high-level controller
+AUTHORS : Reino Ruusu; Sunliang Cao; Benjamin Manrique Delgado; Ala Hasan
+JOURNAL : Energy Conversion and Management
+YEAR    : 2019  | CITED: 54 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.enconman.2018.11.026
+ABSTRACT: 
+---
+TITLE   : Improving operational flexibility of integrated energy system with uncertain renewable generations considering thermal inertia of buildings
+AUTHORS : Yang Li; Chunling Wang; Guoqing Li; Jinlong Wang
+JOURNAL : Energy Conversion and Management
+YEAR    : 2020  | CITED: 272 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.enconman.2020.112526
+ABSTRACT: 
+---
+TITLE   : Comparing operational flexibility and performance of pumped hydro energy storage systems: A quantitative analysis of technology options
+AUTHORS : Inga Beyers; Lukas Krebeck; Astrid Bensmann; Richard Hanke-Rauschenbach
+JOURNAL : Energy Conversion and Management: X
+YEAR    : 2026  | CITED: 1 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ecmx.2025.101473
+ABSTRACT: 
+---
+TITLE   : Automation of greenhouse gas emissions quantification in natural gas production for operational flexibility
+AUTHORS : Hillmert Solano; Disha Gadre; Pallav Sarma
+JOURNAL : Australian Energy Producers Journal
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1071/ep25079
+ABSTRACT: This paper covers a case study demonstrating how automating greenhouse gas (GHG) calculations can improve accuracy, transparency, and efficiency across natural gas operations. This US case study from the Appalachian Basin shows how operational activity data and measurement inputs can be mapped directly into emissions estimation models, producing comprehensive inventories for carbon dioxide (CO2), methane (CH4), and nitrous oxide (N2O). The automated methodology reduces human error common in spreadsheet-based reporting, integrates source-level emissions factors, and enables near real-time identification of emission-intensive processes. Beyond inventory generation, the framework supports emissions forecasting, allowing operators to model the impacts of operational changes, reduction technologies, and production planning on future carbon and methane intensities. The paper also discusses the potential of how requirements from Australian reporting frameworks, including the National Greenhouse and Energy Reporting Scheme, can be incorporated into automated workflows. Overall, the approach positions automated GHG quantification as both a compliance and operational intelligence capability supporting methane mitigation across upstream and midstream assets.
+---
+TITLE   : Energy flexible CHP-DHN systems: Unlocking the flexibility in a real plant
+AUTHORS : A. Mugnini; G. Comodi; D. Salvi; A. Arteconi
+JOURNAL : Energy Conversion and Management: X
+YEAR    : 2021  | CITED: 3 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ecmx.2021.100110
+ABSTRACT: 
+---
+TITLE   : Robust scheduling of a multi-energy system with hybrid electric-thermal-methanol storage: A carbon-cycle-integrated approach for operational flexibility
+AUTHORS : Geng Zhang; Jiangjiang Wang; Chenchen Zhai; Yuanchen Sun
+JOURNAL : Energy Conversion and Management
+YEAR    : 2026  | CITED: 1 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.enconman.2026.121644
+ABSTRACT: 
+---
+TITLE   : Operational Flexibility Quantification Considering Optimal Transmission Switching For Power System Operations
+AUTHORS : Abhishek Harit; Prerna Jain; Satish Sharma
+JOURNAL : 2026 International Conference on Electric Power and Renewable Energy (EPREC)
+YEAR    : 2026  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/eprec66546.2026.11412169
+ABSTRACT: 
+---
+TITLE   : Climate Tech Visual Presentation CT05: Automation of greenhouse gas emissions quantification in natural gas production for operational flexibility
+AUTHORS : Disha Gadre
+JOURNAL : Australian Energy Producers Journal
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1071/ep26477
+ABSTRACT: Climate Tech Visual Presentation CT05 This paper covers a case study demonstrating how automating greenhouse gas (GHG) calculations can improve accuracy, transparency, and efficiency across natural gas operations. This US case study from the Appalachian Basin shows how operational activity data and measurement inputs can be mapped directly into emissions estimation models, producing comprehensive inventories for carbon dioxide (CO2), methane (CH4), and nitrous oxide (N2O). The automated methodology reduces human error common in spreadsheet-based reporting, integrates source-level emissions factors, and enables near real-time identification of emission-intensive processes. Beyond inventory generation, the framework supports emissions forecasting, allowing operators to model the impacts of operational changes, reduction technologies, and production planning on future carbon and methane intensities. The paper also discusses the potential of how requirements from Australian reporting frameworks, including the National Greenhouse and Energy Reporting Scheme, can be incorporated into automated workflows. Overall, the approach positions automated GHG quantification as both a compliance and operational intelligence capability supporting methane mitigation across upstream and midstream assets. To access the Visual Presentation click on 'Supplementary data' below. To read the full paper click here
+---
+TITLE   : Quantification of operational flexibility from a portfolio of flexible energy resources
+AUTHORS : Digvijay Gusain; Milos̆ Cvetković; Peter Palensky
+JOURNAL : International Journal of Electrical Power &amp; Energy Systems
+YEAR    : 2022  | CITED: 18 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijepes.2021.107466
+ABSTRACT: 
+---
+TITLE   : Upgrade of the thermal power plant flexibility by the steam accumulator
+AUTHORS : Vladimir D. Stevanovic; Milan M. Petrovic; Sanja Milivojevic; Milica Ilic
+JOURNAL : Energy Conversion and Management
+YEAR    : 2020  | CITED: 86 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.enconman.2020.113271
+ABSTRACT: 
+---
+TITLE   : Hybrid solar power plant with thermochemical energy storage: A multi-objective operational optimisation
+AUTHORS : R. Bravo; C. Ortiz; R. Chacartegui; D. Friedrich
+JOURNAL : Energy Conversion and Management
+YEAR    : 2020  | CITED: 64 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.enconman.2019.112421
+ABSTRACT: 
+---
+TITLE   : Quantification of energy flexibility of residential net-zero-energy buildings involved with dynamic operations of hybrid energy storages and diversified energy conversion strategies
+AUTHORS : Yuekuan Zhou; Sunliang Cao
+JOURNAL : Sustainable Energy, Grids and Networks
+YEAR    : 2020  | CITED: 38 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.segan.2020.100304
+ABSTRACT: 
+---
+TITLE   : Quantification Analysis of Feeder Operational Flexibility for Active Distribution Networks
+AUTHORS : Li Peng; Wang Yuelong; Ji Haoran; Song Guanyu
+JOURNAL : 
+YEAR    : 2020  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.46855/energy-proceedings-1613
+ABSTRACT: 
+---
+TITLE   : Combined heat and power operational modes for increased product flexibility in a waste incineration plant
+AUTHORS : Johanna Beiron; Rubén M. Montañés; Fredrik Normann; Filip Johnsson
+JOURNAL : Energy
+YEAR    : 2020  | CITED: 39 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2020.117696
+ABSTRACT: 
+---
+TITLE   : Energy flexibility quantification of grid-responsive buildings: Energy flexibility index and assessment of their effectiveness for applications
+AUTHORS : Hong Tang; Shengwei Wang
+JOURNAL : Energy
+YEAR    : 2021  | CITED: 121 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2021.119756
+ABSTRACT: 
+---
+TITLE   : Operational Flexibility of Combined Heat and Power Plant with Steam Extraction Regulation
+AUTHORS : Johanna Beiron; Rubén Montañés; Fredrik Normann
+JOURNAL : 
+YEAR    : 2020  | CITED: 2 | TYPE: posted-content
+DOI     : https://doi.org/10.46855/energy-proceedings-2725
+ABSTRACT: 
+---
+(filtered-in: 21)
+

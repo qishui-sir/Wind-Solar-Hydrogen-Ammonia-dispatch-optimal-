@@ -1,0 +1,137 @@
+﻿### QUERY: operational stability metric load following flexibility indicator assessment | total=3368795 | shown=25
+
+TITLE   : The Potential of Residential Load Flexibility: An Approach for Assessing Operational Flexibility
+AUTHORS : Saeed Akbari; Rui Amaral Lopes; João Martins
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4527303
+ABSTRACT: 
+---
+TITLE   : Digital Twin-Based Predictive Energy Management for Grid-Interactive Smart Buildings: Techno-Economic Flexibility Assessment, Carbon-Aware Control, and Load-Following Performance
+AUTHORS : Ying Mei
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.7152479
+ABSTRACT: Smart buildings are increasingly expected to be active energy assets rather than passive recipients. Unfortunately, many building energy management systems still operate on rules, don&amp;apos;t tightly couple to grid signals, and don&amp;apos;t measure the total energy value of demand response, operational carbon reduction, occupant comfort, and distributed energy resource utilization. This research proposes a digital twin framework for predictive energy management of grid-interactive smart buildings based on the concept of applied energy. It integrates a reduced-order thermal building model, data-driven forecasting, model predictive control, battery and thermal storage dispatch, real-time grid carbon intensity, time-varying tariffs, and techno-economic assessment. A simulation exercise for an office building is conducted to compare the performance of conventional scheduling, energy-cost MPC, carbon-aware MPC, and flexibility-market operation, under the same weather, occupancy, comfort, and distributed-energy requirements. The findings indicate that the proposed carbon-aware digital twin can reduce the peak import power from the grid, reduce the load on the grid during peak carbon periods, increase the self-consumption of PV generation, and deliver a quantifiable flexibility envelope without undue compromise of comfort. In the simulated scenarios, energy costs are 13-23% lower than a rule-based baseline, operational emissions are 18-31% lower, and peak demand is 15-28% lower. Sensitivity analysis shows that the most important assumptions are tariff volatility, forecast accuracy, grid carbon variability, and battery cost. The study provides a repeatable procedure to link building digital twins to technical performance, economic value, load-following performance, and evidence of carbon reduction for low-carbon energy systems.
+---
+TITLE   : Enhancing operational flexibility and stability of coal-fired units under wide-load conditions: A thermo-chemical frequency-based modeling and control strategy
+AUTHORS : Lu Dang; Yuguang Niu; Huanbao Fan; Ming Du
+JOURNAL : Energy
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2026.141562
+ABSTRACT: 
+---
+TITLE   : Impact Assessment of Optimally-Allocated Distributed Generation Units in Active Distribution Networks on Operational Flexibility and Stability
+AUTHORS : Fazel Mohammadi; Sepideh Norouzi; Mehrdad Saif
+JOURNAL : 2025 57th North American Power Symposium (NAPS)
+YEAR    : 2025  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/naps66256.2025.11272415
+ABSTRACT: 
+---
+TITLE   : Flexibility assessment based on operational simulation
+AUTHORS : Zongxiang Lu; Haibo Li; Ying Qiao; Le Xie
+JOURNAL : Power System Flexibility
+YEAR    : 2024  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-323-99517-7.00008-7
+ABSTRACT: 
+---
+TITLE   : eLife Assessment: Stability vs flexibility: reshaping archaeal membranes in silico
+AUTHORS : Lipi Thukral
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.7554/elife.105432.1.sa3
+ABSTRACT: 
+---
+TITLE   : eLife Assessment: Balancing stability and flexibility when reshaping archaeal membranes
+AUTHORS : Lipi Thukral
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.7554/elife.105432.3.sa0
+ABSTRACT: 
+---
+TITLE   : eLife Assessment: Stability vs flexibility: reshaping archaeal membranes in silico
+AUTHORS : Lipi Thukral
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.7554/elife.105432.2.sa3
+ABSTRACT: 
+---
+TITLE   : Base load vs. Flexibility: Operational Challenges of Geothermal Integration in Constrained Power Systems
+AUTHORS : Daniel Fariña-González; Oscar García-Afonso; Agustín  M. Delgado-Torres
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.7038286
+ABSTRACT: Integrating dispatchable base load technologies, such as geothermal energy, into grids with high shares of variable renewables (VRE) presents a complex techno-economic challenge. While geothermal offers firm capacity and decarbonization, its interaction with variable sources in isolated power systems might create significant operational challenges. This study addresses the conflict between grid flexibility requirements and geothermal base load limitations using a calibrated Mixed-Integer Linear Programming (MILP) Unit Commitment (UC) model. La Palma island serves as a representative constrained grid test case, validating the model against actual dispatch data. Various deployment scenarios (5–15 MW) are analyzed to evaluate the interaction between geothermal capacity, conventional thermal units, and VRE.Results demonstrate that while geothermal integration reduces emissions and cost by up to 41% and 38% respectively, obtaining these benefits requires deviating from traditional base load operation. The optimization reveals a critical trade-off: to avoid system inefficiencies and renewable curtailment, geothermal plants must operate flexibly, imposing capacity factor penalties that challenge the plant&amp;apos;s economic viability. A sensitivity analysis confirms that prioritizing rigid geothermal load deteriorates system performance, forcing renewable curtailment and increasing reliance on costly thermal units. These findings highlight that strategic energy planning is critical to optimize deployment scales and mitigate flexibility requirements.
+---
+TITLE   : eLife Assessment: Adult Neurogenesis Reconciles Flexibility and Stability of Olfactory Perceptual Memory
+AUTHORS : Nicolás Pírez
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.7554/elife.104443.1.sa3
+ABSTRACT: 
+---
+TITLE   : eLife Assessment: Adult Neurogenesis Reconciles Flexibility and Stability of Olfactory Perceptual Memory
+AUTHORS : Nicolás Pírez
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.7554/elife.104443.2.sa4
+ABSTRACT: 
+---
+TITLE   : eLife Assessment: Adult neurogenesis reconciles flexibility and stability of olfactory perceptual memory
+AUTHORS : Nicolás Pírez
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.7554/elife.104443.3.sa0
+ABSTRACT: 
+---
+TITLE   : The potential of residential load flexibility: An approach for assessing operational flexibility
+AUTHORS : Saeed Akbari; Rui Amaral Lopes; João Martins
+JOURNAL : International Journal of Electrical Power &amp; Energy Systems
+YEAR    : 2024  | CITED: 15 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijepes.2024.109918
+ABSTRACT: 
+---
+TITLE   : eLife Assessment: Adult-neurogenesis allows for representational stability and flexibility in early olfactory system
+AUTHORS : Tatyana O Sharpee
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.7554/elife.107905.2.sa3
+ABSTRACT: 
+---
+TITLE   : eLife Assessment: Adult-neurogenesis allows for representational stability and flexibility in early olfactory system
+AUTHORS : Tatyana O Sharpee
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.7554/elife.107905.1.sa3
+ABSTRACT: 
+---
+TITLE   : eLife Assessment: Adult-neurogenesis allows for representational stability and flexibility in early olfactory system
+AUTHORS : Tatyana O Sharpee
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.7554/elife.107905.3.sa0
+ABSTRACT: 
+---
+TITLE   : Operational Flexibility Assessment of a Power System Considering Uncertainty of Flexible Resources Supported by Wind Turbines Under Load Shedding Operation
+AUTHORS : Guifen Jiang; Jiayin Xu; Yuming Shen; Peiru Feng
+JOURNAL : Processes
+YEAR    : 2025  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/pr13113635
+ABSTRACT: The high proportion of renewable energy introduces significant operation risks to the system’s flexibility balance due to its volatility and randomness. Traditional regulation methods struggle to meet the urgent demand for flexible resources. Utilizing wind turbines (WTs) under load shedding operation can provide additional reserve capacity, thereby reducing the risk of insufficient system flexibility. However, since wind speed and turbine output exhibit a cubic relationship, minor fluctuations in wind speed can lead to significant variations in output and reserve capacity. This increases the uncertainty in the supply of flexible resources from WTs, posing challenges to power system flexibility assessment. This paper investigates a method for assessing power system flexibility considering the uncertainty of flexible resources supported by WT under load shedding operation. Firstly, according to the flexibility supply control model of WT under shedding operation, the analytical relationship between output, flexible resources, and wind speed under a specific wind energy conversion coefficient is constructed; secondly, combined with the probabilistic model of wind speed based on the nonparametric kernel density estimation, the wind turbine flexible resource uncertainty model is constructed; thirdly, the Monte Carlo simulation is used to obtain the sampled wind speed data, and the operational flexibility assessment method of the power system considering the flexibility uncertainty of WT under load shedding operation is proposed. Finally, through case studies, the validity of the proposed model and method were verified. The analysis concludes that load shedding operation of WTs can enhance the system’s flexible resources to a certain extent but cannot provide stable bi-directional regulation capabilities.
+---
+TITLE   : Operational Flexibility of a CFB Furnace during Fast Load Change—Experimental Measurements and Dynamic Model
+AUTHORS : Jens Peters; Falah Alobaid; Bernd Epple
+JOURNAL : Applied Sciences
+YEAR    : 2020  | CITED: 31 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/app10175972
+ABSTRACT: The share of power from fluctuating renewable energies such as wind and solar is increasing due to the ongoing climate change. It is therefore essential to use technologies that can compensate for these fluctuations. Experiments at 1 MWth scale were carried out to evaluate the operational flexibility of a circulating fluidized bed (CFB) combustor during transient operation from 60% to 100% load. A typical load following sequence for fluctuating electricity generation/demand was reproduced experimentally by performing 4 load changes. The hydrodynamic condition after a load change depends on if the load change was in positive or negative direction due to the heat stored in the refractory/bed material at high loads and released when the load decreases. A 1.5D-process simulation model was created in the software APROS (Advanced Process Simulation) with the target of showing the specific characteristics of a CFB furnace during load following operation. The model was tuned with experimental data of a steady-state test point and validated with the load cycling tests. The simulation results show the key characteristics of CFB combustion with reasonable accuracy. Detailed experimental data is presented and a core-annulus approach for the modeling of the CFB furnace is used.
+---
+TITLE   : Steam Turbine Operational Flexibility
+AUTHORS : Steve Radke
+JOURNAL : 
+YEAR    : 2021  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.1115/1.0000572v
+ABSTRACT: 
+---
+(filtered-in: 19)
+

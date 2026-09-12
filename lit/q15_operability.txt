@@ -1,0 +1,46 @@
+﻿### QUERY: operability constraints scheduling chemical plant renewable dynamic feasibility | total=5320090 | shown=25
+
+TITLE   : A stochastic dynamic programming model for hydropower scheduling with state-dependent maximum discharge constraints
+AUTHORS : Linn Emelie Schäffer; Arild Helseth; Magnus Korpås
+JOURNAL : Renewable Energy
+YEAR    : 2022  | CITED: 37 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.renene.2022.05.106
+ABSTRACT: 
+---
+TITLE   : Dynamic Operability Analysis for the Calculation of Transient Output Constraints of Linear Time-Invariant Systems
+AUTHORS : 
+JOURNAL : Computer Aided Chemical Engineering 14th International Symposium on Process Systems Engineering
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-323-85159-6.50059-2
+ABSTRACT: 
+---
+TITLE   : Distributionally robust scheduling of integrated electricity–natural gas systems incorporating dynamic gas flow under renewable uncertainty: A feasibility-enhanced convex reformulation approach
+AUTHORS : Shengyuan Wei; Shangfei Song; Bingyuan Hong; Xiangying Shan
+JOURNAL : Chemical Engineering Research and Design
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.cherd.2026.08.022
+ABSTRACT: 
+---
+TITLE   : Dynamic Geometric Constraints Govern Covalent Feasibility in KRAS G12C Ligands
+AUTHORS : Saroj Khanal
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.21203/rs.3.rs-9888304/v1
+ABSTRACT: Abstract Covalent inhibition has emerged as an effective strategy for targeting oncogenic proteins, yet successful covalent engagement depends not only on binding affinity but also on the dynamic preservation of productive electrophile–thiol geometry [1,2]. Motivated by the clinical success of acrylamide-based KRAS G12C inhibitors such as sotorasib, we performed a structure-based and molecular dynamics investigation of acrylamide-containing KRAS G12C ligands. Although several ligands initially achieved near-reactive proximity to Cys12, production molecular dynamics simulations revealed rapid relaxation of the pre-reactive geometry and loss of productive electrophile–thiol alignment. Similar geometric relaxation was observed for noncovalent sotorasib simulations, whereas covalent KRAS G12C complexes preserved stable sulfur–carbon distances and chemically consistent bond geometries throughout explicit-solvent molecular dynamics. These findings suggest that covalent feasibility in KRAS G12C is governed by stringent dynamic geometric constraints and emphasize the importance of reactive-state preorganization in covalent inhibitor design.
+---
+TITLE   : Driving force constraints and physical and/or chemical equilibrium conditions
+AUTHORS : 
+JOURNAL : Synthesis and Operability Strategies for Computer-Aided Modular Process Intensification
+YEAR    : 2022  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-32-385587-7.00029-4
+ABSTRACT: 
+---
+TITLE   : Heuristic solutions to the single depot electric vehicle scheduling problem with next day operability constraints
+AUTHORS : Amir Davatgari; Taner Cokyasar; Omer Verbas; Abolfazl (Kouros) Mohammadian
+JOURNAL : Transportation Research Part C: Emerging Technologies
+YEAR    : 2024  | CITED: 14 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.trc.2024.104656
+ABSTRACT: 
+---
+(filtered-in: 6)
+

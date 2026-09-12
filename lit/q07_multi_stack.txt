@@ -1,0 +1,116 @@
+﻿### QUERY: multi-stack electrolyzer array unit commitment scheduling modular | total=2090556 | shown=25
+
+TITLE   : Optimal Scheduling  for  Unit Commitment with Electric Vehicles  And Uncertainty of Renewable Energy Sourcesoptimal Scheduling  for  Unit Commitment with Electric Vehicles  And Uncertainty of  Renewable Energy Sources
+AUTHORS : jian pan; tingzhang liu
+JOURNAL : SSRN Electronic Journal
+YEAR    : 2022  | CITED: 1 | TYPE: journal-article
+DOI     : https://doi.org/10.2139/ssrn.4141408
+ABSTRACT: 
+---
+TITLE   : Multilinear Modeling and Simulation of a Multi-stack PEM Electrolyzer with Degradation for Control Concept Comparison
+AUTHORS : Aline Luxa; Niklas Jöres; Carlos Yáñez; Marina Souza
+JOURNAL : Proceedings of the 12th International Conference on Simulation and Modeling Methodologies, Technologies and Applications
+YEAR    : 2022  | CITED: 10 | TYPE: proceedings-article
+DOI     : https://doi.org/10.5220/0011263300003274
+ABSTRACT: 
+---
+TITLE   : Network-Constrained Clustered Unit Commitment for Optimal Midterm Scheduling of Thermal-Hydro-Wind System: A Multi-Stage Stochastic Model with Multi-Time-Scale Uncertainties and Nonanticipativity
+AUTHORS : Yue Yin; Zifan Tang; Chuan He; Tianqi Liu
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5107161
+ABSTRACT: 
+---
+TITLE   : Region-Driven Two-Layer Refined Scheduling for Multi-Stack-Integrated Alkaline Electrolyzer in Wind-Hydrogen System
+AUTHORS : Aobo Guan; Suyang Zhou; Wei Gu; Haiquan Liu
+JOURNAL : IEEE Transactions on Smart Grid
+YEAR    : 2026  | CITED: 13 | TYPE: journal-article
+DOI     : https://doi.org/10.1109/tsg.2026.3668984
+ABSTRACT: 
+---
+TITLE   : Power allocation strategy of multi-stack PEM electrolyzer for photovoltaic-hydrogen system considering the degradation of components in the electrolyzer
+AUTHORS : Xianjun Qi; Mengjie Gong; Jingjing Zhang; Hejun Yang
+JOURNAL : Electric Power Systems Research
+YEAR    : 2026  | CITED: 2 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.epsr.2025.112653
+ABSTRACT: 
+---
+TITLE   : Review for "An efficient solution method for integrated unit commitment and natural gas network operational scheduling under "Duck Curve""
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2020  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1002/2050-7038.12662/v2/review4
+ABSTRACT: 
+---
+TITLE   : Review for "An efficient solution method for integrated unit commitment and natural gas network operational scheduling under "Duck Curve""
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2020  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1002/2050-7038.12662/v1/review3
+ABSTRACT: 
+---
+TITLE   : Review for "An efficient solution method for integrated unit commitment and natural gas network operational scheduling under "Duck Curve""
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2020  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1002/2050-7038.12662/v2/review3
+ABSTRACT: 
+---
+TITLE   : Review for "An efficient solution method for integrated unit commitment and natural gas network operational scheduling under "Duck Curve""
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2020  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1002/2050-7038.12662/v3/review4
+ABSTRACT: 
+---
+TITLE   : Green hydrogen integration in refineries: optimizing multi-stack electrolyzer and steam-methane reformer operation under renewable intermittency and market exposure
+AUTHORS : Riccardo Travaglini; Dimitrios Xevgenos; Kenneth Bruninx
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.7135493
+ABSTRACT: While Steam Methane Reforming (SMR) remains the dominant production technology in the refining sector, its high carbon intensity necessitates transitional pathways that integrate renewable hydrogen production without compromising supply reliability. However, the decarbonization of hydrogen supply is constrained by process requirements that rarely align with the intermittency of renewable energy. This work presents a techno-economic optimization framework for a hybrid hydrogen production system coupling an existing SMR unit with a grid-connected electrolyzer operating under a wind Power Purchase Agreement and spot market exposure.The model minimizes total operational hydrogen supply costs under strict demand constraints, allowing for a component-level electrolyzer representation, explicitly modeling multi-stack modularity, variable efficiency, degradation dynamics, and operational state transitions. This enables joint optimization of internal stack scheduling and system-level dispatch, capturing asymmetric module behavior neglected in most of conventional models.Applied to a refinery case study, the hybrid configuration reduces operational costs by up to 50% compared with the SMR-only baseline. Optimal stack scheduling converges to an overall uniform load distribution at the end of the optimization span that balances module utilization and minimizes asymmetric degradation. Sensitivity analysis identifies hydrogen remuneration schemes as the dominant economic driver, inducing variations in the levelized cost of hydrogen of up to 57%, while technical parameters such as stack capacity and storage size exert comparatively limited influence. These findings provide a transferable framework for economically viable, brownfield industrial hydrogen decarbonization.
+---
+TITLE   : Review for "An efficient solution method for integrated unit commitment and natural gas network operational scheduling under "Duck Curve""
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2020  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1002/2050-7038.12662/v4/review1
+ABSTRACT: 
+---
+TITLE   : Review for "An efficient solution method for integrated unit commitment and natural gas network operational scheduling under "Duck Curve""
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2020  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1002/2050-7038.12662/v2/review1
+ABSTRACT: 
+---
+TITLE   : A Two-Stage Direct Current Unit Commitment Model for High-Wind Systems: Scenario-Clustered Planning with Electrolyzer–Fuel-Cell Storage
+AUTHORS : Tuhin Poddar; Farzad Hourfar; Mohammed Alkatheri; Ali Almansoori
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.6022264
+ABSTRACT: 
+---
+TITLE   : Review for "Multi-objective unit and load commitment in smart homes considering uncertainties"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2020  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1002/2050-7038.12614/v1/review1
+ABSTRACT: 
+---
+TITLE   : Review for "Multi-objective unit and load commitment in smart homes considering uncertainties"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2020  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1002/2050-7038.12614/v2/review1
+ABSTRACT: 
+---
+TITLE   : Review for "Multi-objective unit and load commitment in smart homes considering uncertainties"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2020  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1002/2050-7038.12614/v1/review3
+ABSTRACT: 
+---
+(filtered-in: 16)
+

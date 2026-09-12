@@ -1,0 +1,102 @@
+﻿### QUERY: electrolyzer degradation cycling start stop counting lifetime cost | total=1059755 | shown=25
+
+TITLE   : Degradation Prediction of Pem Water Electrolyzer Under Constant and Start-Stop Loads Based on Cnn-Lstm
+AUTHORS : Boshi Xu; Wenbiao Ma; Wenyan Wu; Yang Wang
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4858254
+ABSTRACT: 
+---
+TITLE   : Impact of start-stop and load cycling on the lifetime of PEMFC-powered vehicles
+AUTHORS : Wafa Hafsa Saidouni; Marielle Marchand; David Gérard; Samir Jemei
+JOURNAL : 2024 IEEE Vehicle Power and Propulsion Conference (VPPC)
+YEAR    : 2024  | CITED: 1 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/vppc63154.2024.10755359
+ABSTRACT: 
+---
+TITLE   : Robust condition-based generation maintenance: Balancing operations and start/stop cycling to control asset degradation rates
+AUTHORS : Deniz Altinpulluk; Murat Yildirim
+JOURNAL : Reliability Engineering &amp; System Safety
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ress.2025.111776
+ABSTRACT: 
+---
+TITLE   : Degradation prediction of PEM water electrolyzer under constant and start-stop loads based on CNN-LSTM
+AUTHORS : Boshi Xu; Wenbiao Ma; Wenyan Wu; Yang Wang
+JOURNAL : Energy and AI
+YEAR    : 2024  | CITED: 61 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.egyai.2024.100420
+ABSTRACT: 
+---
+TITLE   : Review for "Counting the lifetime cost of obesity: Analysis based on national England data"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1111/dom.15447/v1/review2
+ABSTRACT: 
+---
+TITLE   : Review for "Counting the lifetime cost of obesity: Analysis based on national England data"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1111/dom.15447/v2/review1
+ABSTRACT: 
+---
+TITLE   : Review for "Counting the lifetime cost of obesity: Analysis based on national England data"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1111/dom.15447/v1/review1
+ABSTRACT: 
+---
+TITLE   : Multi-unit Control Strategy of Electrolyzer Considering Start-Stop Times
+AUTHORS : Fei Li; Yicheng Fang; Jiangsong Li; Longlin Sun
+JOURNAL : 2022 4th International Conference on Power and Energy Technology (ICPET)
+YEAR    : 2022  | CITED: 4 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/icpet55165.2022.9918380
+ABSTRACT: 
+---
+TITLE   : Decision letter for "Counting the lifetime cost of obesity: Analysis based on national England data"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1111/dom.15447/v2/decision1
+ABSTRACT: 
+---
+TITLE   : Decision letter for "Counting the lifetime cost of obesity: Analysis based on national England data"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1111/dom.15447/v1/decision1
+ABSTRACT: 
+---
+TITLE   : Degradation study of high temperature proton exchange membrane fuel cell under start/stop and load cycling conditions
+AUTHORS : Jingjing Li; Linlin Yang; Ziqian Wang; Hai Sun
+JOURNAL : International Journal of Hydrogen Energy
+YEAR    : 2021  | CITED: 42 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijhydene.2021.05.010
+ABSTRACT: 
+---
+TITLE   : Lifetime Performance Degradation of an Anion Exchange Membrane Electrolyzer Under Dynamic Operation in a Photovoltaic-Powered Nanogrid Environment
+AUTHORS : Alexandros Arsalis; Panos Papanastasiou; George  E. Georghiou
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5333294
+ABSTRACT: 
+---
+TITLE   : Research on Integrated Energy System Optimal Operation Considering Electrolyzer Dynamic Operation and Lifetime Degradation
+AUTHORS : Ning Wang; Weihao Niu; Teng Zhang
+JOURNAL : Sustainability
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/su18073423
+ABSTRACT: While green hydrogen is vital for sustainable energy transitions, the volatility of renewable power adversely affects the dynamic operation and service life of electrolyzers in integrated energy systems (IESs). To mitigate these effects while minimizing operational costs and extending the service life of electrolyzers, this paper proposes an optimization method for the operation of IESs that considers the dynamic operating characteristics and lifetime degradation of multiple types of electrolyzers. Firstly, detailed models for alkaline (ALK) electrolyzer and proton exchange membrane (PEM) electrolyzer are developed, and their start–stop characteristics and lifetime degradation characteristics are analyzed. Secondly, an optimal operation model for IES is established, taking economy as the optimization objective and considering the dynamic operating characteristics and lifetime degradation of multiple types of electrolyzers. By piecewise linearizing the hydrogen production rate of the electrolyzer, the original model is transformed into a mixed-integer linear programming model for solution. The results indicate that the proposed method can reduce the operational costs of IES, increase the proportion of stable operation time for the electrolyzer, decrease the number of startups and shutdowns, subsequently reduce the cost associated with the lifetime degradation of the electrolyzer, and specifically extend the actual lifetime of the PEM electrolyzer by 12.17% versus its rated life. Ultimately, this approach not only improves the economic viability of the system but also ensures the long-term sustainability of green hydrogen projects by minimizing equipment replacement cycles and maximizing renewable energy accommodation.
+---
+TITLE   : Prismatic Ncm Li-Ion Battery Enables Efficient Power, Safety and Cycling Life in 48v Start/Stop
+AUTHORS : Lingdi Cao; Wenxuan Li; Youkun Gao; Junjie Yuan
+JOURNAL : 
+YEAR    : 2022  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4238410
+ABSTRACT: It is a bottleneck issue for the state-of-the-art start-stop batteries used in commercialized electrical vehicles with long cycling life, high power output and understanding safety performance. In this work, prismatic 10Ah cell was fabricated to overcome these tradeoffs based on the material and process design. Small-particle NCM ternary material with surface modification and isotropous graphite were respectively employed as cathode and anode to provide super power density. Ceramic-coated separator with high permeability and wide temperature electrolyte with high conductivities enable the safety and cold cranking performance. Ultra-thin coating electrodes and whole poles were achieved to shorten the transferring distance of Li ion and promote the efficiency of Li intercalation and deintercalation kinetics, which is favor to lower the internal resistance and current density. As a result, the battery presents high discharge power density of &gt;5000W/kg at 25℃ and 50%SoC, and excellent cold cranking characteristics at -30℃. Capacity retention of 3C (100%DoD) cycling approaches 80% over 6800 cycles at 25℃ and 4300 cycles at 45℃, respectively. Also, capacity retention of WLTP cycling at room temperature is reached up to 92.3% over 6000 cycles with the energy throughput of 614.5kWh and internal resistance DC didn’t soar with the cycling going. The mechanism of the capacity loss is dissolved Ni, Co, and Mn results in irreversible loss of Li. 3C overcharge and nail penetration of cell is EUCAR3 and EUCAR4 respectively. It is evident that the reported battery can be promising commercialized candidate as 48V start/stop and HEV solutions.
+---
+(filtered-in: 14)
+

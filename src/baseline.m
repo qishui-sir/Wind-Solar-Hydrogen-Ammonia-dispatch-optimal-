@@ -10,8 +10,8 @@ function results = baseline(params,renewable_data)
     dt = params.time.step;
     transformer_kw = params.transformer.max_load * params.transformer.capacity * 1000;
 
-    PV = renewable_data.pv_power_kw * 0.8623;
-    PW = renewable_data.pw_power_kw * 0.8623;
+    PV = renewable_data.pv_power_kw;
+    PW = renewable_data.pw_power_kw;
     P_total = PV + PW;
     annual_renewable = sum(P_total) * dt;
 
@@ -32,6 +32,20 @@ function results = baseline(params,renewable_data)
     storage_H2_min = storage_limits.min_mass;
     storage_H2_max = storage_limits.max_mass;
     initial_storage = storage_limits.initial_mass;
+    % Operating-reserve requirement on the usable (above-pressure-heel) inventory.
+    % A nonzero floor forces the dispatch to carry a hydrogen reserve, which is the
+    % lever used to price operational stability.
+    reserve_work_soc = 0;
+    if isfield(params.h2_storage, 'min_work_soc') && ...
+            ~isempty(params.h2_storage.min_work_soc)
+        reserve_work_soc = params.h2_storage.min_work_soc;
+    end
+    if reserve_work_soc > 0
+        reserve_min_mass = storage_limits.min_mass + ...
+            reserve_work_soc * storage_limits.work_mass;
+        storage_H2_min = max(storage_H2_min, reserve_min_mass);
+        initial_storage = max(initial_storage, reserve_min_mass);
+    end
 
     HB_max_load = params.HB.max_load;
     HB_min_load = params.HB.min_load;
@@ -58,6 +72,16 @@ function results = baseline(params,renewable_data)
     SD_AEL = optimvar('SD_AEL',T,'Type','integer','LowerBound',0,'UpperBound',Num_AEL);
     I_AEL_up = optimvar('I_AEL_up', T, 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1);
     P_AEL_start = AEL_start_power_per_module * SU_AEL;
+
+    % Zhou S3 startup/shutdown penalty. Startup electricity is already supplied
+    % through the power balance; this coefficient charges it a second time inside
+    % the objective so the dispatch has an economic reason to avoid cycling the
+    % module fleet. A zero coefficient reproduces the unpenalised objective.
+    C_startup = 0;
+    if isfield(ael_common, 'startup_penalty') && ~isempty(ael_common.startup_penalty)
+        C_startup = ael_common.startup_penalty;
+    end
+    startup_penalty_expr = C_startup * sum(P_AEL_start) * dt;
 
     %H2_short = optimvar('h2_short', T, 'LowerBound', 0);
     H2_prod_kg = P_AEL * dt / AEL_spec_energy * H2_density;
@@ -146,7 +170,8 @@ function results = baseline(params,renewable_data)
         sum(C_sell .* P_sell * dt) - ...
         NH3_income + ...
         C_water * sum(water_use_t) + ...
-        C_catalyst * sum(NH3_prod_t);
+        C_catalyst * sum(NH3_prod_t) + ...
+        startup_penalty_expr;
     if grid_contract_is_fixed
         fixed_cost = annual_fixed_cost(params);
         grid_capacity_cost = fixed_cost.grid_capacity;
@@ -157,9 +182,37 @@ function results = baseline(params,renewable_data)
     annual_fixed_cost_expr = fixed_cost.base_total + grid_capacity_cost;
     prob.Objective = obj_formula + annual_fixed_cost_expr;
 
-    options = optimoptions('intlinprog', 'Display', 'iter',...
+    % Defaults. The optimality tolerance is 1e-4 and there is no wall-clock
+    % budget: if a horizon cannot reach it, that is a property of the formulation
+    % to diagnose, not a parameter to relax. Callers may override both.
+    solver_opts = {'Display', 'iter', ...
         'ConstraintTolerance', 1e-5, ...
-        'RelativeGapTolerance', 1e-4);
+        'RelativeGapTolerance', 1e-3};
+    % Optional solver controls. The defaults above already target 1e-4; a caller
+    % may pass its own gap or a time budget only when it has a documented reason.
+    if isfield(params, 'solver')
+        if isfield(params.solver, 'relative_gap') && ...
+                ~isempty(params.solver.relative_gap)
+            solver_opts = set_solver_option(solver_opts, ...
+                'RelativeGapTolerance', params.solver.relative_gap);
+        end
+        if isfield(params.solver, 'max_time_s') && ...
+                ~isempty(params.solver.max_time_s)
+            solver_opts = set_solver_option(solver_opts, ...
+                'MaxTime', params.solver.max_time_s);
+        end
+        if isfield(params.solver, 'max_nodes') && ...
+                ~isempty(params.solver.max_nodes) && params.solver.max_nodes > 0
+            solver_opts = set_solver_option(solver_opts, ...
+                'MaxNodes', params.solver.max_nodes);
+        end
+        if isfield(params.solver, 'display') && ...
+                ~isempty(params.solver.display)
+            solver_opts = set_solver_option(solver_opts, ...
+                'Display', params.solver.display);
+        end
+    end
+    options = optimoptions('intlinprog', solver_opts{:});
     [sol, fval, exitflag, output] = solve(prob, ...
         'Solver', 'intlinprog', ...
         'Options', options);
@@ -175,6 +228,11 @@ function results = baseline(params,renewable_data)
     if ael_common.startup
         fprintf('AEL启动耗电：%.3f MWh/a。\n', ...
             sum(sol.P_AEL_start) * dt / 1000);
+    end
+    if C_startup > 0
+        fprintf('AEL启停惩罚：系数 %.4f USD/kWh，罚金 %.3f M$/a；启动台次 %.0f。\n', ...
+            C_startup, C_startup * sum(sol.P_AEL_start) * dt / 1e6, ...
+            sum(sol.SU_AEL));
     end
 
     disp(sol);
@@ -195,7 +253,19 @@ function results = baseline(params,renewable_data)
     result_context.C_sell = C_sell;
     result_context.ael_common = ael_common;
     result_context.N_AEL_initial = N_AEL_initial;
+    result_context.C_startup = C_startup;
+    result_context.startup_energy_kwh = sum(sol.P_AEL_start) * dt;
 
     results = feval('results', params, renewable_data, sol, fval, ...
         exitflag, output, result_context);
+end
+
+function opts = set_solver_option(opts, name, value)
+%SET_SOLVER_OPTION Replace or append a name/value pair in an optimoptions cell.
+idx = find(strcmp(opts, name), 1);
+if isempty(idx)
+    opts = [opts, {name, value}];
+else
+    opts{idx + 1} = value;
+end
 end

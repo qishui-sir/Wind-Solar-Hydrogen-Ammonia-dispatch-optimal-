@@ -1,0 +1,53 @@
+﻿### QUERY: startup shutdown cost penalty scheduling chemical process cyclic operation | total=4877576 | shown=25
+
+TITLE   : Shutdown, Startup, Inspection, and Maintenance
+AUTHORS : 
+JOURNAL : Process Steam Systems
+YEAR    : 2022  | CITED: 0 | TYPE: other
+DOI     : https://doi.org/10.1002/9781119838968.ch17
+ABSTRACT: 
+---
+TITLE   : Multi-Objective Optimization Scheduling of Microgrids Considering Single Use Cost of Energy Storage and Unit Combination Startup and Shutdown Cost
+AUTHORS : Baojie Zhang; Yiqian Sun; Hongfeng Zhao; Hongyan Hao
+JOURNAL : Journal of Physics: Conference Series
+YEAR    : 2024  | CITED: 1 | TYPE: journal-article
+DOI     : https://doi.org/10.1088/1742-6596/2774/1/012051
+ABSTRACT: Abstract Microgrids typically consist of various energy resources such as thermal power, solar energy, wind energy, energy storage, and so on. These energy resources have different characteristics and fluctuations. By utilizing the characteristics of different energy resources in a complementary and synergistic manner, their energy utilization efficiency can be promoted and the system stability can be improved. This paper considers the energy storage device in the completion of a single charge and discharge loss, that is, the single-use cost. Special attention to the impact of start-stop costs of unit combinations on microgrid operations. It proposes that in the daily dispatch and operation of microgrids, sinking costs can be reasonably reduced within a reasonable range, and power supply reliability can be appropriately lowered to improve the economic performance of power systems. Using the single-use cost of energy storage devices and the start-stop costs of unit combinations as variables, their impact on the economic operation of isolated microgrids is analyzed. For grid-connected microgrids with the objectives of minimizing operating costs and achieving optimal environmental protection, an optimal balance between economic and environmental performance is achieved through solving by Anti-Entropy weight method and Particle Swarm Optimization combination.
+---
+TITLE   : Model-based optimization and control strategies for on-spec production in a continuous crystallization process from startup to shutdown
+AUTHORS : Hamidreza Taghipour; Fatemeh Eslami; Mohammad Fakhroleslam
+JOURNAL : Chemical Engineering Research and Design
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.cherd.2026.07.005
+ABSTRACT: 
+---
+TITLE   : Task Analysis for Human Reliability Analysis of Startup and Shutdown Operation
+AUTHORS : Woo Jo; Seung Lee
+JOURNAL : Transactions of the American Nuclear Society ANS 2021 Winter Conference
+YEAR    : 2021  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.13182/t130-36804
+ABSTRACT: 
+---
+TITLE   : Unsteady behaviour of bubble column in homogeneous flow regime: Startup and shutdown
+AUTHORS : Marek C. Ruzicka; Sandra Orvalho
+JOURNAL : Chemical Engineering Science
+YEAR    : 2023  | CITED: 4 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ces.2023.118806
+ABSTRACT: 
+---
+TITLE   : Insights into the startup operation of a thermally efficient multi-tube falling-film distillation column
+AUTHORS : José Luiz Francisco Alves; Ricardo Antonio Francisco Machado; Cintia Marangoni
+JOURNAL : Chemical Engineering and Processing - Process Intensification
+YEAR    : 2023  | CITED: 3 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.cep.2023.109471
+ABSTRACT: 
+---
+TITLE   : Misoperation monitoring and early warning during startup and shutdown of petrochemical units
+AUTHORS : Fujie Deng; Feng Wang
+JOURNAL : Journal of Loss Prevention in the Process Industries
+YEAR    : 2020  | CITED: 10 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.jlp.2020.104265
+ABSTRACT: 
+---
+(filtered-in: 7)
+

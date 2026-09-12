@@ -1,0 +1,95 @@
+﻿### QUERY: model predictive control ammonia synthesis loop load following | total=8792043 | shown=25
+
+TITLE   : Optimisation and Robust Control of a Load-Flexible Haber-Bosch Ammonia Synthesis Loop
+AUTHORS : Joachim Weel Rosbo; Anker Degn Jensen; Sigurd Skogestad; John Jørgensen
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5379004
+ABSTRACT: 
+---
+TITLE   : Learning-based Model Predictive Control of an Ammonia Synthesis Reactor
+AUTHORS : Thiago O. Cabral; Amirsalar Bagheri; Davood B. Pourkargar
+JOURNAL : 2024 American Control Conference (ACC)
+YEAR    : 2024  | CITED: 1 | TYPE: proceedings-article
+DOI     : https://doi.org/10.23919/acc60939.2024.10644317
+ABSTRACT: 
+---
+TITLE   : Stochastic Model Predictive Control Strategy for Renewable Energy Hydrogen Production and Ammonia Synthesis System
+AUTHORS : Yong Zhang; Yue Kong
+JOURNAL : 2026 38th Chinese Control and Decision Conference (CCDC)
+YEAR    : 2026  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/ccdc69976.2026.11560793
+ABSTRACT: 
+---
+TITLE   : Distributed and Localized Closed Loop Model Predictive Control via System Level Synthesis
+AUTHORS : Carmen Amo Alonso; Nikolai Matni
+JOURNAL : 2020 59th IEEE Conference on Decision and Control (CDC)
+YEAR    : 2020  | CITED: 11 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/cdc42340.2020.9303936
+ABSTRACT: 
+---
+TITLE   : Model Predictive Control
+AUTHORS : 
+JOURNAL : Control Loop Foundation
+YEAR    : 2026  | CITED: 0 | TYPE: other
+DOI     : https://doi.org/10.1002/9781394442294.ch14
+ABSTRACT: 
+---
+TITLE   : Synthesis of Robust Model Predictive Control for Vehicle Path Following with Uncertainties
+AUTHORS : Shuai Ma; Yunwen Xu; Dewei Li
+JOURNAL : 2023 42nd Chinese Control Conference (CCC)
+YEAR    : 2023  | CITED: 2 | TYPE: proceedings-article
+DOI     : https://doi.org/10.23919/ccc58697.2023.10240118
+ABSTRACT: 
+---
+TITLE   : Constrained Nonlinear Model Predictive Control for High Temperature Gas-Cooled Reactor in Load Following
+AUTHORS : Yunlong Zhu; Zhe Dong; Xiaojin Huang
+JOURNAL : Volume 3: I&amp;C, Digital Control, and Influence of Human Factors
+YEAR    : 2024  | CITED: 1 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1115/icone31-136137
+ABSTRACT: Abstract As the climate issue has become the focus of global attention, new energy with less carbon emissions have attracted the attention of the world, especially nuclear energy. High temperature gas-cooled reactor is an inherently safe reactor designed by the Institute of Nuclear and New Energy Technology of Tsinghua University and has been put into commercial operation. The nuclear steam supply system (NSSS) is the key system of the modular high temperature gas-cooled reactor for generating superheated steam, including a reactor core and a once-through steam generator (OTSG). In the process of nuclear power plant operation, power-level control is the key technology to ensure the NSSS to operate in the desired state. By adjusting and controlling the control rod speed, the rotation-rate of the main helium circulator and the valve-opening, the neutron flux, helium temperature and water supply flow rate are adjusted, and then the power-level maintenance, maneuvering and load tracking are realized. Considering the strong nonlinearity of NSSS, it is necessary to develop nonlinear power-level control methods. In this paper, model predictive control (MPC) is proposed to realize load following in the NSSS of high temperature gas-cooled reactor. MPC has the advantage of obtaining control input by iterating and solving optimization problems, which has a good application scenario for power-level control of nuclear power plants. The research in this paper has an enlightening significance for the application of MPC to the power-level control of high temperature gas-cooled reactor. In the future engineering application, facing the actual situation of multi-objective and multi-constraint conditions, the MPC iterative optimization idea can be used to obtain the control input that can make the nuclear power plant stable and meet the operation requirements.
+---
+TITLE   : Robust Closed-loop Model Predictive Control via System Level Synthesis
+AUTHORS : Shaoru Chen; Han Wang; Manfred Morari; Victor M. Preciado
+JOURNAL : 2020 59th IEEE Conference on Decision and Control (CDC)
+YEAR    : 2020  | CITED: 10 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/cdc42340.2020.9304200
+ABSTRACT: 
+---
+TITLE   : Optimisation and robust control of a load-flexible Haber–Bosch ammonia synthesis loop
+AUTHORS : Joachim Weel Rosbo; Anker Degn Jensen; Sigurd Skogestad; John Bagterp Jørgensen
+JOURNAL : Computers &amp; Chemical Engineering
+YEAR    : 2026  | CITED: 5 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.compchemeng.2026.109614
+ABSTRACT: 
+---
+TITLE   : Data-Driven Dual-Loop Model Predictive Control
+AUTHORS : Jianglin Lan
+JOURNAL : Learning-Enabled Autonomous Systems
+YEAR    : 2026  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1201/9781003773719-3
+ABSTRACT: 
+---
+TITLE   : Approximating open-loop and closed-loop optimal control by model predictive control
+AUTHORS : Asen L. Dontchev; Ilya V. Kolmanovsky; Mikhail I. Krastanov; Vladimir M. Veliova
+JOURNAL : 2020 European Control Conference (ECC)
+YEAR    : 2020  | CITED: 1 | TYPE: proceedings-article
+DOI     : https://doi.org/10.23919/ecc51009.2020.9143615
+ABSTRACT: 
+---
+TITLE   : Load mitigation of wind turbines by Linear Unique Model Predictive Control
+AUTHORS : Rafael Barcena; Ainhoa Etxebarria
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.36227/techrxiv.175289447.77646909/v1
+ABSTRACT: This paper describes a new model-based predictive controller, specially designed to enable its practical implementation. In that sense, it uses a unique linear model for the entire turbine operating range. To achieve this, external processing blocks are used to handle the nonlinearities present in the rotor aerodynamics. The objective of this active vibration control system is to reduce the structural load on the rotor and tower of wind turbines, without the need to use specific structural control actuators (e.g. tuned mass dampers). In fact, special effort is put in analyzing the additional effort to be made by the collective pitch actuators, in order to evaluate the circumstances in which the addition of specific control devices is advisable. Also, the proposed system works in parallel to the baseline controller in charge of the rotor speed control, thus avoiding the substitution of the latter.
+---
+TITLE   : Nonlinear model predictive control of flexible ammonia production
+AUTHORS : Baiwen Kong; Qi Zhang; Prodromos Daoutidis
+JOURNAL : Control Engineering Practice
+YEAR    : 2024  | CITED: 34 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.conengprac.2024.105946
+ABSTRACT: 
+---
+(filtered-in: 13)
+

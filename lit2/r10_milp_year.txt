@@ -1,0 +1,88 @@
+﻿### QUERY: yearly hourly MILP renewable hydrogen plant computational tractability decomposition | total=2999309 | shown=25
+
+TITLE   : Combining a deep learning model with multivariate empirical mode decomposition for hourly global horizontal irradiance forecasting
+AUTHORS : Priya Gupta; Rhythm Singh
+JOURNAL : Renewable Energy
+YEAR    : 2023  | CITED: 53 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.renene.2023.02.052
+ABSTRACT: 
+---
+TITLE   : Accelerating Computational Efficiency in Sub-Hourly Renewable Energy Systems Modeling
+AUTHORS : Olalekan Omoyele; Maximilian Hoffmann; Jann  Michael Weinand; Detlef Stolten
+JOURNAL : 
+YEAR    : 2024  | CITED: 2 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5004752
+ABSTRACT: 
+---
+TITLE   : Optimum Hourly Energy Scheduling in Interconnected Renewable Microgrids
+AUTHORS : Bineeta Mukhopadhyay; Rajib Kumar Mandal; Debapriya Das
+JOURNAL : 2023 IEEE IAS Global Conference on Renewable Energy and Hydrogen Technologies (GlobConHT)
+YEAR    : 2023  | CITED: 4 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/globconht56829.2023.10087595
+ABSTRACT: 
+---
+TITLE   : Development of a MILP optimization framework to design grid-connected microgrids: enhancing operational synergy among wind, solar, batteries, and hydrogen storage
+AUTHORS : Francesco Superchi; Alessandro Bianchini
+JOURNAL : Renewable Energy
+YEAR    : 2026  | CITED: 16 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.renene.2025.124470
+ABSTRACT: 
+---
+TITLE   : A MILP model for a large scale fully renewable integrated energy system with hydrogen storage
+AUTHORS : Ryan Li; Felipe Bastarrica; Linhao Luo; Vicky Mak-Hau
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.21203/rs.3.rs-5329013/v1
+ABSTRACT: Abstract Integrated Energy Systems (IESs) with hydrogen storage typically generate a large amount of data when the time resolution is high and the planning horizon is long. Making use of the nature of data in the case study provided by the 16th AIMMS-MOPTA competition, a full and a compact version of a Mixed Integer Linear Programming (MILP) model were formulated with an objective of minimizing the total investment cost of the system components. The full and compact models were tested with different time-slot aggregations, finding that the latter provided a significant computational improvement over the former. Taking advantage of the computational efficiency of the compact model, we analyzed the trade-offs of the resources by applying different upper bounds to the power generation capacities. Furthermore, we introduced a stochastic approach to account for the intermittency of wind and solar resources. The optimal system produced by our method is capable of supplying electricity and hydrogen demand of the case study at a minimum cost with a realistic security of supply level.
+---
+TITLE   : Short-Term Hourly Hydropower Prediction: Evaluating Lstm and Milp-Based Methods
+AUTHORS : Yoan Villeneuve; Sara Séguin; Abdellah Chehri; Kenjy Demeester
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5332880
+ABSTRACT: 
+---
+TITLE   : Cost-Optimal Design of Surface Facilities for Underground Hydrogen Storage under Renewable Supply Variability: A MILP Approach
+AUTHORS : Mostafa Montazeri; Alireza Salmachi; Tara Hosseini; Manouchehr Haghighi
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.6619432
+ABSTRACT: This study introduces a variability-driven mixed-integer linear programming (MILP) framework for the cost-optimal design of surface facilities in underground hydrogen storage (UHS) systems. Unlike conventional approaches that treat design and operation separately or neglect temporal variability, the proposed framework explicitly links time-resolved renewable hydrogen supply with the co-optimisation of compressor portfolios, shared buffer storage, and heat exchanger requirements. The subsurface is represented through a fixed wellhead pressure boundary, enabling a focused and computationally efficient assessment of surface system design. The model is implemented in MATLAB and validated against Aspen Plus simulations. Three representative storage scenarios—low, medium, and high variability—are analysed to quantify the impact of renewable-driven fluctuations on optimal system configuration and cost. Results reveal a strongly non-linear cost response, where a 110% increase in annual hydrogen storage leads to a 67% rise in total surface facility cost (from 30.85 to 51.42 million AUD). The optimal design shows portfolios of compressors with different nominal capacities (increasing from 4 to 6 units) coupled with a shared buffer tank, based on the hydrogen flow variability. Compressors dominate capital expenditure (70–80%), while electricity consumption is identified as the primary operational cost. Overall, the findings highlight that system design is governed not only by total hydrogen throughput but critically by supply variability, providing new insights for cost-efficient integration,K
+---
+TITLE   : On Computational Tractability
+AUTHORS : 
+JOURNAL : Statistical Inference via Convex Optimization
+YEAR    : 2020  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1515/9780691200316-006
+ABSTRACT: 
+---
+TITLE   : Impact of deep learning LSTM on hourly dispatch optimization in hybrid renewable energy Virtual Power Plant systems
+AUTHORS : Omaira Jajbhay; Andrew  Graham Swanson; Mohamed Fayaz Khan
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5765921
+ABSTRACT: 
+---
+TITLE   : Scheduling a Single-Robot Manufacturing Cell Under Blocking Constraints: A MILP-Based Decomposition Approach
+AUTHORS : Eduardo Redondo; Clara Diaz
+JOURNAL : Proceedings of the 15th International Conference on Operations Research and Enterprise Systems
+YEAR    : 2026  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.5220/0014310200004055
+ABSTRACT: 
+---
+TITLE   : ON COMPUTATIONAL TRACTABILITY
+AUTHORS : 
+JOURNAL : Statistical Inference via Convex Optimization
+YEAR    : 2020  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.2307/j.ctvqsdxqd.8
+ABSTRACT: 
+---
+TITLE   : Short-Term Hourly Hydropower Prediction: Evaluating Long Short-Term Memory (LSTM) and Mixed-Integer Linear Programming (MILP)-Based Methods
+AUTHORS : Yoan Villeneuve; Sara Séguin; Abdellah Chehri; Kenjy Demeester
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5960272
+ABSTRACT: 
+---
+(filtered-in: 12)
+

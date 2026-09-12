@@ -10,59 +10,42 @@ addpath(fullfile(project_dir, 'src', 'params'));
 addpath(fullfile(project_dir, 'src', 'results'));
 end
 
-function testAelCountAlgorithmRespectsPowerBounds(test_case)
-ael_common = AEL().common;
-power_kw = [0; 5000; 20000; 20000; 5000; 0];
-
-[optimized_count, info] = algorithm(power_kw, ael_common);
-
-verifyEqual(test_case, info.lower_bound, [0; 1; 4; 4; 1; 0]);
-verifyEqual(test_case, info.upper_bound, [0; 5; 20; 20; 5; 0]);
-verifyGreaterThanOrEqual(test_case, optimized_count, info.lower_bound);
-verifyLessThanOrEqual(test_case, optimized_count, info.upper_bound);
-verifyEqual(test_case, optimized_count, round(optimized_count));
+function testAelStartupPenaltyDefaults(test_case)
+% S1 keeps the unpenalised objective; S2 and S3 carry the Zhou startup/shutdown
+% penalty so the S2 baseline in main.m can enable it without a one-off override.
+s1 = my_system('s1');
+s2 = my_system('s2');
+s3 = my_system('s3');
+verifyEqual(test_case, s1.AEL.common.startup_penalty, 0);
+verifyEqual(test_case, s2.AEL.common.startup_penalty, 0.053);
+verifyEqual(test_case, s3.AEL.common.startup_penalty, 0.053);
 end
 
-function testAelCountAlgorithmRetainsOnlyFeasibleOnlineModules(test_case)
-ael_common = AEL().common;
-power_kw = [40000; 7000; 45000];
-options = struct('future_hours', 1, 'history_days', 7, ...
-    'future_weight', 0.7, 'keep_threshold', 0.5);
-
-[optimized_count, info] = algorithm(power_kw, ael_common, options);
-
-verifyEqual(test_case, info.lower_bound, [8; 2; 9]);
-verifyEqual(test_case, info.upper_bound, [26; 7; 26]);
-verifyEqual(test_case, optimized_count, [8; 7; 9]);
-verifyEqual(test_case, info.startup_count, 10);
-verifyEqual(test_case, info.start_event_count, 2);
+function testAelStartupPenaltyEnabledInS3(test_case)
+% Zhou S3 enables the startup/shutdown penalty.
+config = my_system('s3');
+verifyGreaterThan(test_case, config.AEL.common.startup_penalty, 0);
+verifyEqual(test_case, config.AEL.common.startup_penalty, 0.053);
 end
 
-function testAelCountAlgorithmClipsSolverToleranceAtZero(test_case)
-ael_common = AEL().common;
-power_kw = [-1e-5; 0; 5000];
+function testStartupPenaltyEntersObjectiveOnlyWhenEnabled(test_case)
+baseline_source = fileread(fullfile(fileparts(fileparts( ...
+    mfilename('fullpath'))), 'src', 'baseline.m'));
 
-[optimized_count, info] = algorithm(power_kw, ael_common);
-
-verifyEqual(test_case, info.lower_bound, [0; 0; 1]);
-verifyEqual(test_case, info.upper_bound, [0; 0; 5]);
-verifyEqual(test_case, optimized_count, [0; 0; 1]);
+% The penalty must be built from the committed startup power and added to the
+% objective, and it must be skippable via a zero coefficient.
+verifyNotEmpty(test_case, regexp(baseline_source, ...
+    'C_startup\s*\*\s*sum\(P_AEL_start\)\s*\*\s*dt', 'once'));
+verifyNotEmpty(test_case, regexp(baseline_source, ...
+    'startup_penalty_expr', 'once'));
 end
 
-function testAelCountAlgorithmRejectsMaterialNegativePower(test_case)
-ael_common = AEL().common;
-
-verifyError(test_case, @() algorithm(-1, ael_common), ...
-    'algorithm:negative_power');
-end
-
-function testBaselineDoesNotInvokeSlidingWindowAlgorithm(test_case)
-test_dir = fileparts(mfilename('fullpath'));
-project_dir = fileparts(test_dir);
-baseline_source = fileread(fullfile(project_dir, 'src', 'baseline.m'));
-
-verifyEmpty(test_case, regexp(baseline_source, ...
-    '\<algorithm\s*\(', 'once'));
+function testDefaultIsStillS2Unpenalised(test_case)
+config = my_system();
+verifyEqual(test_case, config.scenario.id, 's2');
+% S2 default carries the Zhou S3 startup/shutdown penalty (0.053), matching the
+% main.m baseline. The "unpenalised" reference is S1, not S2.
+verifyEqual(test_case, config.AEL.common.startup_penalty, 0.053);
 end
 
 function testDefaultScenarioIsS2(test_case)

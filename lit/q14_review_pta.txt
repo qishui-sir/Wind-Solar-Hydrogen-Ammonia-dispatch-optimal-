@@ -1,0 +1,158 @@
+﻿### QUERY: green ammonia production review challenges prospects power to ammonia | total=12056384 | shown=25
+
+TITLE   : A Critical Assessment of Green Ammonia Production and Ammonia Production Technologies
+AUTHORS : Ahmet Ozan Gezerman
+JOURNAL : Kemija u industriji
+YEAR    : 2022  | CITED: 8 | TYPE: journal-article
+DOI     : https://doi.org/10.15255/kui.2021.013
+ABSTRACT: 
+---
+TITLE   : Hydrogen Utilization for Renewable Ammonia Production (Power-to-Ammonia)
+AUTHORS : Alper Can Ince; C. Ozgur Colpan; Mustafa Fazıl Serincan; Ugur Pasaogullari
+JOURNAL : Prospects of Hydrogen Fueled Power Generation
+YEAR    : 2024  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1201/9781032656212-11
+ABSTRACT: 
+---
+TITLE   : Green Ammonia Production in Stochastic Power Markets
+AUTHORS : Ezio Lauro; Amélie Têtu; Helyette Geman
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4601591
+ABSTRACT: 
+---
+TITLE   : Ammonia Production Technologies
+AUTHORS : K.H.R. Rouwenhorst; P.M. Krzywda; N.E. Benes; G. Mul
+JOURNAL : Techno-Economic Challenges of Green Ammonia as an Energy Vector
+YEAR    : 2021  | CITED: 79 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-12-820560-0.00004-7
+ABSTRACT: 
+---
+TITLE   : Prospects and Challenges of Green Ammonia as an Alternate Fuel for Internal Combustion Engines
+AUTHORS : Kislay Kishore; Priyank Gupta; Caneon Kurien; Mayank Mittal
+JOURNAL : Energy, Environment, and Sustainability Ammonia and Hydrogen for Green Energy Transition
+YEAR    : 2024  | CITED: 3 | TYPE: book-chapter
+DOI     : https://doi.org/10.1007/978-981-97-0507-8_6
+ABSTRACT: 
+---
+TITLE   : Prospects and challenges of green ammonia synthesis
+AUTHORS : Dongpei Ye; Shik Chi Edman Tsang
+JOURNAL : Nature Synthesis
+YEAR    : 2023  | CITED: 328 | TYPE: journal-article
+DOI     : https://doi.org/10.1038/s44160-023-00321-7
+ABSTRACT: 
+---
+TITLE   : Green Ammonia Production in Stochastic Power Markets
+AUTHORS : Ezio Lauro; Amélie Têtu; Helyette Geman
+JOURNAL : 
+YEAR    : 2024  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.20944/preprints202402.0778.v1
+ABSTRACT: Real assets in the energy market are subject to ecological uncertainty due to the penetration of renewables. We illustrate this point by analysing electrolysers, a class of assets which recently became the subject of a large interest, as they lead to the production of the desirable green hydrogen and green ammonia. The latter has the advantage of being easily stored and has huge potential in decarbonising both the fertilizer and shipping industries. We consider the optimization of green ammonia production with different types of electricity procurement in the context of stochastic power and ammonia markets, a necessary assumption to translate the features of renewable, hence intermittent, electricity. We emphasise the importance of using stochastic prices to effectively model the volatile nature of the price dynamics, illustrating the project risks that can be mitigated by hedging activities. This study shows the pivotal role of flexibility when dealing with fluctuating renewable production and volatile electricity prices to maximise profits and better manage risks.
+---
+TITLE   : Using Biomass or Green Ammonia to Replace Coal in Existing Thermal Power Plants: Feasibility and Challenges
+AUTHORS : Stratos Tavoulareas
+JOURNAL : 
+YEAR    : 2024  | CITED: 1 | TYPE: book
+DOI     : https://doi.org/10.1596/41670
+ABSTRACT: 
+---
+TITLE   : Advancements in Green Ammonia Production and Utilisation Technologies
+AUTHORS : John Humphreys; Shanwen Tao
+JOURNAL : Johnson Matthey Technology Review
+YEAR    : 2024  | CITED: 17 | TYPE: journal-article
+DOI     : https://doi.org/10.1595/205651324x16946999404542
+ABSTRACT: Green ammonia, produced through renewable energy-powered electrochemical and thermal processes, is emerging as a promising candidate to replace fossil fuel-based ammonia in the fertiliser, transportation and energy sectors. This paper provides an overview of the production methods, utilisation methods and technological advancements for green ammonia. The electrochemical production and Haber-Bosch with renewable hydrogen and energy are discussed in detail highlighting recent material advances. Green ammonia utilisation methods are discussed with direct use cases such as ammonia combustion and direct ammonia fuel cells examined. Green ammonia’s potential as a carbon-free hydrogen carrier is also discussed in regards to ammonia cracking for effective hydrogen recovery. This paper concludes that green ammonia has the potential to play a significant role in the transition to a sustainable energy system and offers new opportunities for the fertiliser, transportation and energy industries.
+---
+TITLE   : 
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2025  | CITED:  | TYPE: grant
+DOI     : https://doi.org/10.54499/2025.05272.bdana
+ABSTRACT: 
+---
+TITLE   : Pathways for Green Ammonia
+AUTHORS : R.M. Nayak-Luke; Z. Cesaro; R. Bañares-Alcántara
+JOURNAL : Techno-Economic Challenges of Green Ammonia as an Energy Vector
+YEAR    : 2021  | CITED: 3 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-12-820560-0.00003-5
+ABSTRACT: 
+---
+TITLE   : Process challenges of green ammonia production
+AUTHORS : Laura Torrente-Murciano; Collin Smith
+JOURNAL : Nature Synthesis
+YEAR    : 2023  | CITED: 35 | TYPE: journal-article
+DOI     : https://doi.org/10.1038/s44160-023-00339-x
+ABSTRACT: 
+---
+TITLE   : Green Ammonia Production System
+AUTHORS : Yasushi Fujimura
+JOURNAL : CO2 Free Ammonia as an Energy Carrier
+YEAR    : 2022  | CITED: 1 | TYPE: book-chapter
+DOI     : https://doi.org/10.1007/978-981-19-4767-4_16
+ABSTRACT: 
+---
+TITLE   : Catalytic Ammonia Decomposition for Hydrogen Production: Utilization of Ammonia in a Fuel Cell
+AUTHORS : Lateef Jolaoso; Sharif Fakhruz Zaman
+JOURNAL : Green Energy and Technology Sustainable Ammonia Production
+YEAR    : 2020  | CITED: 19 | TYPE: book-chapter
+DOI     : https://doi.org/10.1007/978-3-030-35106-9_5
+ABSTRACT: 
+---
+TITLE   : Techno-Economic Aspects of Production, Storage and Distribution of Ammonia
+AUTHORS : R.M. Nayak-Luke; C. Forbes; Z. Cesaro; R. Bañares-Alcántara
+JOURNAL : Techno-Economic Challenges of Green Ammonia as an Energy Vector
+YEAR    : 2021  | CITED: 23 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-12-820560-0.00008-4
+ABSTRACT: 
+---
+TITLE   : Microbial electrosynthesis of ammonia from atmospheric nitrogen: A review on advancements and challenges in sustainable ammonia production
+AUTHORS : Ananya Chugh; Sudipta Sarkar
+JOURNAL : Biotechnology Advances
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.biotechadv.2026.108898
+ABSTRACT: 
+---
+TITLE   : Use of Ammonia for Heat, Power and Propulsion
+AUTHORS : N. De Vries; E.C. Okafor; M. Gutesa-Bozo; H. Xiao
+JOURNAL : Techno-Economic Challenges of Green Ammonia as an Energy Vector
+YEAR    : 2021  | CITED: 11 | TYPE: book-chapter
+DOI     : https://doi.org/10.1016/b978-0-12-820560-0.00006-0
+ABSTRACT: 
+---
+TITLE   : 
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2020  | CITED:  | TYPE: grant
+DOI     : https://doi.org/10.3030/951880
+ABSTRACT: 
+---
+TITLE   : Green Ammonia Production in Stochastic Power Markets
+AUTHORS : Ezio Lauro; Amélie Têtu; Hélyette Geman
+JOURNAL : Commodities
+YEAR    : 2024  | CITED: 5 | TYPE: journal-article
+DOI     : https://doi.org/10.3390/commodities3010007
+ABSTRACT: Real assets in the energy market are subject to ecological uncertainty due to the penetration of renewables. We illustrate this point by analyzing electrolyzers, a class of assets that recently became the subject of large interest, as they lead to the production of the desirable green hydrogen and green ammonia. The latter has the advantage of being easily stored and has huge potential in decarbonizing both the fertilizer and shipping industries. We consider the optimization of green ammonia production with different types of electricity procurement in the context of stochastic power and ammonia markets, a necessary assumption to translate the features of renewable, hence intermittent, electricity. We emphasize the importance of using stochastic prices to model the volatile nature of the price dynamics effectively, illustrating the project risks that hedging activities can mitigate. This study shows the pivotal role of flexibility when dealing with fluctuating renewable production and volatile electricity prices to maximize profits and better manage risks.
+---
+TITLE   : Review for "Progress and prospects in electrocatalytic ammonia synthesis reactors"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d6cc00296j/v2/review1
+ABSTRACT: 
+---
+TITLE   : Techno-Economic Challenges of Green Ammonia as an Energy Vector
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2021  | CITED: 7 | TYPE: edited-book
+DOI     : https://doi.org/10.1016/c2019-0-01417-3
+ABSTRACT: 
+---
+TITLE   : Review for "Progress and prospects in electrocatalytic ammonia synthesis reactors"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d6cc00296j/v1/review1
+ABSTRACT: 
+---
+(filtered-in: 22)
+

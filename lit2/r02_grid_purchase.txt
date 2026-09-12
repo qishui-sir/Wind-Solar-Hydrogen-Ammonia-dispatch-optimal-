@@ -1,0 +1,144 @@
+﻿### QUERY: grid purchase capacity charge demand contract industrial power tariff hydrogen plant | total=227928 | shown=25
+
+TITLE   : Flexible Computing Loads, Power Purchase Agreements, and Carbon: A Contract-theoretic Analysis of Bitcoin Mining as Grid-adjacent Demand Response
+AUTHORS : Shreyas Kondapuram
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.7140778
+ABSTRACT: Bitcoin miners consume roughly 0.5% of global electricity and, unlike most industrial loads, can curtail consumption on subsecond timescales. I develop a contract-theoretic model of a vertically-integrated utility that jointly chooses fossil, renewable, and flexible-computing-load (FCL) capacities and then dispatches against stochastic residual demand. Under the maintained assumptions of the model I derive sufficient conditions under which introducing an FCL weakly reduces expected carbon emissions in equilibrium, with strict reduction on the interior event. I sign the comparative statics of the equilibrium carbon functional Ψ(F; θ) with respect to seven primitives and verify each sign numerically across eight residual-demand distributions, confirming five distribution-free signs and two shape-sensitive ones. On the Pareto tail I obtain a closed-form distributionally robust characterization: the worst-case tail index shifts from 2.50 to 2.10 as the Wasserstein-1 ambiguity radius grows, and the price of robustness is bounded by 0.125 units of expected profit in the tested grid. I calibrate the model to the June 2021 power purchase agreement between Cipher Mining's Odessa facility and Luminant ET Services (Vistra Corp), a 200 MW fixed-price contract with curtailment rights extending through July 2027, and show that publicly disclosed curtailment events during the summer 2022 ERCOT scarcity episodes are broadly consistent with the model's carbon-optimal dispatch rule.
+---
+TITLE   : Grid Tariff Design and Peak Demand Reduction: A Comparative Tariff Analysis with Simulated Demand Response
+AUTHORS : Matthias Hofmann; Sigurd Bjarghov; Hanne Sæle; Karen  Byskov Lindberg
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.4437997
+ABSTRACT: 
+---
+TITLE   : Multilateral agreement contract optimization of renewable energy power grid-connecting under uncertain supply and market demand
+AUTHORS : Kong Lingcheng; Zhu Zhenning; Xie Jiaping; Li Jing
+JOURNAL : Computers &amp; Industrial Engineering
+YEAR    : 2019  | CITED: 31 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.cie.2019.06.016
+ABSTRACT: 
+---
+TITLE   : An Analysis From the Perspective of Direct Power-Purchase for Industrial Users: Should the Power Grid Company Implement Incentive-Based Demand Response Management?
+AUTHORS : Haomiao Wang; Nan Hu; Shuran Jia; Bo Xu
+JOURNAL : IEEE Access
+YEAR    : 2021  | CITED: 4 | TYPE: journal-article
+DOI     : https://doi.org/10.1109/access.2021.3081631
+ABSTRACT: 
+---
+TITLE   : Optimal Home Energy Management System With Demand Charge Tariff and Appliance Operational Dependencies
+AUTHORS : Fengji Luo; Weicong Kong; Gianluca Ranzi; Zhao Yang Dong
+JOURNAL : IEEE Transactions on Smart Grid
+YEAR    : 2020  | CITED: 143 | TYPE: journal-article
+DOI     : https://doi.org/10.1109/tsg.2019.2915679
+ABSTRACT: 
+---
+TITLE   : Grid tariff design and peak demand shaving: A comparative tariff analysis with simulated demand response
+AUTHORS : Matthias Hofmann; Sigurd Bjarghov; Hanne Sæle; Karen Byskov Lindberg
+JOURNAL : Energy Policy
+YEAR    : 2025  | CITED: 29 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.enpol.2024.114475
+ABSTRACT: 
+---
+TITLE   : Optimal Grid Expansion Planning in Power Systems with Surplus Generation Capacity and Suppressed Demand
+AUTHORS : Vedaste NDAYISHIMIYE; Geofrey Bakkabulindi; Emmanuel Miyingo
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.22541/au.169653457.77009204/v1
+ABSTRACT: Abstract: In many developing countries, the construction of transmission lines often lags behind commissioning of new power plants. This results in insufficient transmission line capacity to evacuate generated power to distant load centres. This study aims to address the problem of overcapacity of installed generation relative to transmission capacity and demand, arising from the misalignment of investments in the respective segments. The study proposes coordinated Generation and Transmission Expansion Planning (GTEP) models that consider surplus generation capacity while minimizing investment and operating costs to unlock suppressed customer demand. We develop a multistage stochastic optimization model for GTEP, as well as isolated Generation Expansion Planning (GEP) and Transmission Expansion Planning (TEP) models, and then compare their performance. The models were developed and simulated using PLEXOS Software by Energy Exemplar. The results show that the combined GTEP model provides an optimal expansion plan that utilizes surplus generation capacity and reduces suppressed demand by prioritizing transmission network reinforcements and then investments in generation. The TEP model mitigates overcapacity and unserved energy in some areas, but if not aligned with generation planning, there will be eventual power supply shortages as demand exceeds generation over time.
+---
+TITLE   : PV Plant Influence on Distribution Grid in Terms of Power Quality Considering Hosting Capacity of the Grid
+AUTHORS : Ivan Ramljak; Drago Bago
+JOURNAL : Electric Power Conversion
+YEAR    : 2019  | CITED: 1 | TYPE: book-chapter
+DOI     : https://doi.org/10.5772/intechopen.82441
+ABSTRACT: 
+---
+TITLE   : Fuzzy stochastic control algorithm for virtual power plant capacity of source-grid-load-storage integration under demand constraints
+AUTHORS : ChengYu Wang; Lei Ye; Peng Fu; Wei Zhang
+JOURNAL : International Conference on Electrical Engineering and Smart Grid (EESG 2025)
+YEAR    : 2025  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1117/12.3094290
+ABSTRACT: 
+---
+TITLE   : A Stochastic MPEC Approach for Grid Tariff Design with Demand Side Flexibility
+AUTHORS : Magnus Askeland; Thorsten Burandt; Steven A. Gabriel
+JOURNAL : 
+YEAR    : 2019  | CITED: 2 | TYPE: posted-content
+DOI     : https://doi.org/10.36227/techrxiv.10031804
+ABSTRACT: &lt;div&gt;As the end-users increasingly can provide flexibility to the power system, it is important to consider how this flexibility can be activated as a resource for the grid. Electricity network tariffs are one option that can be used to activate this flexibility. Therefore, by designing efficient grid tariffs, it might be possible to reduce the total costs in the power system by incentivizing a change in consumption patterns.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;This paper provides a methodology for optimal grid tariff design under decentralized decision-making and uncertainty in demand, power prices, and renewable generation. A bilevel model is formulated to adequately describe the interaction between the end-users and a distribution system operator. In addition, a centralized decision-making model is provided for benchmarking purposes. The bilevel model is reformulated as a mixed-integer linear problem solvable by branch-and-cut techniques.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Results for a deterministic example and a stochastic case study are presented and discussed.&lt;/div&gt;
+---
+TITLE   : A Stochastic MPEC Approach for Grid Tariff Design with Demand Side Flexibility
+AUTHORS : Magnus Askeland; Thorsten Burandt; Steven A. Gabriel
+JOURNAL : 
+YEAR    : 2019  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.36227/techrxiv.10031804.v1
+ABSTRACT: As the end-users increasingly can provide flexibility to the power system, it is important to consider how this flexibility can be activated as a resource for the grid. Electricity network tariffs are one option that can be used to activate this flexibility. Therefore, by designing efficient grid tariffs, it might be possible to reduce the total costs in the power system by incentivizing a change in consumption patterns. This paper provides a methodology for optimal grid tariff design under decentralized decision-making and uncertainty in demand, power prices, and renewable generation. A bilevel model is formulated to adequately describe the interaction between the end-users and a distribution system operator. In addition, a centralized decision-making model is provided for benchmarking purposes. The bilevel model is reformulated as a mixed-integer linear problem solvable by branch-and-cut techniques. Results for a deterministic example and a stochastic case study are presented and discussed.
+---
+TITLE   : Beyond capacity factor: A demand-referenced perspective on power plant key performance indicators
+AUTHORS : Eylül Gedik; Manfred Wirsum
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.7158178
+ABSTRACT: The rapid energy transition requires a reconsideration of the performance metrics used to assess power generation technologies. While the limitations of economic metrics such as levelized cost of electricity (LCOE) have been widely recognized, the shortcomings of capacity factor (CF) have received very limited attention. As the share of variable renewable energy increases in the electricity mix, flexible and dispatchable facilities will operate less frequently while becoming critically important; however, such a role cannot be adequately captured by capacity factor. This paper revisits the concepts of power plant KPIs with a particular focus on capacity factor, and proposes a new demand-referenced perspective through the introduction of the demand coverage factor (DCF), a metric that evaluates power plant performance relative to system demand. This work provides an enhanced evaluation framework and aims to stimulate a broader discussion on the perception of energy technologies, highlighting the indispensable yet underappreciated role of dispatchable generation.
+---
+TITLE   : Optimal Sizing of Battery Energy Storage Capacity Considering Demand Charge for Industrial Loads
+AUTHORS : Madia Safdar; Behnam Mohammadi-Ivatloo; Ghulam Amjad Hussain; Arslan Ahmad Bashir
+JOURNAL : 2024 7th International Conference on Electric Power and Energy Conversion Systems (EPECS)
+YEAR    : 2024  | CITED: 2 | TYPE: proceedings-article
+DOI     : https://doi.org/10.1109/epecs62845.2024.10805527
+ABSTRACT: 
+---
+TITLE   : Investigating the role of flexible electrical appliances in a demand charge grid tariff scenario - a Norwegian case study
+AUTHORS : K. E. Thorvaldsen; E. S. Kiel; H. Sæle
+JOURNAL : IET Conference Proceedings
+YEAR    : 2023  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1049/icp.2023.0992
+ABSTRACT: 
+---
+TITLE   : Split Standing Charge Tariff Trials: Encouraging demand flexibility to meet clean power goals
+AUTHORS : Luca Panzone; Beth Moon; Rosie Almond; Laura Smart
+JOURNAL : AEA Randomized Controlled Trials
+YEAR    : 2025  | CITED: 0 | TYPE: dataset
+DOI     : https://doi.org/10.1257/rct.17049
+ABSTRACT: 
+---
+TITLE   : Split Standing Charge Tariff Trials: Encouraging demand flexibility to meet clean power goals
+AUTHORS : Luca Panzone; Beth Moon; Rosie Almond; Laura Smart
+JOURNAL : AEA Randomized Controlled Trials
+YEAR    : 2025  | CITED: 0 | TYPE: dataset
+DOI     : https://doi.org/10.1257/rct.17049-1.0
+ABSTRACT: 
+---
+TITLE   : Hydrogen Storage Optimal Scheduling for Fuel Supply and Capacity-Based Demand Response Program Under Dynamic Hydrogen Pricing
+AUTHORS : Nader A. El-Taweel; Hadi Khani; Hany E. Z. Farag
+JOURNAL : IEEE Transactions on Smart Grid
+YEAR    : 2019  | CITED: 226 | TYPE: journal-article
+DOI     : https://doi.org/10.1109/tsg.2018.2863247
+ABSTRACT: 
+---
+TITLE   : Risk-aware Coordinated Scheduling and Power Purchase Agreement Procurement for Industrial Hydrogen Portfolio Companies in Hydrogen, Electricity, and Green Certificate Markets
+AUTHORS : Seyed Amir Mansouri; Kenneth Bruninx
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.6083446
+ABSTRACT: 
+---
+TITLE   : Valuing Coordinated Scheduling, Risk Management, and Power Purchase Agreements for Industrial Hydrogen Enterprises in the Hydrogen, Electricity, and Green Certificate Markets
+AUTHORS : Seyed Amir Mansouri; Kenneth Bruninx
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5765926
+ABSTRACT: 
+---
+TITLE   : Chinese grid investment based on transmission and distribution tariff policy: An optimal coordination between capacity and demand
+AUTHORS : Yongli Wang; Minhan Zhou; Fuli Zhang; Yuli Zhang
+JOURNAL : Energy
+YEAR    : 2021  | CITED: 19 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2020.119589
+ABSTRACT: 
+---
+(filtered-in: 20)
+

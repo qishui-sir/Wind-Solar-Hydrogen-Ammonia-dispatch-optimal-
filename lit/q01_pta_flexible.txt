@@ -1,0 +1,179 @@
+﻿### QUERY: power to ammonia flexible operation renewable energy Haber-Bosch flexibility | total=4865339 | shown=25
+
+TITLE   : Review for "Impact of process flexibility and imperfect forecasting on the operation and design of Haber-Bosch green ammonia"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d3su00067b/v2/review2
+ABSTRACT: 
+---
+TITLE   : Review for "Impact of process flexibility and imperfect forecasting on the operation and design of Haber-Bosch green ammonia"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d3su00067b/v2/review1
+ABSTRACT: 
+---
+TITLE   : Review for "Impact of process flexibility and imperfect forecasting on the operation and design of Haber-Bosch green ammonia"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d3su00067b/v1/review1
+ABSTRACT: 
+---
+TITLE   : Review for "Impact of process flexibility and imperfect forecasting on the operation and design of Haber-Bosch green ammonia"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d3su00067b/v3/review1
+ABSTRACT: 
+---
+TITLE   : Review for "Impact of process flexibility and imperfect forecasting on the operation and design of Haber-Bosch green ammonia"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d3su00067b/v1/review2
+ABSTRACT: 
+---
+TITLE   : Decision letter for "Impact of process flexibility and imperfect forecasting on the operation and design of Haber-Bosch green ammonia"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d3su00067b/v1/decision1
+ABSTRACT: 
+---
+TITLE   : Decision letter for "Impact of process flexibility and imperfect forecasting on the operation and design of Haber-Bosch green ammonia"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d3su00067b/v3/decision1
+ABSTRACT: 
+---
+TITLE   : Decision letter for "Impact of process flexibility and imperfect forecasting on the operation and design of Haber-Bosch green ammonia"
+AUTHORS : 
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d3su00067b/v2/decision1
+ABSTRACT: 
+---
+TITLE   : Author response for "Impact of process flexibility and imperfect forecasting on the operation and design of Haber-Bosch green ammonia"
+AUTHORS :  Nicholas Salmon;  René Bañares-Alcántara
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d3su00067b/v2/response1
+ABSTRACT: 
+---
+TITLE   : Author response for "Impact of process flexibility and imperfect forecasting on the operation and design of Haber-Bosch green ammonia"
+AUTHORS :  Nicholas Salmon;  René Bañares-Alcántara
+JOURNAL : 
+YEAR    : 2023  | CITED: 0 | TYPE: peer-review
+DOI     : https://doi.org/10.1039/d3su00067b/v3/response1
+ABSTRACT: 
+---
+TITLE   : Optimising Renewable Generation Configurations of Off-Grid Green Ammonia Production Systems considering Haber-Bosch Flexibility
+AUTHORS : changlong wang; Stuart Walsh; Thomas Longden; Graham Palmer
+JOURNAL : 
+YEAR    : 2022  | CITED: 1 | TYPE: posted-content
+DOI     : https://doi.org/10.31223/x5vp9g
+ABSTRACT: Green ammonia has received increasing interest for its potential as an energy carrier in the international trade of renewable power. This paper considers Australia’s prospects for green ammonia production from an exporter’s perspective by highlighting Australia’s competitive advantage in renewable resource quality and seasonal complementarity to its potential trade buyers. Although renewable resources are unevenly distributed across Australia and present distinct diurnal and seasonal variability, modelling shows that most of the pre-identified hydrogen hubs in each state and territory of Australia can produce cost-competitive green ammonia providing the electrolysis and Haber-Bosch processes are partially flexible to cope with the variability of renewables. Flexible operation reduces energy curtailment and leads to lower storage capacity requirements using batteries or hydrogen storage, which would otherwise increase system costs. In addition, an optimised combination of wind and solar can reduce the magnitude of storage required. Providing that a partially flexible Haber Bosch plant is commercially available, our modelling shows a levelised cost of ammonia (LCOA) of AU\$756/tonne and AU\$659/tonne in 2025 and 2030, respectively. Based on these results, green ammonia would be cost-competitive with grey hydrogen in 2030, given a feedstock natural gas price higher than AU\$14/MBtu. For green ammonia to be cost-competitive with grey hydrogen, assuming a lower gas price of AU\$6/MBtu, a carbon price would need to be in place of at least AU\$123/tonne. A further factor favouring Australian production of green ammonia is the potential synergy between Southern Hemisphere supply and Northern Hemisphere demand. Given that there is a greater demand for energy in winter concurrent with lower solar power production, there may be opportunities for solar-based Southern Hemisphere suppliers to supply the major industrial regions, most of which are located in the Northern Hemispher ...[truncated]
+---
+TITLE   : Optimising renewable generation configurations of off-grid green ammonia production systems considering Haber-Bosch flexibility
+AUTHORS : Changlong Wang; Stuart D.C. Walsh; Thomas Longden; Graham Palmer
+JOURNAL : Energy Conversion and Management
+YEAR    : 2023  | CITED: 130 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.enconman.2023.116790
+ABSTRACT: 
+---
+TITLE   : Impact of process flexibility and imperfect forecasting on the operation and design of Haber–Bosch green ammonia
+AUTHORS : Nicholas Salmon; René Bañares-Alcántara
+JOURNAL : RSC Sustainability
+YEAR    : 2023  | CITED: 41 | TYPE: journal-article
+DOI     : https://doi.org/10.1039/d3su00067b
+ABSTRACT: Inability to predict the weather, and to rapidly adjust the operating rate of Haber–Bosch synthesis, are major challenges for green ammonia production. This article assesses and provides methods for managing both challenges.
+---
+TITLE   : Transforming energy-intensive loads into flexible resources: A scenario-based multi-objective planning model for renewable power-to-ammonia system with integrated flexibility
+AUTHORS : Naixin Zhao; Suhua Lou
+JOURNAL : Energy
+YEAR    : 2026  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2026.142175
+ABSTRACT: 
+---
+TITLE   : Electric Vehicle Flexible Charging Load Control for Comprehensive Energy System Operation with Renewable Energy
+AUTHORS : Yuanzheng Li; Yang Li; Zhigang Zeng
+JOURNAL : Power Systems Flexible Load Control for Enhancing Renewable Power System Operation
+YEAR    : 2024  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1007/978-981-97-0312-8_8
+ABSTRACT: 
+---
+TITLE   : Integrated Operation and Planning Model of Renewable Energy Sources with Flexible Devices in Active Distribution Networks
+AUTHORS : Vijay Babu Pamshetti; Shiv Pujan Singh
+JOURNAL : Flexibility in Electric Power Distribution Networks
+YEAR    : 2021  | CITED: 0 | TYPE: book-chapter
+DOI     : https://doi.org/10.1201/9781003122326-11
+ABSTRACT: 
+---
+TITLE   : How sensitive is a dynamic ammonia synthesis process? Global sensitivity analysis of a dynamic Haber-Bosch process (for flexible seasonal energy storage)
+AUTHORS : Kevin Verleysen; Alessandro Parente; Francesco Contino
+JOURNAL : Energy
+YEAR    : 2021  | CITED: 63 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2021.121016
+ABSTRACT: 
+---
+TITLE   : Exceeding Single‐Pass Equilibrium with Integrated Absorption Separation for Ammonia Synthesis Using Renewable Energy—Redefining the Haber‐Bosch Loop
+AUTHORS : Collin Smith; Laura Torrente‐Murciano
+JOURNAL : Advanced Energy Materials
+YEAR    : 2021  | CITED: 98 | TYPE: journal-article
+DOI     : https://doi.org/10.1002/aenm.202003845
+ABSTRACT: Abstract The synthesis of ammonia through the Haber‐Bosch process has been at the foundation of the chemical industry for over 100 years, but when the energy and feedstock sources switch from fossil fuels to renewable electricity, the process needs to be reimagined. Herein, the successful integration of ammonia synthesis and separation is demonstrated in a recycle‐less process setting the foundations of green ammonia technology. The ruthenium‐based catalyst uses a nanostructured CeO 2 support and Cs electronic promotion to remove hydrogen and ammonia inhibition, respectively, creating a catalyst with low‐temperature (&lt;300 °C) activity that quickly approaches equilibrium. The absorbent uses MnCl 2 to avoid the acid releasing decomposition of conventional absorbents like MgCl 2 , and a support of SiO 2 to simultaneously enhance MnCl 2 dispersion and improve stabilization. This integrated catalyst‐absorbent system reproducibly exceeds single‐pass ammonia synthesis equilibrium. Kinetic models of the catalyst and absorbent successfully predict the experimental long‐term behavior and facilitate the design of an integrated system. These results present a framework for aligning intermittent and isolated renewable energy with ammonia synthesis by decreasing capital complexity and increasing process agility—adapting to a shifting energy landscape to continue providing fertilizers with minimum CO 2 penalty and pioneer energy storage.
+---
+TITLE   : Green ammonia from air, water, and renewable electricity: Energy costs using natural gas reforming, solid oxide electrolysis, liquid water electrolysis, chemical looping, or a Haber–Bosch loop
+AUTHORS : Peter H. Pfromm; Wrya Aframehr
+JOURNAL : Journal of Renewable and Sustainable Energy
+YEAR    : 2022  | CITED: 12 | TYPE: journal-article
+DOI     : https://doi.org/10.1063/5.0101709
+ABSTRACT: The purpose of this work is to quantitatively compare the energy cost of design alternatives for a process to produce ammonia (NH3) from air, water, and renewable electricity. It is assumed that a Haber–Bosch (H–B) synthesis loop is available to produce 1000 metric tons (tonnes) of renewable NH3 per day. The overall energy costs per tonne of NH3 will then be estimated at U.S.$195, 197, 158, and 179 per tonne of NH3 when H2 is supplied by (i) natural gas reforming (reference), (ii) liquid phase electrolysis, (iii) solid oxide electrolysis (SOE) of water only, and (iv) simultaneous SOE of water and air. A renewable electricity price of U.S.$0.02 per kWhelectric, and U.S.$6 per 106 BTU for natural gas is assumed. SOE provides some energy cost advantage but incurs the inherent risk of an emerging process. The last consideration is replacement of the H–B loop with atmospheric pressure chemical looping for ammonia synthesis (CLAS) combined with SOE for water electrolysis, and separately oxygen removal from air to provide N2, with energy costs of U.S.$153 per tonne of NH3. Overall, the most significant findings are (i) the energy costs are not substantially different for the alternatives investigated here and (ii) the direct SOE of a mixture of steam and air, followed by a H.–B. synthesis loop, or SOE to provide H2 and N2 separately, followed by CLAS may be attractive for small scale production, modular systems, remote locations, or stranded electricity resources with the primary motivation being process simplification rather than significantly lower energy cost.
+---
+TITLE   : Flexible design and operation of off-grid green ammonia systems with gravity energy storage under long-term renewable power uncertainty
+AUTHORS : Jiahui Zhou; Bing Tong; Haiming Wang; Gang Xu
+JOURNAL : Applied Energy
+YEAR    : 2025  | CITED: 30 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.apenergy.2025.125629
+ABSTRACT: 
+---
+TITLE   : Process-level energy assessment of sorption-enhanced ammonia separation in distributed Haber–Bosch synthesis
+AUTHORS : Elvira Spatolisano; Anton  A. Kiss
+JOURNAL : 
+YEAR    : 2026  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.6886853
+ABSTRACT: Small-scale, renewable-powered Haber–Bosch (HB) synthesis is constrained by inefficient ammonia separation at reduced operating pressures, where conventional condensation removes less than 10% of NH₃ per pass due to vapor–liquid equilibrium limitations. Sorption-based separation offers a potential alternative by selectively removing NH₃ from the synthesis loop, enhancing equilibrium conversion.This work develops an integrated framework combining sorbent screening, dynamic cycle simulation, and process-level energy assessment for distributed ammonia production.Five sorbent classes (activated carbons, zeolites, metal halides, hydrides, and borohydrides) were evaluated using a multi-criteria decision methodology based on working capacity, regeneration requirements, kinetics, stability, cost, and safety. Zeolite 13X was identified as the most suitable candidate and implemented in a three-step pressure swing adsorption (PSA) cycle simulated in Aspen Adsorption® V14 under representative HB effluent conditions (220 °C, 150 bar, 24 mol% NH₃).The PSA cycle reduced the recycle NH₃ concentration from 2.4 mol% to 0.033 mol%, corresponding to a ~70-fold improvement in recycle cleanup. However, the desorption stream contained only 37 mol% NH₃, significantly below the 99.99 mol% purity achieved by conventional condensation.A shortcut screening framework linking sorbent properties to process-level energy demand was developed and benchmarked against the conventional separation requirement of 0.21 kWh kg⁻¹ NH₃. Although the PSA cycle satisfies the benchmark in terms of recycle cleanup and nominal separation energy, product dilution remains the dominant limitation. The proposed framework identifies the sorbent targets required for sorption-enhanced HB systems to become energetically competitive, providing a generalizable methodology for process–material integration studies.
+---
+TITLE   : Data Center Flexible Load Control for Renewable Energy Integration
+AUTHORS : Yuanzheng Li; Yang Li; Zhigang Zeng
+JOURNAL : Power Systems Flexible Load Control for Enhancing Renewable Power System Operation
+YEAR    : 2024  | CITED: 2 | TYPE: book-chapter
+DOI     : https://doi.org/10.1007/978-981-97-0312-8_2
+ABSTRACT: 
+---
+TITLE   : Optimisation and Robust Control of a Load-Flexible Haber-Bosch Ammonia Synthesis Loop
+AUTHORS : Joachim Weel Rosbo; Anker Degn Jensen; Sigurd Skogestad; John Jørgensen
+JOURNAL : 
+YEAR    : 2025  | CITED: 0 | TYPE: posted-content
+DOI     : https://doi.org/10.2139/ssrn.5379004
+ABSTRACT: 
+---
+TITLE   : Novel integrated system for power, hydrogen, and ammonia production using direct oxy-combustion sCO2 power cycle with automatic CO2 capture, water electrolyzer, and Haber-Bosch process
+AUTHORS : Ahmad K. Sleiti; Wahib A. Al-Ammari; Farayi Musharavati
+JOURNAL : Energy
+YEAR    : 2024  | CITED: 19 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.energy.2024.132554
+ABSTRACT: 
+---
+TITLE   : Improvement of wind power utilization through flexible operation of data center in wind parks
+AUTHORS : Mehdi Ahmadi; Lukas Knorr; Henning Meschede
+JOURNAL : Renewable Energy
+YEAR    : 2025  | CITED: 12 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.renene.2025.123073
+ABSTRACT: 
+---
+(filtered-in: 25)
+

@@ -1,0 +1,123 @@
+﻿### QUERY: China green ammonia Inner Mongolia wind solar hydrogen demonstration project | total=111786 | shown=25
+
+TITLE   : StRac1 increase potato resistance against Phytophthora infestans via regulating H2O2 production
+AUTHORS :  ; Zhiwei Zhang; Xiaoluo Zhang;  
+JOURNAL : XIth International Congress of Geneticists and Breeders from the Republic of Moldova
+YEAR    : 2021  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.53040/cga11.2021.101
+ABSTRACT: 
+---
+TITLE   : The Application of Virtual Simulated Experiment in the Theoretical Teaching (ABO Blood Grouping) for Physiology
+AUTHORS :  ; Jing Yun; Guohua Zhang;  
+JOURNAL : The Journal of Medical Research
+YEAR    : 2021  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.31254/jmr.2021.7105
+ABSTRACT: Objective: To explore the effect on students’ independent learning capacity through the usage of virtual simulated experiment ((here after referred to as VSE) in the theoretical teaching for Physiology. Methods: This research is conducted in Inner Mongolia Medical University. Experimental group: students majored in Forensic Medicine, Class 1, 2019. Self-study teaching mode is applied in the content of blood type and ABO blood grouping with VSE in the theoretical course. Control group: students majored in Psychiatry, Class 1, 2019. Traditional teaching mode is applied to the same content. The effects of these two modes are assessed through test performance and questionnaire. Results: Students adopted self-study mode with VSE are superior to those employed traditional teaching mode in test performance. Questionnaires answered by experimental group show that students are satisfied with self-study mode through the application of VSE. Meanwhile, their independent learning capacity has been improved. Conclusion: The application of self-study teaching mode with VSE can enhance students’ learning effect and contribute to the improvement of self-study ability. It should be applied further in medical theory teaching.
+---
+TITLE   : An SNP-based high-density genetic linkage map for tetraploid potato using specific length amplified fragment sequencing (SLAF-SEQ) technology
+AUTHORS :  ; Xiaoxia Yu; Mingfei Zhang;  
+JOURNAL : XIth International Congress of Geneticists and Breeders from the Republic of Moldova
+YEAR    : 2021  | CITED: 1 | TYPE: proceedings-article
+DOI     : https://doi.org/10.53040/cga11.2021.098
+ABSTRACT: 
+---
+TITLE   : Intelligent Optimization of On/Off Grid Wind Solar Hydrogen Synthesis Green Ammonia System Based on Big Data Analysis
+AUTHORS : Lei YAO; Zhen ZHANG; Zhenyu DENG; Gang XU
+JOURNAL : 13th International Symposium on Project Management (ISPM2025)
+YEAR    : 2025  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.52202/081497-0108
+ABSTRACT: 
+---
+TITLE   : FUNCTIONAL IDENTIFICATION OF YAM CALCIUM-DEPENDENT PROTEIN KINASE GENE CDPK20
+AUTHORS :  ; Yuanli Gao; Yanfang Zhang;  
+JOURNAL : XIth International Congress of Geneticists and Breeders from the Republic of Moldova
+YEAR    : 2021  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.53040/cga11.2021.145
+ABSTRACT: 
+---
+TITLE   : Hierarchical Bayesian Based Reliability Analysis of a Sharing Storage Processor
+AUTHORS : Guang-Jun Jiang;  ; Zong-Yuan Li;  
+JOURNAL : Computational Research Progress in Applied Science and Engineering
+YEAR    : 2021  | CITED: 1 | TYPE: journal-article
+DOI     : https://doi.org/10.52547/crpase.7.2.2334
+ABSTRACT: 
+---
+TITLE   : Functional analysis of three mirnas in Agropyron mongolicum keng under drought stress
+AUTHORS :  ; Xuting Zhang; Bobo Fan;  
+JOURNAL : XIth International Congress of Geneticists and Breeders from the Republic of Moldova
+YEAR    : 2021  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.53040/cga11.2021.099
+ABSTRACT: 
+---
+TITLE   : Downregulated FGFR3 expression inhibits the in vitro osteogenic differentiation of bone marrow mesenchymal stem cells of TBXT gene mutation mice
+AUTHORS :  ; H. Su;  ; G. Yang
+JOURNAL : Cell Technologies in Biology and Medicine
+YEAR    : 2022  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.47056/1814-3490-2022-4-269-276
+ABSTRACT: 
+---
+TITLE   : Effects of improved saline-alkali soil with synergistic addition of coal slime and silica calcium slag on wheat growth
+AUTHORS :  ; Ruixin An; Xinyang Wang;  
+JOURNAL : BioResources
+YEAR    : 2026  | CITED: 1 | TYPE: journal-article
+DOI     : https://doi.org/10.15376/biores.21.2.2878-2891
+ABSTRACT: The feasibility was explored for synergistic addition of coal slime and silica calcium slag for saline-alkali soil improvement. A pot method was used to evaluate the effects on physicochemical properties of saline-alkali soil and wheat growth. The results demonstrated that the density and bulk density of saline-alkali soil were reduced with the synergistic additions, but the water content and the contents of organic matter, nitrogen, phosphorus, and potassium in the soil were increased. The emergence and growth height of wheat seedlings was found to be effectively improved. In terms of the emergence, no matter what proportion of M-G (coal slime: silica calcium slag ratio) was used, the emergence of wheat was greater than 70% when the addition amount was at 20%. In terms of seedling length, when the aggregate addition reached 35%, the high coal slime content (M-G 3:1) did not play a greater role in fostering the development of wheat. Therefore, with M-G 1:1, 35% addition of the soil can meet the growth needs of wheat in the early stage. In summary, the synergistic addition of coal slime and silica calcium slag has a promising application in the field of saline-alkali soil improvement.
+---
+TITLE   : Inhibition by water soluble fertilizer containing amino acids-jinmiao target on Orobanche cumana Wallr. Living in Helianthus annuus under lab incubation
+AUTHORS :  ; Zhiwei Zhang; Hui-Qing Liu;  
+JOURNAL : XIth International Congress of Geneticists and Breeders from the Republic of Moldova
+YEAR    : 2021  | CITED: 0 | TYPE: proceedings-article
+DOI     : https://doi.org/10.53040/cga11.2021.100
+ABSTRACT: 
+---
+TITLE   : Anti-inflammatory immunoregulatory effects of taurocholic acid are mediated by TGR5
+AUTHORS :  ; H. Su;  ; Z. Y. Zhang
+JOURNAL : Bulletin of Experimental Biology and Medicine
+YEAR    : 2025  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.47056/0365-9615-2025-180-9-338-344
+ABSTRACT: 
+---
+TITLE   : Inhibitory effects of safranal on laser-induced choroidal neovascularization and human choroidal microvascular endothelial cells and related pathways analyzed with transcriptome sequencing
+AUTHORS :  ; Qin-Xiao Qin-Xiao; Zhan-Jun Lu;  
+JOURNAL : International Journal of Ophthalmology
+YEAR    : 2021  | CITED: 3 | TYPE: journal-article
+DOI     : https://doi.org/10.18240/ijo.2021.07.04
+ABSTRACT: AIM: To determine the effects of safranal on choroidal neovascularization (CNV) and oxidative stress damage of human choroidal microvascular endothelial cells (HCVECs) and its possible mechanisms. METHODS: Forty-five rats were used as a laser-induced CNV model for testing the efficacy and safety of safranal (0.5 mg/kg·d, intraperitoneally) on CNV. CNV leakage on fluorescein angiography (FA) and CNV thickness on histology was compared. HCVECs were used for a H2O2-induced oxidative stress model to test the effect of safranal in vitro. MTT essay was carried to test the inhibition rate of safranal on cell viability at different concentrations. Tube formation was used to test protective effect of safranal on angiogenesis at different concentrations. mRNA transcriptome sequencing was performed to find the possible signal pathway. The expressions of different molecules and their phosphorylation level were validated by Western blotting. RESULTS: On FA, the average CNV leakage area was 0.73±0.49 and 0.31±0.11 mm2 (P?=?0.012) in the control and safranal-treated group respectively. The average CNV thickness was 127.4±18.75 and 100.6±17.34 μm (P=0.001) in control and safranal-treated group. Under the condition of oxidative stress, cell proliferation was inhibited by safranal and inhibition rates were 7.4%-35.4% at the different concentrations. For tube formation study, the number of new branches was 364 in control group and 35, 42, and 17 in 20, 40, and 80 μg/mL safranal groups respectively (P&lt;0.01). From the KEGG pathway bubble graph, the PI3K-AKT signaling pathway showed a high gene ratio. The protein expression was elevated of insulin receptor substrate (IRS) and the phosphorylation level of PI3K, phosphoinositide-dependent protein kinase 1/2 (PDK1/2), AKT and Bcl-2 associated death promoter (BAD) was also elevated under oxidative stress condition but inhibited by safranal. CONCLUSION: Safranal can inhibit CNV both in vivo and in vitro, and the IRS-PI3K-PDK1/2-AKT-BAD sig ...[truncated]
+---
+TITLE   : Stenting for Severe C7 Stenosis of Internal Carotid Artery (ICA) and Related Literature Review
+AUTHORS :  ; Xiao-Dong Wang; Jian-Ping Zhang;  
+JOURNAL : Austin Surgery Case Reports
+YEAR    : 2023  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.26420/austinsurgcaserep.2023.1060
+ABSTRACT: Intracranial Atherosclerosis (ICAS) is a common cerebrovascular lesion worldwide and an important cause of stroke [1]. Non-modifiable risk factors include age, gender, and genetics, with age being a key factor and atherosclerosis usually progressive, with no clinical manifestations until middle age. Ischemic Heart Disease (IHD) has increased fivefold among people aged 40 to 60. Before menopause, women are less prone to atherosclerosis than men, and the incidence of atherosclerosis is increased in postmenopausal women [2,3]. The inheritance of various genetic polymorphisms and the accumulation of family risk factors (such as diabetes and hypertension) create multiple conditions for the formation of atherosclerosis [4]. On the other hand, modifiable risk factors, such as smoking, hyperlipidemia, diabetes, and high blood pressure, can be improved by adjusting daily life. Studies have analyzed that white people are prone to extracranial arterial occlusive disease, while Asian, black and Hispanic people have a higher risk of intracranial atherosclerotic disease [1]. Therefore, the prevention of atherosclerotic disease, has been very urgent, to increase publicity, from the source to solve the problem.
+---
+TITLE   : A New Crown-Group Frog (Amphibia: Anura) from the Early Cretaceous of Northeastern Inner Mongolia, China (project)
+AUTHORS : 
+JOURNAL : MorphoBank datasets
+YEAR    : 2020  | CITED: 0 | TYPE: dataset
+DOI     : https://doi.org/10.7934/p3570
+ABSTRACT: 
+---
+TITLE   : Stenting for Severe C7 Stenosis of Internal Carotid Artery (ICA) and Related Literature Review
+AUTHORS :  ; Xiao-Dong Wang; Jian-Ping Zhang;  
+JOURNAL : SciBase Clinical and Medical Case Reports
+YEAR    : 2023  | CITED: 0 | TYPE: journal-article
+DOI     : https://doi.org/10.52768/casereports/1009
+ABSTRACT: Intracranial Atherosclerosis (ICAS) is a common cerebrovascular lesion worldwide and an important cause of stroke [1]. Nonmodifiable risk factors include age, gender, and genetics, with age being a key factor and atherosclerosis usually progressive, with no clinical manifestations until middle age. Ischemic Heart Disease (IHD) has increased fivefold among people aged 40 to 60. Before menopause, women are less prone to atherosclerosis than men, and the incidence of atherosclerosis is increased in postmenopausal women [2,3]. The inheritance of various genetic polymorphisms and the accumulation of family risk factors (such as diabetes and hypertension) create multiple conditions for the formation of atherosclerosis [4]. On the other hand, modifiable risk factors, such as smoking, hyperlipidemia, diabetes, and high blood pressure, can be improved by adjusting daily life. Studies have analyzed that white people are prone to extracranial arterial occlusive disease, while Asian, black and Hispanic people have a higher risk of intracranial atherosclerotic disease [1]. Therefore, the prevention of atherosclerotic disease, has been very urgent, to increase publicity, from the source to solve the problem.
+---
+TITLE   : The identification of new sunflower varieties resistant to Orobanche cumana in field
+AUTHORS :  ; Rongde Li; Rui Duan;  
+JOURNAL : XIth International Congress of Geneticists and Breeders from the Republic of Moldova
+YEAR    : 2021  | CITED: 1 | TYPE: proceedings-article
+DOI     : https://doi.org/10.53040/cga11.2021.072
+ABSTRACT: 
+---
+TITLE   : Flexible production of green hydrogen and ammonia from variable solar and wind energy: Case study of Chile and Argentina
+AUTHORS : Julien Armijo; Cédric Philibert
+JOURNAL : International Journal of Hydrogen Energy
+YEAR    : 2020  | CITED: 568 | TYPE: journal-article
+DOI     : https://doi.org/10.1016/j.ijhydene.2019.11.028
+ABSTRACT: 
+---
+(filtered-in: 17)
+

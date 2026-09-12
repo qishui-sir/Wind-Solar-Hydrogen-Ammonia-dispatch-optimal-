@@ -175,8 +175,17 @@ function result = results(params, renewable_data, sol, fval, exitflag, output, c
     result.cost.catalyst = params.material.cat_price * ...
         result.summary.NH3_prod_kg / params.unit.mass_scale;
     result.cost.raw_material = result.cost.water + result.cost.catalyst;
+    % Zhou S3 startup/shutdown penalty actually charged inside the objective.
+    C_startup_value = 0;
+    if isfield(context, 'C_startup') && ~isempty(context.C_startup)
+        C_startup_value = context.C_startup;
+    end
+    result.cost.startup_penalty = ...
+        C_startup_value * result.summary.AEL_start_energy_kwh;
+    result.cost.startup_penalty_coefficient = C_startup_value;
     result.cost.variable = result.cost.raw_material + ...
-        result.cost.purchase + result.cost.curtail;
+        result.cost.purchase + result.cost.curtail + ...
+        result.cost.startup_penalty;
     %result.cost.H2_short = sum(C_H2_short .* H2_short_opt);
 
     result.economics = result_LCOA(params, result);
