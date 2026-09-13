@@ -31,10 +31,13 @@ o1_config.frontier_k = []; % Add selected K values after locating boundaries.
 o1_config.max_time_s = 1200;
 o1_config.cost_relative_gap = 1e-3;
 o1_config.count_absolute_gap = 0.99;
+o1_config.change_epsilon = 0.01; % 1% nominal HB-load scheduling deadband.
+o1_config.max_count_bound_width = 20;
 o1_config.display = 'iter';
 fprintf('[main] baseline relative gap=%.4f; O1 cost gap=%.4f; ', ...
     params.solver.relative_gap, o1_config.cost_relative_gap);
-fprintf('O1 count absolute gap=%.2f\n', o1_config.count_absolute_gap);
+fprintf('O1 count absolute gap=%.2f; epsilon=%.2f%%\n', ...
+    o1_config.count_absolute_gap, 100 * o1_config.change_epsilon);
 
 O1_results = baseline(params, renewable_data, ...
     @(model) O1(model, o1_config));

@@ -41,19 +41,23 @@ if config.nh3_target_t < minimum_output_t - target_tolerance || ...
         config.nh3_target_t, minimum_output_t, maximum_output_t);
 end
 
-% 优化变量
-z = optimvar('O1_HB_change', T, 'Type', 'integer', ...
-    'LowerBound', 0, 'UpperBound', 1);
 HB_next = [HB_load(2:end); HB_load(1)];
 HB_change = HB_next - HB_load;
 HB_ramp = params.HB.ramp_rate * dt;
+if config.change_epsilon >= HB_ramp
+    error('O1:bad_change_epsilon', ...
+        'change_epsilon must be smaller than the hourly HB ramp limit %.6g.', ...
+        HB_ramp);
+end
 
 % 约束条件
-problem = model.problem;
-problem.Constraints.O1_nh3_target = NH3_total_t == config.nh3_target_t;
-problem.Constraints.O1_change_up = HB_change <= HB_ramp * z;
-problem.Constraints.O1_change_down = -HB_change <= HB_ramp * z;
-update_count = sum(z);
+base_problem = model.problem;
+base_problem.Constraints.O1_nh3_target = ...
+    NH3_total_t == config.nh3_target_t;
+base_problem.Constraints.O1_cyclic_ramp_up = ...
+    HB_load(1) - HB_load(end) <= HB_ramp;
+base_problem.Constraints.O1_cyclic_ramp_down = ...
+    HB_load(end) - HB_load(1) <= HB_ramp;
 
 % 两套求解选项：最小化成本，最小化变化次数
 cost_options = optimoptions(model.options, ...
@@ -66,34 +70,79 @@ count_options = optimoptions(model.options, ...
 
 study = struct();
 study.method = 'minimum_HB_load_updates';
-study.definition = ['Number of hourly HB load set-point changes, including ', ...
-    'the cyclic last-to-first boundary.'];
+study.definition = ['Number of effective hourly HB load set-point changes ', ...
+    'above change_epsilon, including the cyclic last-to-first boundary.'];
 study.config = config;
 study.output_range_t = [minimum_output_t, maximum_output_t];
 
 % 参考解：无变化次数约束下的最小成本
-reference_problem = problem;
+fprintf('\n[O1] Stage 1: economic reference without change binaries\n');
+reference_problem = base_problem;
 reference_problem.Objective = system_cost_usd;
 reference = solve_record(reference_problem, cost_options, 'cost', []);
 study.reference = reference;
-
-% 可行性解：最小化变化次数（无成本约束）
-feasibility_problem = problem;
-feasibility_problem.Objective = update_count;
-feasibility = solve_record(feasibility_problem, count_options, 'count', ...
-    reference.solution);
-study.feasibility = struct('minimum_updates', feasibility);
-
-if ~reference.has_incumbent || ~feasibility.has_incumbent
-    study.status = 'incomplete_no_incumbent';
-    study.economic = struct([]);
-    study.frontier = table();
+study.feasibility = struct();
+study.economic = struct([]);
+study.frontier = table();
+if ~reference.has_incumbent
+    study.status = 'incomplete_reference_no_incumbent';
     print_summary(study);
     return
 end
 
-% 在最小变化次数上求最小成本
+% 优化变量
+% 若HB负荷变更小于epsilon，则不计入有效变化次数
+z = optimvar('O1_HB_change', T, 'Type', 'integer', ...
+    'LowerBound', 0, 'UpperBound', 1);
+effective_change_limit = config.change_epsilon + ...
+    (HB_ramp - config.change_epsilon) * z;
+problem = base_problem;
+problem.Constraints.O1_change_up = HB_change <= effective_change_limit;
+problem.Constraints.O1_change_down = -HB_change <= effective_change_limit;
+update_count = sum(z);
+reference_count_start = add_change_indicators(reference.solution, ...
+    HB_change, config.change_epsilon);
+
+% 可行性解：最小化变化次数（无成本约束）
+fprintf(['[O1] Stage 2: minimum feasible effective load updates ', ...
+    '(warm start K=%g)\n'], sum(reference_count_start.O1_HB_change));
+feasibility_problem = problem;
+feasibility_problem.Objective = update_count;
+feasibility = solve_record(feasibility_problem, count_options, 'count', ...
+    reference_count_start);
+study.feasibility = struct('minimum_updates', feasibility);
+
+if ~feasibility.has_incumbent
+    study.status = 'incomplete_no_incumbent';
+    print_summary(study);
+    return
+end
+
 K_feas_upper = feasibility.count_upper;
+study.feasibility.K_lower = feasibility.count_lower;
+study.feasibility.K_upper = K_feas_upper;
+study.feasibility.bound_width = ...
+    K_feas_upper - feasibility.count_lower;
+study.feasibility.is_proven = feasibility.is_proven;
+study.check = struct();
+study.check.reference = solution_check(reference.solution, model, config);
+study.check.minimum_updates = solution_check(...
+    feasibility.solution, model, config);
+
+% 当K_feas区间仍过宽时，继续求成本边界只会重复日志中已经观察到的
+% 根节点超时。保留上下界并停止，先改善核心计数问题。
+if ~isfinite(study.feasibility.bound_width) || ...
+        study.feasibility.bound_width > config.max_count_bound_width
+    fprintf(['[O1] Stop after Stage 2: K_feas bound width %g exceeds ', ...
+        'the configured limit %g.\n'], study.feasibility.bound_width, ...
+        config.max_count_bound_width);
+    study.status = 'incomplete_feasibility_bound';
+    print_summary(study);
+    return
+end
+
+% 在当前已证明的K_feas区间上界内求成本最低的代表性调度。
+fprintf('[O1] Stage 3: minimum cost with K <= %g\n', K_feas_upper);
 representative_problem = problem;
 representative_problem.Constraints.O1_update_limit = ...
     update_count <= K_feas_upper;
@@ -101,77 +150,67 @@ representative_problem.Objective = system_cost_usd;
 representative = solve_record(representative_problem, cost_options, 'cost', ...
     feasibility.solution);
 study.feasibility.minimum_cost_at_upper_bound = representative;
-study.feasibility.K_lower = feasibility.count_lower;
-study.feasibility.K_upper = K_feas_upper;
-study.feasibility.is_proven = ...
-    isfinite(feasibility.count_lower) && ...
-    feasibility.count_lower == K_feas_upper;
+if representative.has_incumbent
+    study.check.minimum_updates_representative = solution_check(...
+        representative.solution, model, config);
+end
 
 reference_lower = reference.objective_lower;
 reference_upper = reference.objective_upper;
 if ~isfinite(reference_lower)
     study.status = 'incomplete_reference_bound';
-    study.economic = struct([]);
-    study.frontier = table();
     print_summary(study);
     return
 end
 
-% 经济性分析：给定成本预算，最少需要多少次变化
+% 从Uc + deltaQ和Lc + deltaQ的成本上下限中，取成本上限，减少下限MILP的求解已提高求解效率。
+% 经济性分析：使用已知可行的经济参考上界作为统一成本锚点。相对于
+% 并对未知真最优值的最大附加误差单独报告，避免每个delta重复求解上下界。
 allowances = config.cost_allowance_usd_t(:);
 economic = repmat(struct(), numel(allowances), 1);
+reference_uncertainty_usd_t = ...
+    (reference_upper - reference_lower) / config.nh3_target_t;
+economic_start = reference_count_start;
 for i = 1:numel(allowances)
     allowance = allowances(i);
     allowance_total = allowance * config.nh3_target_t;
-    optimistic_cap = reference_upper + allowance_total;
-    conservative_cap = reference_lower + allowance_total;
-
-    optimistic_problem = problem;
-    optimistic_problem.Constraints.O1_cost_limit = ...
-        system_cost_usd <= optimistic_cap;
-    optimistic_problem.Objective = update_count;
-    optimistic = solve_record(optimistic_problem, count_options, 'count', ...
-        reference.solution);
-
-    if abs(reference_upper - reference_lower) <= config.cost_bound_tolerance_usd
-        conservative = optimistic;
-    else
-        conservative_start = [];
-        if reference_upper <= conservative_cap + config.cost_bound_tolerance_usd
-            conservative_start = reference.solution;
-        elseif representative.has_incumbent && ...
-                evaluate(system_cost_usd, representative.solution) <= ...
-                conservative_cap + config.cost_bound_tolerance_usd
-            conservative_start = representative.solution;
-        end
-        conservative_problem = problem;
-        conservative_problem.Constraints.O1_cost_limit = ...
-            system_cost_usd <= conservative_cap;
-        conservative_problem.Objective = update_count;
-        conservative = solve_record(conservative_problem, count_options, ...
-            'count', conservative_start);
-    end
+    cost_cap = reference_upper + allowance_total;
+    economic_start = choose_count_start(economic_start, ...
+        {feasibility.solution, representative.solution}, ...
+        system_cost_usd, cost_cap);
+    fprintf(['[O1] Economic boundary: delta=%g USD/t, cap=%.3f USD, ', ...
+        'warm start K=%g\n'], allowance, cost_cap, ...
+        sum(economic_start.O1_HB_change));
+    economic_problem = problem;
+    economic_problem.Constraints.O1_cost_limit = ...
+        system_cost_usd <= cost_cap;
+    economic_problem.Objective = update_count;
+    boundary = solve_record(economic_problem, count_options, 'count', ...
+        economic_start);
 
     K_lower = 0;
     if isfinite(feasibility.count_lower)
         K_lower = feasibility.count_lower;
     end
-    if isfinite(optimistic.count_lower)
-        K_lower = max(K_lower, optimistic.count_lower);
+    if isfinite(boundary.count_lower)
+        K_lower = max(K_lower, boundary.count_lower);
     end
     K_upper = NaN;
-    if conservative.has_incumbent
-        K_upper = conservative.count_upper;
+    if boundary.has_incumbent
+        K_upper = boundary.count_upper;
+        economic_start = boundary.solution;
     end
     economic(i).allowance_usd_t = allowance;
-    economic(i).budget_lower_usd = conservative_cap;
-    economic(i).budget_upper_usd = optimistic_cap;
+    economic(i).cost_cap_usd = cost_cap;
+    economic(i).reference_uncertainty_usd_t = ...
+        reference_uncertainty_usd_t;
+    economic(i).certified_allowance_usd_t = ...
+        allowance + reference_uncertainty_usd_t;
     economic(i).K_lower = K_lower;
     economic(i).K_upper = K_upper;
     economic(i).is_proven = isfinite(K_lower) && isfinite(K_upper) && ...
         K_lower == K_upper;
-    economic(i).optimistic = optimistic;
-    economic(i).conservative = conservative;
+    economic(i).minimum_updates = boundary;
 end
 study.economic = economic;
 
@@ -200,15 +239,12 @@ end
 study.frontier = frontier;
 
 % 验证
-study.check = struct();
-study.check.reference = solution_check(reference.solution, model, config);
-study.check.minimum_updates = solution_check(...
-    feasibility.solution, model, config);
-if representative.has_incumbent
-    study.check.minimum_updates_representative = solution_check(...
-        representative.solution, model, config);
+if feasibility.is_proven && ...
+        (isempty(economic) || all([economic.is_proven]))
+    study.status = 'complete';
+else
+    study.status = 'complete_with_bounds';
 end
-study.status = 'complete';
 print_summary(study);
 end
 
@@ -217,8 +253,9 @@ function config = validate_config(config)
 defaults = struct('nh3_target_t', 80000, ...
     'cost_allowance_usd_t', [0, 1, 5, 10], 'frontier_k', [], ...
     'max_time_s', 1200, 'cost_relative_gap', 1e-3, ...
-    'count_absolute_gap', 0.99, 'cost_bound_tolerance_usd', 1e-4, ...
-    'change_tolerance', 1e-6, 'display', 'off');
+    'count_absolute_gap', 0.99, 'change_epsilon', 0.01, ...
+    'max_count_bound_width', 20, 'change_tolerance', 1e-6, ...
+    'display', 'off');
 allowed = fieldnames(defaults);
 unknown = setdiff(fieldnames(config), allowed);
 if ~isempty(unknown)
@@ -258,11 +295,16 @@ if ~isscalar(config.count_absolute_gap) || config.count_absolute_gap < 0 || ...
         config.count_absolute_gap >= 1
     error('O1:bad_count_gap', 'count_absolute_gap must be in [0, 1).');
 end
-if ~isscalar(config.cost_bound_tolerance_usd) || ...
-        config.cost_bound_tolerance_usd < 0 || ...
-        ~isfinite(config.cost_bound_tolerance_usd)
-    error('O1:bad_bound_tolerance', ...
-        'cost_bound_tolerance_usd must be finite and nonnegative.');
+if ~isscalar(config.change_epsilon) || config.change_epsilon < 0 || ...
+        ~isfinite(config.change_epsilon)
+    error('O1:bad_change_epsilon', ...
+        'change_epsilon must be a finite nonnegative load fraction.');
+end
+if ~isscalar(config.max_count_bound_width) || ...
+        config.max_count_bound_width < 0 || ...
+        isnan(config.max_count_bound_width)
+    error('O1:bad_count_bound_width', ...
+        'max_count_bound_width must be nonnegative.');
 end
 if ~isscalar(config.change_tolerance) || config.change_tolerance < 0 || ...
         ~isfinite(config.change_tolerance)
@@ -274,6 +316,38 @@ if ~(ischar(config.display) || ...
     error('O1:bad_display', 'display must be text.');
 end
 config.cost_allowance_usd_t = unique(config.cost_allowance_usd_t, 'stable');
+end
+
+function start = add_change_indicators(solution, HB_change, epsilon)
+start = solution;
+changes = evaluate(HB_change, solution);
+start.O1_HB_change = double(abs(changes) > epsilon);
+end
+
+function best = choose_count_start(initial_solution, candidates, ...
+        system_cost_usd, cost_cap)
+all_candidates = [{initial_solution}, candidates];
+best = struct();
+best_count = Inf;
+cost_tolerance = 1e-8 * max(1, abs(cost_cap));
+for i = 1:numel(all_candidates)
+    candidate = all_candidates{i};
+    if ~isstruct(candidate) || isempty(fieldnames(candidate)) || ...
+            ~isfield(candidate, 'O1_HB_change')
+        continue
+    end
+    try
+        candidate_cost = evaluate(system_cost_usd, candidate);
+    catch
+        continue
+    end
+    candidate_count = round(sum(candidate.O1_HB_change));
+    if candidate_cost <= cost_cap + cost_tolerance && ...
+            candidate_count < best_count
+        best = candidate;
+        best_count = candidate_count;
+    end
+end
 end
 
 function record = solve_record(problem, options, objective_kind, initial_solution)
@@ -347,10 +421,17 @@ HB_change = [HB_load(2:end); HB_load(1)] - HB_load;
 NH3_total_t = sum(HB_load) * model.params.HB.nh3_output ...
     * model.params.time.step / model.params.unit.mass_scale;
 check = struct();
-check.actual_updates = sum(abs(HB_change) > config.change_tolerance);
-check.binary_updates = round(sum(solution.O1_HB_change));
+check.raw_updates = sum(abs(HB_change) > config.change_tolerance);
+check.effective_updates = sum(abs(HB_change) > ...
+    config.change_epsilon + config.change_tolerance);
+check.actual_updates = check.effective_updates;
+check.binary_updates = NaN;
+if isfield(solution, 'O1_HB_change')
+    check.binary_updates = round(sum(solution.O1_HB_change));
+end
 check.total_variation = sum(abs(HB_change));
 check.maximum_change = max(abs(HB_change));
+check.change_epsilon = config.change_epsilon;
 check.nh3_total_t = NH3_total_t;
 check.nh3_residual_t = NH3_total_t - config.nh3_target_t;
 P_AEL_start = model.start_power_per_module_kw * solution.SU_AEL;
@@ -372,25 +453,32 @@ function print_summary(study)
 fprintf('\n========== O1 minimum HB load updates ==========\n');
 fprintf('NH3 target: %.3f t over the modeled horizon\n', ...
     study.config.nh3_target_t);
+fprintf('Effective-change epsilon: %.3f%% of nominal HB load\n', ...
+    100 * study.config.change_epsilon);
 if study.reference.has_incumbent
     fprintf('Economic reference: [%.3f, %.3f] USD\n', ...
         study.reference.objective_lower, study.reference.objective_upper);
 else
     fprintf('Economic reference: no incumbent (%s)\n', study.reference.status);
 end
-minimum_updates = study.feasibility.minimum_updates;
-if minimum_updates.has_incumbent
-    fprintf('K_feas: [%g, %g], proven=%d\n', ...
-        minimum_updates.count_lower, minimum_updates.count_upper, ...
-        minimum_updates.is_proven);
-else
-    fprintf('K_feas: no incumbent (%s)\n', minimum_updates.status);
+if isfield(study.feasibility, 'minimum_updates')
+    minimum_updates = study.feasibility.minimum_updates;
+    if minimum_updates.has_incumbent
+        fprintf('K_feas: [%g, %g], proven=%d\n', ...
+            minimum_updates.count_lower, minimum_updates.count_upper, ...
+            minimum_updates.is_proven);
+    else
+        fprintf('K_feas: no incumbent (%s)\n', minimum_updates.status);
+    end
 end
 if isfield(study, 'economic') && ~isempty(study.economic)
     for i = 1:numel(study.economic)
         row = study.economic(i);
-        fprintf('delta=%g USD/t: K_econ=[%g, %g], proven=%d\n', ...
-            row.allowance_usd_t, row.K_lower, row.K_upper, row.is_proven);
+        fprintf(['delta=%g USD/t (certified <= %.6g): ', ...
+            'K_econ=[%g, %g], proven=%d\n'], ...
+            row.allowance_usd_t, row.certified_allowance_usd_t, ...
+            row.K_lower, row.K_upper, row.is_proven);
     end
 end
+fprintf('O1 status: %s\n', study.status);
 end
