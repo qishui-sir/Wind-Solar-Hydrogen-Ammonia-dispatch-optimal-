@@ -1,4 +1,8 @@
-function results = baseline(params,renewable_data)
+function results = baseline(params, renewable_data, algorithm)
+%   BASELINE Build and solve the common wind-hydrogen-ammonia dispatch model.
+%   BASELINE(PARAMS, DATA) keeps the original single-stage economic solve.
+%   BASELINE(PARAMS, DATA, ALGORITHM) passes the unsolved common model to a
+%   function handle, so a study can add constraints without copying this model.
     opts = struct();
     thisFile = mfilename('fullpath');
     rootDir = fileparts(thisFile);
@@ -101,8 +105,10 @@ function results = baseline(params,renewable_data)
     prob.Constraints.sell_rate = ...
         mean(P_sell) <= ...
         params.grid.max_sell * mean(P_total);
-    prob.Constraints.HB_ramp_up = HB_load(2:end) - HB_load(1:end-1) <= HB_ramp;
-    prob.Constraints.HB_ramp_down = HB_load(1:end-1) - HB_load(2:end) <=HB_ramp;
+    prob.Constraints.HB_ramp_up = ...
+        HB_load(2:end) - HB_load(1:end-1) <= HB_ramp * dt;
+    prob.Constraints.HB_ramp_down = ...
+        HB_load(1:end-1) - HB_load(2:end) <= HB_ramp * dt;
     prob.Constraints.curtail = P_curt <= P_total;
     prob.Constraints.curtail_rate = sum(P_curt) * dt <= ...
         params.grid.curtail_limit * annual_renewable;
@@ -167,14 +173,13 @@ function results = baseline(params,renewable_data)
         grid_capacity_cost = params.grid.cap_fee * 12 * P_grid_contract;
     end
     annual_fixed_cost_expr = fixed_cost.base_total + grid_capacity_cost;
+    annual_system_cost = obj_formula + NH3_income + annual_fixed_cost_expr;
     prob.Objective = obj_formula + annual_fixed_cost_expr;
 
-    % The requested optimality tolerance is 1e-4 with no wall-clock cap. If a
-    % horizon cannot reach it, that is a property of the formulation to diagnose,
-    % not a tolerance to relax. Callers may still pass their own values.
     solver_opts = {'Display', 'iter', ...
         'ConstraintTolerance', 1e-5, ...
         'RelativeGapTolerance', 0.02};
+
     if isfield(params, 'solver')
         if isfield(params.solver, 'relative_gap') && ...
                 ~isempty(params.solver.relative_gap)
@@ -198,6 +203,41 @@ function results = baseline(params,renewable_data)
         end
     end
     options = optimoptions('intlinprog', solver_opts{:});
+
+    result_context = struct();
+    result_context.T = T;
+    result_context.dt = dt;
+    result_context.P_total = P_total;
+    result_context.AEL_spec_energy = AEL_spec_energy;
+    result_context.H2_density = H2_density;
+    result_context.NH3_rate = NH3_rate;
+    result_context.HB_power_kw = HB_power_kw;
+    result_context.C_curt = C_curt;
+    result_context.C_purchase = C_purchase;
+    result_context.C_sell = C_sell;
+    result_context.ael_common = ael_common;
+    result_context.N_AEL_initial = N_AEL_initial;
+
+    if nargin >= 3 && ~isempty(algorithm)
+        if ~isa(algorithm, 'function_handle')
+            error('baseline:bad_algorithm', ...
+                'The optional algorithm input must be a function handle.');
+        end
+        model = struct();
+        model.problem = prob;
+        model.variables = struct('HB_load', HB_load);
+        model.expressions = struct( ...
+            'nh3_total_t', NH3_total_kg / params.unit.mass_scale, ...
+            'system_cost_usd', annual_system_cost);
+        model.options = options;
+        model.context = result_context;
+        model.params = params;
+        model.renewable_data = renewable_data;
+        model.start_power_per_module_kw = AEL_start_power_per_module;
+        results = algorithm(model);
+        return
+    end
+
     [sol, fval, exitflag, output] = solve(prob, ...
         'Solver', 'intlinprog', ...
         'Options', options);
@@ -220,19 +260,6 @@ function results = baseline(params,renewable_data)
     disp(['求解状态: ', num2str(exitflag)]);
     disp(output);
 
-    result_context = struct();
-    result_context.T = T;
-    result_context.dt = dt;
-    result_context.P_total = P_total;
-    result_context.AEL_spec_energy = AEL_spec_energy;
-    result_context.H2_density = H2_density;
-    result_context.NH3_rate = NH3_rate;
-    result_context.HB_power_kw = HB_power_kw;
-    result_context.C_curt = C_curt;
-    result_context.C_purchase = C_purchase;
-    result_context.C_sell = C_sell;
-    result_context.ael_common = ael_common;
-    result_context.N_AEL_initial = N_AEL_initial;
     result_context.startup_energy_kwh = sum(sol.P_AEL_start) * dt;
 
     results = feval('results', params, renewable_data, sol, fval, ...
