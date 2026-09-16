@@ -173,7 +173,7 @@ function results = baseline(params, renewable_data, algorithm)
         grid_capacity_cost = params.grid.cap_fee * 12 * P_grid_contract;
     end
     annual_fixed_cost_expr = fixed_cost.base_total + grid_capacity_cost;
-    annual_system_cost = obj_formula + NH3_income + annual_fixed_cost_expr;
+    annual_system_cost = obj_formula + annual_fixed_cost_expr;
     prob.Objective = obj_formula + annual_fixed_cost_expr;
 
     solver_opts = {'Display', 'iter', ...
