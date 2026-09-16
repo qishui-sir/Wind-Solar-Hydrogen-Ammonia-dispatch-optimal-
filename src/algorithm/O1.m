@@ -41,8 +41,6 @@ if config.nh3_target_t < minimum_output_t - target_tolerance || ...
         config.nh3_target_t, minimum_output_t, maximum_output_t);
 end
 
-HB_next = [HB_load(2:end); HB_load(1)];
-HB_change = HB_next - HB_load;
 HB_ramp = params.HB.ramp_rate * dt;
 if config.change_epsilon >= HB_ramp
     error('O1:bad_change_epsilon', ...
@@ -70,14 +68,38 @@ count_options = optimoptions(model.options, ...
 
 study = struct();
 study.method = 'minimum_HB_load_updates';
-study.definition = ['Number of effective hourly HB load set-point changes ', ...
-    'above change_epsilon, including the cyclic last-to-first boundary.'];
+study.definition = ['Number of hourly HB set-point updates. Actual HB load ', ...
+    'may remain within a change_epsilon-wide band around an unchanged ', ...
+    'set-point; the cyclic last-to-first boundary is included.'];
 study.config = config;
 study.output_range_t = [minimum_output_t, maximum_output_t];
+study.progressive_penalty = struct();
 
-% 参考解：无变化次数约束下的最小成本
-fprintf('\n[O1] Stage 1: economic reference without change binaries\n');
-reference_problem = base_problem;
+% 优化变量
+% epsilon定义为同一设定值周围允许的完整调节带宽。z=0时设定值必须
+% 严格不变，避免连续的小幅逐时变化累积成未计数的大幅负荷漂移。
+z = optimvar('O1_HB_change', T, 'Type', 'integer', ...
+    'LowerBound', 0, 'UpperBound', 1);
+HB_setpoint = optimvar('O1_HB_setpoint', T, ...
+    'LowerBound', params.HB.min_load, 'UpperBound', params.HB.max_load);
+setpoint_next = [HB_setpoint(2:end); HB_setpoint(1)];
+setpoint_change = setpoint_next - HB_setpoint;
+tracking_half_band = config.change_epsilon / 2;
+setpoint_change_limit = HB_ramp + config.change_epsilon;
+problem = base_problem;
+problem.Constraints.O1_tracking_up = ...
+    HB_load - HB_setpoint <= tracking_half_band;
+problem.Constraints.O1_tracking_down = ...
+    HB_setpoint - HB_load <= tracking_half_band;
+problem.Constraints.O1_change_up = ...
+    setpoint_change <= setpoint_change_limit * z;
+problem.Constraints.O1_change_down = ...
+    -setpoint_change <= setpoint_change_limit * z;
+update_count = sum(z);
+
+% 求解在经济基础阶段不可达，重新使参考解保留辅助变更变量z
+fprintf('\n[O1] Stage 1: economic reference\n');
+reference_problem = problem;
 reference_problem.Objective = system_cost_usd;
 reference = solve_record(reference_problem, cost_options, 'cost', []);
 study.reference = reference;
@@ -89,27 +111,25 @@ if ~reference.has_incumbent
     print_summary(study);
     return
 end
-
-% 优化变量
-% 若HB负荷变更小于epsilon，则不计入有效变化次数
-z = optimvar('O1_HB_change', T, 'Type', 'integer', ...
-    'LowerBound', 0, 'UpperBound', 1);
-effective_change_limit = config.change_epsilon + ...
-    (HB_ramp - config.change_epsilon) * z;
-problem = base_problem;
-problem.Constraints.O1_change_up = HB_change <= effective_change_limit;
-problem.Constraints.O1_change_down = -HB_change <= effective_change_limit;
-update_count = sum(z);
 reference_count_start = add_change_indicators(reference.solution, ...
-    HB_change, config.change_epsilon);
+    config.change_epsilon, params.HB.min_load, params.HB.max_load);
+reference.solution = reference_count_start;
+study.reference = reference;
+
+% 用逐步增强的变更惩罚生成低K可行解，仅作为严格计数阶段的热启动。
+[feasibility_start, progressive_penalty] = progressive_penalty_start( ...
+    problem, system_cost_usd, update_count, reference_count_start, ...
+    reference.objective_upper, cost_options, config, T, ...
+    params.HB.min_load, params.HB.max_load);
+study.progressive_penalty = progressive_penalty;
 
 % 可行性解：最小化变化次数（无成本约束）
 fprintf(['[O1] Stage 2: minimum feasible effective load updates ', ...
-    '(warm start K=%g)\n'], sum(reference_count_start.O1_HB_change));
+    '(warm start K=%g)\n'], sum(feasibility_start.O1_HB_change));
 feasibility_problem = problem;
 feasibility_problem.Objective = update_count;
 feasibility = solve_record(feasibility_problem, count_options, 'count', ...
-    reference_count_start);
+    feasibility_start);
 study.feasibility = struct('minimum_updates', feasibility);
 
 if ~feasibility.has_incumbent
@@ -254,6 +274,8 @@ defaults = struct('nh3_target_t', 80000, ...
     'cost_allowance_usd_t', [0, 1, 5, 10], 'frontier_k', [], ...
     'max_time_s', 1200, 'cost_relative_gap', 1e-3, ...
     'count_absolute_gap', 0.99, 'change_epsilon', 0.01, ...
+    'penalty_alpha', [0.1, 1, 10], 'penalty_max_time_s', 300, ...
+    'penalty_relative_gap', 0.02, ...
     'max_count_bound_width', 20, 'change_tolerance', 1e-6, ...
     'display', 'off');
 allowed = fieldnames(defaults);
@@ -300,6 +322,22 @@ if ~isscalar(config.change_epsilon) || config.change_epsilon < 0 || ...
     error('O1:bad_change_epsilon', ...
         'change_epsilon must be a finite nonnegative load fraction.');
 end
+if ~isnumeric(config.penalty_alpha) || isempty(config.penalty_alpha) || ...
+        ~isvector(config.penalty_alpha) || ...
+        any(~isfinite(config.penalty_alpha)) || any(config.penalty_alpha <= 0)
+    error('O1:bad_penalty_alpha', ...
+        'penalty_alpha must contain positive finite values.');
+end
+if ~isscalar(config.penalty_max_time_s) || ...
+        ~isfinite(config.penalty_max_time_s) || config.penalty_max_time_s <= 0
+    error('O1:bad_penalty_time', ...
+        'penalty_max_time_s must be a positive finite scalar.');
+end
+if ~isscalar(config.penalty_relative_gap) || ...
+        config.penalty_relative_gap < 0 || config.penalty_relative_gap >= 1
+    error('O1:bad_penalty_gap', ...
+        'penalty_relative_gap must be in [0, 1).');
+end
 if ~isscalar(config.max_count_bound_width) || ...
         config.max_count_bound_width < 0 || ...
         isnan(config.max_count_bound_width)
@@ -316,12 +354,220 @@ if ~(ischar(config.display) || ...
     error('O1:bad_display', 'display must be text.');
 end
 config.cost_allowance_usd_t = unique(config.cost_allowance_usd_t, 'stable');
+config.penalty_alpha = config.penalty_alpha(:).';
 end
 
-function start = add_change_indicators(solution, HB_change, epsilon)
+% 增加渐进惩罚辅助求解，alpha取值为[0.1,1,10]
+function [best_solution, analysis] = progressive_penalty_start( ...
+        problem, system_cost_usd, update_count, initial_solution, ...
+        reference_cost, base_options, config, T, minimum_load, maximum_load)
+alphas = config.penalty_alpha(:);
+cost_scale = max(1, abs(reference_cost));
+penalty_options = optimoptions(base_options, ...
+    'RelativeGapTolerance', config.penalty_relative_gap, ...
+    'MaxTime', config.penalty_max_time_s);
+run_template = struct('alpha', NaN, 'has_incumbent', false, ...
+    'update_count', NaN, 'system_cost_usd', NaN, ...
+    'weighted_objective', NaN, 'relative_gap', NaN, ...
+    'exitflag', NaN, 'status', "not_run", ...
+    'is_best_penalty', false, 'selected_for_stage2', false);
+runs = repmat(run_template, numel(alphas), 1);
+
+best_solution = initial_solution;
+best_count = round(sum(initial_solution.O1_HB_change));
+best_cost = evaluate(system_cost_usd, initial_solution);
+selected_index = 0;
+current_solution = initial_solution;
+best_penalty_index = 0;
+best_penalty_count = Inf;
+best_penalty_cost = Inf;
+
+fprintf(['[O1] Progressive penalty warm start: alpha=[%s], ', ...
+    'time limit=%g s each\n'], num2str(alphas.'), ...
+    config.penalty_max_time_s);
+for i = 1:numel(alphas)
+    alpha = alphas(i);
+    penalty_problem = problem;
+    penalty_problem.Objective = system_cost_usd / cost_scale + ...
+        alpha * update_count / T;
+    record = solve_record(penalty_problem, penalty_options, 'penalty', ...
+        current_solution);
+
+    runs(i).alpha = alpha;
+    runs(i).has_incumbent = record.has_incumbent;
+    runs(i).weighted_objective = record.objective_upper;
+    runs(i).relative_gap = record.relative_gap;
+    runs(i).exitflag = record.exitflag;
+    runs(i).status = record.status;
+    if ~record.has_incumbent
+        fprintf('[O1]   alpha=%g: no incumbent (%s)\n', ...
+            alpha, char(record.status));
+        continue
+    end
+
+    current_solution = record.solution;
+    canonical_solution = add_change_indicators(current_solution, ...
+        config.change_epsilon, minimum_load, maximum_load);
+    if sum(canonical_solution.O1_HB_change) <= ...
+            sum(current_solution.O1_HB_change)
+        current_solution = canonical_solution;
+    end
+    candidate_count = round(sum(current_solution.O1_HB_change));
+    candidate_cost = evaluate(system_cost_usd, current_solution);
+    candidate_objective = candidate_cost / cost_scale + ...
+        alpha * candidate_count / T;
+    runs(i).update_count = candidate_count;
+    runs(i).system_cost_usd = candidate_cost;
+    runs(i).weighted_objective = candidate_objective;
+    fprintf(['[O1]   alpha=%g: K=%g, cost=%.3f USD, ', ...
+        'weighted objective=%.6g, status=%s\n'], ...
+        alpha, candidate_count, candidate_cost, ...
+        candidate_objective, char(record.status));
+
+    penalty_cost_tolerance = 1e-8 * max(1, abs(best_penalty_cost));
+    if candidate_count < best_penalty_count || ...
+            (candidate_count == best_penalty_count && ...
+            candidate_cost < best_penalty_cost - penalty_cost_tolerance)
+        best_penalty_index = i;
+        best_penalty_count = candidate_count;
+        best_penalty_cost = candidate_cost;
+    end
+    cost_tolerance = 1e-8 * max(1, abs(best_cost));
+    if candidate_count < best_count || ...
+            (candidate_count == best_count && ...
+            candidate_cost < best_cost - cost_tolerance)
+        best_solution = current_solution;
+        best_count = candidate_count;
+        best_cost = candidate_cost;
+        selected_index = i;
+    end
+end
+
+if best_penalty_index > 0
+    runs(best_penalty_index).is_best_penalty = true;
+end
+if selected_index > 0
+    runs(selected_index).selected_for_stage2 = true;
+    selected_source = "progressive_penalty";
+    selected_alpha = alphas(selected_index);
+else
+    selected_source = "economic_reference";
+    selected_alpha = NaN;
+end
+analysis = struct('objective_definition', ...
+    "system_cost_usd/cost_scale + alpha*update_count/T", ...
+    'cost_scale_usd', cost_scale, ...
+    'initial_update_count', ...
+    round(sum(initial_solution.O1_HB_change)), ...
+    'initial_system_cost_usd', ...
+    evaluate(system_cost_usd, initial_solution), ...
+    'runs', runs, 'best_penalty_alpha', NaN, ...
+    'best_penalty_update_count', NaN, ...
+    'best_penalty_system_cost_usd', NaN, ...
+    'selected_source', selected_source, ...
+    'selected_alpha', selected_alpha, ...
+    'selected_update_count', best_count, ...
+    'selected_system_cost_usd', best_cost);
+if best_penalty_index > 0
+    analysis.best_penalty_alpha = alphas(best_penalty_index);
+    analysis.best_penalty_update_count = best_penalty_count;
+    analysis.best_penalty_system_cost_usd = best_penalty_cost;
+end
+fprintf('[O1] Selected Stage 2 warm start: source=%s, alpha=%g, K=%g\n', ...
+    char(selected_source), selected_alpha, best_count);
+end
+
+% 初始解替换为区间交集合并
+function start = add_change_indicators(solution, epsilon, minimum_load, ...
+        maximum_load)
 start = solution;
-changes = evaluate(HB_change, solution);
-start.O1_HB_change = double(abs(changes) > epsilon);
+HB_load = solution.HB_load(:);
+interval_lower = max(minimum_load, HB_load - epsilon / 2);
+interval_upper = min(maximum_load, HB_load + epsilon / 2);
+
+[setpoint, platform_starts] = merge_load_intervals(...
+    interval_lower, interval_upper, 1);
+candidate_starts = unique([1; platform_starts(:)], 'stable');
+if epsilon == 0
+    candidate_starts = 1;
+end
+best_count = sum(abs([setpoint(2:end); setpoint(1)] - setpoint) > 1e-12);
+best_variation = sum(abs([setpoint(2:end); setpoint(1)] - setpoint));
+for i = 2:numel(candidate_starts)
+    candidate = merge_load_intervals(interval_lower, interval_upper, ...
+        candidate_starts(i));
+    candidate_change = [candidate(2:end); candidate(1)] - candidate;
+    candidate_count = sum(abs(candidate_change) > 1e-12);
+    candidate_variation = sum(abs(candidate_change));
+    if candidate_count < best_count || ...
+            (candidate_count == best_count && ...
+            candidate_variation < best_variation)
+        setpoint = candidate;
+        best_count = candidate_count;
+        best_variation = candidate_variation;
+    end
+end
+setpoint_change = [setpoint(2:end); setpoint(1)] - setpoint;
+start.O1_HB_setpoint = setpoint;
+start.O1_HB_change = double(abs(setpoint_change) > 1e-12);
+end
+
+function [setpoint, platform_starts] = merge_load_intervals(...
+        interval_lower, interval_upper, first_hour)
+T = numel(interval_lower);
+order = [first_hour:T, 1:first_hour-1];
+segment_first = 1;
+segment_count = 0;
+segment_lower = zeros(T, 1);
+segment_upper = zeros(T, 1);
+segment_ranges = zeros(T, 2);
+current_lower = interval_lower(order(1));
+current_upper = interval_upper(order(1));
+
+for position = 2:T
+    next_lower = max(current_lower, interval_lower(order(position)));
+    next_upper = min(current_upper, interval_upper(order(position)));
+    if next_lower <= next_upper + 1e-12
+        current_lower = next_lower;
+        current_upper = next_upper;
+    else
+        segment_count = segment_count + 1;
+        segment_lower(segment_count) = current_lower;
+        segment_upper(segment_count) = current_upper;
+        segment_ranges(segment_count, :) = [segment_first, position - 1];
+        segment_first = position;
+        current_lower = interval_lower(order(position));
+        current_upper = interval_upper(order(position));
+    end
+end
+segment_count = segment_count + 1;
+segment_lower(segment_count) = current_lower;
+segment_upper(segment_count) = current_upper;
+segment_ranges(segment_count, :) = [segment_first, T];
+
+segment_lower = segment_lower(1:segment_count);
+segment_upper = segment_upper(1:segment_count);
+segment_ranges = segment_ranges(1:segment_count, :);
+merge_ends = false;
+if segment_count > 1
+    merged_lower = max(segment_lower(1), segment_lower(end));
+    merged_upper = min(segment_upper(1), segment_upper(end));
+    merge_ends = merged_lower <= merged_upper + 1e-12;
+end
+
+setpoint = zeros(T, 1);
+platform_starts = zeros(segment_count, 1);
+for segment = 1:segment_count
+    value = (segment_lower(segment) + segment_upper(segment)) / 2;
+    if merge_ends && (segment == 1 || segment == segment_count)
+        value = (merged_lower + merged_upper) / 2;
+    end
+    positions = segment_ranges(segment, 1):segment_ranges(segment, 2);
+    hours = order(positions);
+    setpoint(hours) = value;
+    platform_starts(segment) = hours(1);
+end
+platform_starts = unique(platform_starts, 'stable');
 end
 
 function best = choose_count_start(initial_solution, candidates, ...
@@ -404,11 +650,15 @@ if strcmp(objective_kind, 'count')
     record.count_upper = round(sum(solution.O1_HB_change));
     record.count_lower = max(0, ceil(record.objective_lower - 1e-7));
     record.is_proven = record.count_lower == record.count_upper;
+elseif strcmp(objective_kind, 'penalty')
+    record.is_proven = false;
 else
     record.is_proven = exitflag > 0 && record.absolute_gap <= ...
         max(1e-7, eps(abs(fval)));
 end
-if record.is_proven
+if strcmp(objective_kind, 'penalty')
+    record.status = "heuristic_incumbent";
+elseif record.is_proven
     record.status = "proven";
 else
     record.status = "incumbent_with_bound";
@@ -422,10 +672,20 @@ NH3_total_t = sum(HB_load) * model.params.HB.nh3_output ...
     * model.params.time.step / model.params.unit.mass_scale;
 check = struct();
 check.raw_updates = sum(abs(HB_change) > config.change_tolerance);
-check.effective_updates = sum(abs(HB_change) > ...
-    config.change_epsilon + config.change_tolerance);
-check.actual_updates = check.effective_updates;
+check.setpoint_updates = NaN;
+check.effective_updates = NaN;
+check.actual_updates = NaN;
 check.binary_updates = NaN;
+check.max_tracking_deviation = NaN;
+if isfield(solution, 'O1_HB_setpoint')
+    HB_setpoint = solution.O1_HB_setpoint(:);
+    setpoint_change = [HB_setpoint(2:end); HB_setpoint(1)] - HB_setpoint;
+    check.setpoint_updates = sum(abs(setpoint_change) > ...
+        config.change_tolerance);
+    check.effective_updates = check.setpoint_updates;
+    check.actual_updates = check.setpoint_updates;
+    check.max_tracking_deviation = max(abs(HB_load - HB_setpoint));
+end
 if isfield(solution, 'O1_HB_change')
     check.binary_updates = round(sum(solution.O1_HB_change));
 end
@@ -453,7 +713,7 @@ function print_summary(study)
 fprintf('\n========== O1 minimum HB load updates ==========\n');
 fprintf('NH3 target: %.3f t over the modeled horizon\n', ...
     study.config.nh3_target_t);
-fprintf('Effective-change epsilon: %.3f%% of nominal HB load\n', ...
+fprintf('HB set-point tracking band epsilon: %.3f%% of nominal load\n', ...
     100 * study.config.change_epsilon);
 if study.reference.has_incumbent
     fprintf('Economic reference: [%.3f, %.3f] USD\n', ...

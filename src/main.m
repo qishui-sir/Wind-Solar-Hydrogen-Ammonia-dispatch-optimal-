@@ -32,6 +32,9 @@ o1_config.max_time_s = 1200;
 o1_config.cost_relative_gap = 1e-3;
 o1_config.count_absolute_gap = 0.99;
 o1_config.change_epsilon = 0.01; % 1% nominal HB-load scheduling deadband.
+o1_config.penalty_alpha = [0.1, 1, 10];
+o1_config.penalty_max_time_s = 300;
+o1_config.penalty_relative_gap = 0.02;
 o1_config.max_count_bound_width = 20;
 o1_config.display = 'iter';
 fprintf('[main] baseline relative gap=%.4f; O1 cost gap=%.4f; ', ...
