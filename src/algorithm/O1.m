@@ -94,10 +94,33 @@ function study = O1(model, config)
     update_count = sum(z);
 
     % 经济基础阶段
+    %  删除经济惩罚
+    %   加入缓存重载经济基础阶段的结果，避免重复求解
     fprintf('\n[O1] Stage 1: economic reference\n');
-    reference_problem = problem;
-    reference_problem.Objective = system_cost_usd;
-    reference = solve_record(reference_problem, cost_options, 'cost', []);
+    stage1_cache_file = fullfile(pwd, 'O1_stage1_cache.mat');
+    use_cache = true;   % 改成 false 可强制重算 Stage 1
+    cache_signature = build_stage1_cache_signature(config, params);
+    reference = struct();
+    if use_cache && isfile(stage1_cache_file)
+        loaded = load(stage1_cache_file);
+        [cache_is_valid, cache_reason] = validate_stage1_cache(loaded, ...
+            cache_signature, T, config.cost_relative_gap);
+        if cache_is_valid
+            reference = loaded.reference;
+            fprintf('[O1] Stage 1 loaded from cache: %s\n', stage1_cache_file);
+        else
+            fprintf('[O1] Stage 1 cache ignored: %s\n', cache_reason);
+        end
+    end
+    if isempty(fieldnames(reference)) || ~reference.has_incumbent
+        reference_problem = problem;
+        reference_problem.Objective = system_cost_usd;
+        reference = solve_record(reference_problem, cost_options, 'cost', []);
+        if reference.has_incumbent
+            save(stage1_cache_file, 'reference', 'cache_signature');
+            fprintf('[O1] Stage 1 result cached to: %s\n', stage1_cache_file);
+        end
+    end
     study.reference = reference;
     study.feasibility = struct();
     study.economic = struct([]);
@@ -112,20 +135,14 @@ function study = O1(model, config)
     reference.solution = reference_count_start;
     study.reference = reference;
 
-    % 用逐步增强的变更惩罚生成低K可行解，仅作为严格计数阶段的热启动。
-    [feasibility_start, progressive_penalty] = progressive_penalty_start( ...
-        problem, system_cost_usd, update_count, reference_count_start, ...
-        reference.objective_upper, cost_options, config, T, ...
-        params.HB.min_load, params.HB.max_load);
-    study.progressive_penalty = progressive_penalty;
-
     % 可行性解：最小化变化次数（无成本约束）
     fprintf(['[O1] Stage 2: minimum feasible effective load updates ', ...
-        '(warm start K=%g)\n'], sum(feasibility_start.O1_HB_change));
+    '(warm start K=%g from economic reference)\n'], ...
+    sum(reference_count_start.O1_HB_change));
     feasibility_problem = problem;
     feasibility_problem.Objective = update_count;
     feasibility = solve_record(feasibility_problem, count_options, 'count', ...
-        feasibility_start);
+        reference_count_start);
     study.feasibility = struct('minimum_updates', feasibility);
 
     if ~feasibility.has_incumbent
@@ -353,124 +370,69 @@ config.cost_allowance_usd_t = unique(config.cost_allowance_usd_t, 'stable');
 config.penalty_alpha = config.penalty_alpha(:).';
 end
 
-% 增加渐进惩罚辅助求解，alpha取值为[0.1,1,10]
-function [best_solution, analysis] = progressive_penalty_start( ...
-        problem, system_cost_usd, update_count, initial_solution, ...
-        reference_cost, base_options, config, T, minimum_load, maximum_load)
-alphas = config.penalty_alpha(:);
-cost_scale = max(1, abs(reference_cost));
-penalty_options = optimoptions(base_options, ...
-    'RelativeGapTolerance', config.penalty_relative_gap, ...
-    'MaxTime', config.penalty_max_time_s);
-run_template = struct('alpha', NaN, 'has_incumbent', false, ...
-    'update_count', NaN, 'system_cost_usd', NaN, ...
-    'weighted_objective', NaN, 'relative_gap', NaN, ...
-    'exitflag', NaN, 'status', "not_run", ...
-    'is_best_penalty', false, 'selected_for_stage2', false);
-runs = repmat(run_template, numel(alphas), 1);
-
-best_solution = initial_solution;
-best_count = round(sum(initial_solution.O1_HB_change));
-best_cost = evaluate(system_cost_usd, initial_solution);
-selected_index = 0;
-current_solution = initial_solution;
-best_penalty_index = 0;
-best_penalty_count = Inf;
-best_penalty_cost = Inf;
-
-fprintf(['[O1] Progressive penalty warm start: alpha=[%s], ', ...
-    'time limit=%g s each\n'], num2str(alphas.'), ...
-    config.penalty_max_time_s);
-for i = 1:numel(alphas)
-    alpha = alphas(i);
-    penalty_problem = problem;
-    penalty_problem.Objective = system_cost_usd / cost_scale + ...
-        alpha * update_count / T;
-    record = solve_record(penalty_problem, penalty_options, 'penalty', ...
-        current_solution);
-
-    runs(i).alpha = alpha;
-    runs(i).has_incumbent = record.has_incumbent;
-    runs(i).weighted_objective = record.objective_upper;
-    runs(i).relative_gap = record.relative_gap;
-    runs(i).exitflag = record.exitflag;
-    runs(i).status = record.status;
-    if ~record.has_incumbent
-        fprintf('[O1]   alpha=%g: no incumbent (%s)\n', ...
-            alpha, char(record.status));
-        continue
-    end
-
-    current_solution = record.solution;
-    canonical_solution = add_change_indicators(current_solution, ...
-        config.change_epsilon, minimum_load, maximum_load);
-    if sum(canonical_solution.O1_HB_change) <= ...
-            sum(current_solution.O1_HB_change)
-        current_solution = canonical_solution;
-    end
-    candidate_count = round(sum(current_solution.O1_HB_change));
-    candidate_cost = evaluate(system_cost_usd, current_solution);
-    candidate_objective = candidate_cost / cost_scale + ...
-        alpha * candidate_count / T;
-    runs(i).update_count = candidate_count;
-    runs(i).system_cost_usd = candidate_cost;
-    runs(i).weighted_objective = candidate_objective;
-    fprintf(['[O1]   alpha=%g: K=%g, cost=%.3f USD, ', ...
-        'weighted objective=%.6g, status=%s\n'], ...
-        alpha, candidate_count, candidate_cost, ...
-        candidate_objective, char(record.status));
-
-    penalty_cost_tolerance = 1e-8 * max(1, abs(best_penalty_cost));
-    if candidate_count < best_penalty_count || ...
-            (candidate_count == best_penalty_count && ...
-            candidate_cost < best_penalty_cost - penalty_cost_tolerance)
-        best_penalty_index = i;
-        best_penalty_count = candidate_count;
-        best_penalty_cost = candidate_cost;
-    end
-    cost_tolerance = 1e-8 * max(1, abs(best_cost));
-    if candidate_count < best_count || ...
-            (candidate_count == best_count && ...
-            candidate_cost < best_cost - cost_tolerance)
-        best_solution = current_solution;
-        best_count = candidate_count;
-        best_cost = candidate_cost;
-        selected_index = i;
-    end
+% Stage1缓存签名：用于验证缓存的有效性
+function signature = build_stage1_cache_signature(config, params)
+signature = struct();
+signature.schema_version = 1;
+signature.nh3_target_t = config.nh3_target_t;
+signature.change_epsilon = config.change_epsilon;
+signature.model_parameters = struct( ...
+    'time_step', params.time.step, ...
+    'unit', params.unit, ...
+    'renewable_capacity', struct( ...
+        'PV_capacity', params.renewable.PV_capacity, ...
+        'PW_capacity', params.renewable.PW_capacity), ...
+    'finance', params.finance, ...
+    'pw', params.pw, ...
+    'pv', params.pv, ...
+    'h2_storage', params.h2_storage, ...
+    'ammonia', params.ammonia, ...
+    'material', params.material, ...
+    'labor', params.labor, ...
+    'converter', params.converter, ...
+    'transformer', params.transformer, ...
+    'grid', params.grid, ...
+    'environment', params.environment, ...
+    'AEL_common', params.AEL.common, ...
+    'HB', params.HB);
 end
 
-if best_penalty_index > 0
-    runs(best_penalty_index).is_best_penalty = true;
+function [is_valid, reason] = validate_stage1_cache(loaded, ...
+        expected_signature, expected_length, requested_relative_gap)
+is_valid = false;
+reason = 'missing cache metadata';
+if ~isstruct(loaded) || ~isfield(loaded, 'reference') || ...
+        ~isfield(loaded, 'cache_signature')
+    return
 end
-if selected_index > 0
-    runs(selected_index).selected_for_stage2 = true;
-    selected_source = "progressive_penalty";
-    selected_alpha = alphas(selected_index);
-else
-    selected_source = "economic_reference";
-    selected_alpha = NaN;
+if ~isequaln(loaded.cache_signature, expected_signature)
+    reason = 'production target or model parameters changed';
+    return
 end
-analysis = struct('objective_definition', ...
-    "system_cost_usd/cost_scale + alpha*update_count/T", ...
-    'cost_scale_usd', cost_scale, ...
-    'initial_update_count', ...
-    round(sum(initial_solution.O1_HB_change)), ...
-    'initial_system_cost_usd', ...
-    evaluate(system_cost_usd, initial_solution), ...
-    'runs', runs, 'best_penalty_alpha', NaN, ...
-    'best_penalty_update_count', NaN, ...
-    'best_penalty_system_cost_usd', NaN, ...
-    'selected_source', selected_source, ...
-    'selected_alpha', selected_alpha, ...
-    'selected_update_count', best_count, ...
-    'selected_system_cost_usd', best_cost);
-if best_penalty_index > 0
-    analysis.best_penalty_alpha = alphas(best_penalty_index);
-    analysis.best_penalty_update_count = best_penalty_count;
-    analysis.best_penalty_system_cost_usd = best_penalty_cost;
+
+reference = loaded.reference;
+reason = 'cached reference is incomplete';
+if ~isstruct(reference) || ~isfield(reference, 'has_incumbent') || ...
+        ~reference.has_incumbent || ~isfield(reference, 'solution') || ...
+        ~isstruct(reference.solution) || ...
+        ~isfield(reference.solution, 'HB_load') || ...
+        numel(reference.solution.HB_load) ~= expected_length
+    return
 end
-fprintf('[O1] Selected Stage 2 warm start: source=%s, alpha=%g, K=%g\n', ...
-    char(selected_source), selected_alpha, best_count);
+
+reason = 'cached cost bound is looser than requested';
+if isfield(reference, 'is_proven') && reference.is_proven
+    is_valid = true;
+elseif requested_relative_gap > 0 && ...
+        isfield(reference, 'relative_gap') && ...
+        isscalar(reference.relative_gap) && ...
+        isfinite(reference.relative_gap) && ...
+        reference.relative_gap <= requested_relative_gap + 1e-12
+    is_valid = true;
+end
+if is_valid
+    reason = '';
+end
 end
 
 % 初始解替换为区间交集合并
