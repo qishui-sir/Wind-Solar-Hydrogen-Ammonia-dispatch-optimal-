@@ -59,11 +59,6 @@ function study = O1(model, config)
     cost_options = optimoptions(model.options, ...
         'RelativeGapTolerance', config.cost_relative_gap, ...
         'MaxTime', config.max_time_s, 'Display', config.display);
-    count_options = optimoptions(model.options, ...
-        'RelativeGapTolerance', 0, ...
-        'AbsoluteGapTolerance', config.count_absolute_gap, ...
-        'MaxTime', config.max_time_s, 'Display', config.display);
-
     study = struct();
     study.method = 'minimum_HB_load_updates';
     study.definition = ['Number of hourly HB set-point updates. Actual HB load ', ...
@@ -135,56 +130,44 @@ function study = O1(model, config)
     reference.solution = reference_count_start;
     study.reference = reference;
 
-    % 可行性解：最小化变化次数（无成本约束）
-    fprintf(['[O1] Stage 2: minimum feasible effective load updates ', ...
-    '(warm start K=%g from economic reference)\n'], ...
-    sum(reference_count_start.O1_HB_change));
-    feasibility_problem = problem;
-    feasibility_problem.Objective = update_count;
-    feasibility = solve_record(feasibility_problem, count_options, 'count', ...
-        reference_count_start);
-    study.feasibility = struct('minimum_updates', feasibility);
+    % 固定K求最小成本，并复用同一份求解器矩阵。
+    K_reference = round(sum(reference_count_start.O1_HB_change));
+    fprintf('[O1] Stage 2: fixed-K cost search, initial K=%g\n', K_reference);
+    cost_at_k_problem = problem;
+    cost_at_k_problem.Constraints.O1_update_limit = update_count <= T;
+    cost_at_k_problem.Objective = system_cost_usd;
+    [fixed_k_solver, build_time_s] = build_fixed_k_solver( ...
+        cost_at_k_problem, cost_options, reference_count_start, T);
+    point_cache = initialize_k_cache(reference, reference_count_start, ...
+        K_reference);
+    [feasibility, point_cache] = search_feasibility_boundary( ...
+        fixed_k_solver, point_cache, K_reference, config, params);
+    study.feasibility = feasibility;
+    study.search = struct('method', "cost_at_fixed_K", ...
+        'solver_model_build_count', 1, ...
+        'solver_model_build_time_s', build_time_s, 'points', table());
 
-    if ~feasibility.has_incumbent
-        study.status = 'incomplete_no_incumbent';
-        print_summary(study);
-        return
-    end
-
-    K_feas_upper = feasibility.count_upper;
-    study.feasibility.K_lower = feasibility.count_lower;
-    study.feasibility.K_upper = K_feas_upper;
-    study.feasibility.bound_width = ...
-        K_feas_upper - feasibility.count_lower;
-    study.feasibility.is_proven = feasibility.is_proven;
     study.check = struct();
     study.check.reference = solution_check(reference.solution, model, config);
-    study.check.minimum_updates = solution_check(...
-        feasibility.solution, model, config);
+    if feasibility.minimum_updates.has_incumbent
+        study.check.minimum_updates = solution_check( ...
+            feasibility.minimum_updates.solution, model, config);
+    end
 
-    % 当K_feas区间仍过宽时，继续求成本边界只会重复日志中已经观察到的
-    % 根节点超时。保留上下界并停止，先改善核心计数问题。
-    if ~isfinite(study.feasibility.bound_width) || ...
-            study.feasibility.bound_width > config.max_count_bound_width
+    if ~isfinite(feasibility.bound_width) || ...
+            feasibility.bound_width > config.max_count_bound_width
+        study.search.points = k_cache_table(point_cache);
         fprintf(['[O1] Stop after Stage 2: K_feas bound width %g exceeds ', ...
-            'the configured limit %g.\n'], study.feasibility.bound_width, ...
+            'the configured limit %g.\n'], feasibility.bound_width, ...
             config.max_count_bound_width);
         study.status = 'incomplete_feasibility_bound';
         print_summary(study);
         return
     end
 
-    % 在当前已证明的K_feas区间上界内求成本最低的代表性调度。
-    fprintf('[O1] Stage 3: minimum cost with K <= %g\n', K_feas_upper);
-    representative_problem = problem;
-    representative_problem.Constraints.O1_update_limit = ...
-        update_count <= K_feas_upper;
-    representative_problem.Objective = system_cost_usd;
-    representative = solve_record(representative_problem, cost_options, 'cost', ...
-        feasibility.solution);
-    study.feasibility.minimum_cost_at_upper_bound = representative;
+    representative = feasibility.minimum_cost_at_upper_bound;
     if representative.has_incumbent
-        study.check.minimum_updates_representative = solution_check(...
+        study.check.minimum_updates_representative = solution_check( ...
             representative.solution, model, config);
     end
 
@@ -196,54 +179,26 @@ function study = O1(model, config)
         return
     end
 
-    % 从Uc + deltaQ和Lc + deltaQ的成本上下限中，取成本上限，减少下限MILP的求解已提高求解效率。
-    % 经济性分析：使用已知可行的经济参考上界作为统一成本锚点。相对于
-    % 并对未知真最优值的最大附加误差单独报告，避免每个delta重复求解上下界。
+    % 用成本上下界判定每个K是否满足经济预算。
     allowances = config.cost_allowance_usd_t(:);
-    economic = repmat(struct(), numel(allowances), 1);
+    economic = struct([]);
     reference_uncertainty_usd_t = ...
         (reference_upper - reference_lower) / config.nh3_target_t;
-    economic_start = reference_count_start;
     for i = 1:numel(allowances)
         allowance = allowances(i);
-        allowance_total = allowance * config.nh3_target_t;
-        cost_cap = reference_upper + allowance_total;
-        economic_start = choose_count_start(economic_start, ...
-            {feasibility.solution, representative.solution}, ...
-            system_cost_usd, cost_cap);
-        fprintf(['[O1] Economic boundary: delta=%g USD/t, cap=%.3f USD, ', ...
-            'warm start K=%g\n'], allowance, cost_cap, ...
-            sum(economic_start.O1_HB_change));
-        economic_problem = problem;
-        economic_problem.Constraints.O1_cost_limit = ...
-            system_cost_usd <= cost_cap;
-        economic_problem.Objective = update_count;
-        boundary = solve_record(economic_problem, count_options, 'count', ...
-            economic_start);
-
-        K_lower = 0;
-        if isfinite(feasibility.count_lower)
-            K_lower = feasibility.count_lower;
-        end
-        if isfinite(boundary.count_lower)
-            K_lower = max(K_lower, boundary.count_lower);
-        end
-        K_upper = NaN;
-        if boundary.has_incumbent
-            K_upper = boundary.count_upper;
-            economic_start = boundary.solution;
-        end
-        economic(i).allowance_usd_t = allowance;
-        economic(i).cost_cap_usd = cost_cap;
-        economic(i).reference_uncertainty_usd_t = ...
+        fprintf('[O1] Economic boundary: delta=%g USD/t\n', allowance);
+        [economic_row, point_cache] = search_economic_boundary( ...
+            fixed_k_solver, point_cache, feasibility, K_reference, ...
+            allowance, reference_lower, reference_upper, config, params);
+        economic_row.reference_uncertainty_usd_t = ...
             reference_uncertainty_usd_t;
-        economic(i).certified_allowance_usd_t = ...
+        economic_row.certified_allowance_usd_t = ...
             allowance + reference_uncertainty_usd_t;
-        economic(i).K_lower = K_lower;
-        economic(i).K_upper = K_upper;
-        economic(i).is_proven = isfinite(K_lower) && isfinite(K_upper) && ...
-            K_lower == K_upper;
-        economic(i).minimum_updates = boundary;
+        if isempty(economic)
+            economic = economic_row;
+        else
+            economic(i, 1) = economic_row;
+        end
     end
     study.economic = economic;
 
@@ -255,11 +210,8 @@ function study = O1(model, config)
         'VariableNames', {'K', 'cost_lower_usd', 'cost_upper_usd', ...
         'premium_lower_usd_t', 'premium_upper_usd_t', 'status'});
     for i = 1:numel(frontier_K)
-        frontier_problem = problem;
-        frontier_problem.Constraints.O1_update_limit = ...
-            update_count <= frontier_K(i);
-        frontier_problem.Objective = system_cost_usd;
-        point = solve_record(frontier_problem, cost_options, 'cost', []);
+        [point, point_cache] = get_k_point(fixed_k_solver, point_cache, ...
+            frontier_K(i), config, params);
         frontier.K(i) = frontier_K(i);
         frontier.cost_lower_usd(i) = point.objective_lower;
         frontier.cost_upper_usd(i) = point.objective_upper;
@@ -270,9 +222,10 @@ function study = O1(model, config)
         frontier.status(i) = point.status;
     end
     study.frontier = frontier;
+    study.search.points = k_cache_table(point_cache);
 
     % 验证
-    if feasibility.is_proven && ...
+    if study.feasibility.is_proven && ...
             (isempty(economic) || all([economic.is_proven]))
         study.status = 'complete';
     else
@@ -289,7 +242,8 @@ defaults = struct('nh3_target_t', 80000, ...
     'count_absolute_gap', 0.99, 'change_epsilon', 0.01, ...
     'penalty_alpha', [0.1, 1, 10], 'penalty_max_time_s', 300, ...
     'penalty_relative_gap', 0.02, ...
-    'max_count_bound_width', 20, 'change_tolerance', 1e-6, ...
+    'max_count_bound_width', 20, 'max_k_search_points', 16, ...
+    'change_tolerance', 1e-6, ...
     'display', 'off');
 allowed = fieldnames(defaults);
 unknown = setdiff(fieldnames(config), allowed);
@@ -357,6 +311,13 @@ if ~isscalar(config.max_count_bound_width) || ...
     error('O1:bad_count_bound_width', ...
         'max_count_bound_width must be nonnegative.');
 end
+if ~isscalar(config.max_k_search_points) || ...
+        ~isfinite(config.max_k_search_points) || ...
+        config.max_k_search_points < 1 || ...
+        abs(config.max_k_search_points - round(config.max_k_search_points)) > 1e-9
+    error('O1:bad_k_search_points', ...
+        'max_k_search_points must be a positive integer.');
+end
 if ~isscalar(config.change_tolerance) || config.change_tolerance < 0 || ...
         ~isfinite(config.change_tolerance)
     error('O1:bad_change_tolerance', ...
@@ -370,10 +331,351 @@ config.cost_allowance_usd_t = unique(config.cost_allowance_usd_t, 'stable');
 config.penalty_alpha = config.penalty_alpha(:).';
 end
 
+% 把 problem-based 模型一次性转成 solver-based 矩阵
+% 固定K模型只转换一次，后续仅修改次数约束右端项。
+function [solver_data, elapsed_s] = build_fixed_k_solver( ...
+        problem, options, initial_solution, maximum_K)
+started = tic;
+solver_problem = prob2struct(problem, initial_solution, ...
+    'Solver', 'intlinprog');
+solver_problem.options = options;
+indices = varindex(problem);
+z_indices = indices.O1_HB_change(:);
+A = solver_problem.Aineq;
+z_block = A(:, z_indices);
+row_nnz = full(sum(spones(A), 2));
+z_nnz = full(sum(spones(z_block), 2));
+candidates = find(row_nnz == numel(z_indices) & ...
+    z_nnz == numel(z_indices));
+
+update_row = NaN;
+update_coefficient = NaN;
+for i = 1:numel(candidates)
+    row = candidates(i);
+    values = full(A(row, z_indices));
+    coefficient = values(1);
+    if coefficient > 0 && ...
+            max(abs(values - coefficient)) <= 1e-12 && ...
+            abs(solver_problem.bineq(row) / coefficient - maximum_K) <= 1e-8
+        update_row = row;
+        update_coefficient = coefficient;
+        break
+    end
+end
+if ~isfinite(update_row)
+    error('O1:update_row_not_found', ...
+        'Cannot locate the fixed-K constraint in the solver matrix.');
+end
+
+solver_data = struct('problem', solver_problem, 'indices', indices, ...
+    'update_row', update_row, ...
+    'update_coefficient', update_coefficient);
+elapsed_s = toc(started);
+end
+
+% 经济参考解Stage1的结果初始化K缓存
+function cache = initialize_k_cache(reference, solution, K)
+record = reference;
+record.objective_kind = 'cost';
+record.solution = solution;
+record.count_upper = K;
+record.count_lower = NaN;
+record.solve_backend = "problem_reference";
+record.is_infeasible = false;
+record.K_limit = K;
+cache = struct('K', K, 'record', record, 'source', "reference");
+end
+
+% 在[K_lower, K_upper]二分搜索最小可行变化次数
+function [summary, cache] = search_feasibility_boundary( ...
+        solver_data, cache, K_reference, config, params)
+lower_infeasible = -1;
+upper_feasible = K_reference;
+best_record = cache(1).record;
+trace_K = zeros(0, 1);
+trace_status = strings(0, 1);
+
+for iteration = 1:config.max_k_search_points
+    if upper_feasible - lower_infeasible <= 1
+        break
+    end
+    K = floor((lower_infeasible + upper_feasible) / 2);
+    [record, cache] = get_k_point(solver_data, cache, K, config, params);
+    trace_K(end + 1, 1) = K; %#ok<AGROW>
+    if record.has_incumbent
+        upper_feasible = K;
+        best_record = record;
+        trace_status(end + 1, 1) = "feasible"; %#ok<AGROW>
+    elseif record.is_infeasible
+        lower_infeasible = K;
+        trace_status(end + 1, 1) = "infeasible"; %#ok<AGROW>
+    else
+        trace_status(end + 1, 1) = "unknown"; %#ok<AGROW>
+        break
+    end
+end
+
+K_lower = lower_infeasible + 1;
+K_upper = upper_feasible;
+minimum_updates = make_count_summary( ...
+    K_lower, K_upper, best_record, "fixed_k_feasibility_search");
+summary = struct();
+summary.minimum_updates = minimum_updates;
+summary.minimum_cost_at_upper_bound = best_record;
+summary.K_lower = K_lower;
+summary.K_upper = K_upper;
+summary.bound_width = K_upper - K_lower;
+summary.is_proven = K_lower == K_upper;
+summary.search = table(trace_K, trace_status, ...
+    'VariableNames', {'K', 'classification'});
+end
+
+% 在给定成本允许量δ下，二分搜索满足成本预算的最小K。
+function [economic, cache] = search_economic_boundary( ...
+        solver_data, cache, feasibility, K_reference, allowance, ...
+        reference_lower, reference_upper, config, params)
+allowance_total = allowance * config.nh3_target_t;
+cost_cap = reference_upper + allowance_total;
+lower_infeasible = feasibility.K_lower - 1;
+upper_feasible = K_reference;
+[best_record, cache] = get_k_point( ...
+    solver_data, cache, K_reference, config, params);
+trace_K = zeros(0, 1);
+trace_status = strings(0, 1);
+
+% 复用已有K点，先收紧经济边界。
+for i = 1:numel(cache)
+    K = cache(i).K;
+    classification = classify_cost_point(cache(i).record, cost_cap);
+    if classification == "feasible" && K < upper_feasible
+        upper_feasible = K;
+        best_record = cache(i).record;
+    elseif classification == "infeasible" && ...
+            K > lower_infeasible && K < upper_feasible
+        lower_infeasible = K;
+    end
+end
+
+for iteration = 1:config.max_k_search_points
+    if upper_feasible - lower_infeasible <= 1
+        break
+    end
+    K = floor((lower_infeasible + upper_feasible) / 2);
+    [record, cache] = get_k_point(solver_data, cache, K, config, params);
+    classification = classify_cost_point(record, cost_cap);
+    trace_K(end + 1, 1) = K; %#ok<AGROW>
+    trace_status(end + 1, 1) = classification; %#ok<AGROW>
+    if classification == "feasible"
+        upper_feasible = K;
+        best_record = record;
+    elseif classification == "infeasible"
+        lower_infeasible = K;
+    else
+        break
+    end
+end
+
+K_lower = lower_infeasible + 1;
+K_upper = upper_feasible;
+boundary = make_count_summary( ...
+    K_lower, K_upper, best_record, "fixed_k_economic_search");
+economic = struct();
+economic.allowance_usd_t = allowance;
+economic.cost_cap_usd = cost_cap;
+economic.reference_lower_usd = reference_lower;
+economic.reference_upper_usd = reference_upper;
+economic.K_lower = K_lower;
+economic.K_upper = K_upper;
+economic.is_proven = K_lower == K_upper;
+economic.minimum_updates = boundary;
+economic.search = table(trace_K, trace_status, ...
+    'VariableNames', {'K', 'classification'});
+end
+
+function classification = classify_cost_point(record, cost_cap)
+tolerance = 1e-8 * max(1, abs(cost_cap));
+if record.has_incumbent && ...
+        record.objective_upper <= cost_cap + tolerance
+    classification = "feasible";
+elseif record.is_infeasible || ...
+        (isfinite(record.objective_lower) && ...
+        record.objective_lower > cost_cap + tolerance)
+    classification = "infeasible";
+else
+    classification = "unknown";
+end
+end
+
+function summary = make_count_summary(K_lower, K_upper, cost_record, status)
+summary = struct('objective_kind', 'k_search', ...
+    'has_incumbent', cost_record.has_incumbent, ...
+    'objective_lower', NaN, 'objective_upper', NaN, ...
+    'absolute_gap', K_upper - K_lower, 'relative_gap', NaN, ...
+    'count_lower', K_lower, 'count_upper', K_upper, ...
+    'is_proven', K_lower == K_upper, 'exitflag', cost_record.exitflag, ...
+    'status', string(status), 'message', cost_record.message, ...
+    'output', cost_record.output, 'solution', cost_record.solution);
+end
+
+function [record, cache] = get_k_point( ...
+        solver_data, cache, K, config, params)
+index = find([cache.K] == K, 1);
+if ~isempty(index)
+    record = cache(index).record;
+    return
+end
+
+initial_solution = choose_k_start(cache, K);
+record = solve_fixed_k(solver_data, K, initial_solution);
+if record.has_incumbent
+    record.solution = add_change_indicators(record.solution, ...
+        config.change_epsilon, params.HB.min_load, params.HB.max_load);
+    record.count_upper = round(sum(record.solution.O1_HB_change));
+end
+entry = struct('K', K, 'record', record, 'source', "fixed_k");
+cache(end + 1) = entry;
+end
+
+function solution = choose_k_start(cache, K)
+solution = struct();
+best_cost = Inf;
+for i = 1:numel(cache)
+    record = cache(i).record;
+    if ~record.has_incumbent || record.count_upper > K
+        continue
+    end
+    if record.objective_upper < best_cost
+        solution = record.solution;
+        best_cost = record.objective_upper;
+    end
+end
+end
+
+% 在固定K的情况下求解最小成本问题
+function record = solve_fixed_k(solver_data, K, initial_solution)
+problem = solver_data.problem;
+problem.bineq(solver_data.update_row) = ...
+    solver_data.update_coefficient * K;
+problem.x0 = solution_to_vector(initial_solution, solver_data.indices, ...
+    numel(problem.lb));
+
+record = empty_cost_record(K);
+try
+    [x, fval, exitflag, output] = intlinprog(problem);
+catch exception
+    record.status = "solver_error";
+    record.message = string(exception.message);
+    return
+end
+
+record.exitflag = exitflag;
+record.output = output;
+if isfield(output, 'message')
+    record.message = string(output.message);
+end
+record.is_infeasible = exitflag == -2;
+record.has_incumbent = ~isempty(x) && isscalar(fval) && isfinite(fval);
+if ~record.has_incumbent
+    if record.is_infeasible
+        record.status = "infeasible";
+    else
+        record.status = "no_incumbent";
+    end
+    return
+end
+
+record.solution = vector_to_solution(x, solver_data.indices);
+record.objective_upper = fval + problem.f0;
+if isfield(output, 'absolutegap') && isscalar(output.absolutegap) && ...
+        isfinite(output.absolutegap)
+    record.absolute_gap = max(0, output.absolutegap);
+    record.objective_lower = record.objective_upper - record.absolute_gap;
+elseif exitflag > 0
+    record.absolute_gap = 0;
+    record.objective_lower = record.objective_upper;
+end
+if isfinite(record.absolute_gap)
+    record.relative_gap = record.absolute_gap / ...
+        max(1, abs(record.objective_upper));
+end
+record.count_upper = round(sum(record.solution.O1_HB_change));
+record.is_proven = exitflag > 0 && record.absolute_gap <= ...
+    max(1e-7, eps(abs(record.objective_upper)));
+if record.is_proven
+    record.status = "proven";
+else
+    record.status = "incumbent_with_bound";
+end
+end
+
+function record = empty_cost_record(K)
+record = struct('objective_kind', 'cost', 'has_incumbent', false, ...
+    'objective_lower', NaN, 'objective_upper', NaN, ...
+    'absolute_gap', NaN, 'relative_gap', NaN, ...
+    'count_lower', NaN, 'count_upper', NaN, 'is_proven', false, ...
+    'is_infeasible', false, 'exitflag', NaN, 'status', "not_run", ...
+    'message', "", 'output', struct(), 'solution', struct(), ...
+    'solve_backend', "intlinprog_matrix", 'K_limit', K);
+end
+
+function vector = solution_to_vector(solution, indices, variable_count)
+if ~isstruct(solution) || isempty(fieldnames(solution))
+    vector = [];
+    return
+end
+vector = zeros(variable_count, 1);
+names = fieldnames(indices);
+for i = 1:numel(names)
+    name = names{i};
+    if ~isfield(solution, name) || ...
+            numel(solution.(name)) ~= numel(indices.(name))
+        vector = [];
+        return
+    end
+    vector(indices.(name)(:)) = solution.(name)(:);
+end
+end
+
+function solution = vector_to_solution(vector, indices)
+solution = struct();
+names = fieldnames(indices);
+for i = 1:numel(names)
+    name = names{i};
+    variable_indices = indices.(name);
+    solution.(name) = reshape(vector(variable_indices(:)), ...
+        size(variable_indices));
+end
+end
+
+function points = k_cache_table(cache)
+row_count = numel(cache);
+K = zeros(row_count, 1);
+cost_lower_usd = NaN(row_count, 1);
+cost_upper_usd = NaN(row_count, 1);
+has_incumbent = false(row_count, 1);
+is_infeasible = false(row_count, 1);
+status = strings(row_count, 1);
+source = strings(row_count, 1);
+objective_kind = repmat("cost", row_count, 1);
+for i = 1:row_count
+    K(i) = cache(i).K;
+    record = cache(i).record;
+    cost_lower_usd(i) = record.objective_lower;
+    cost_upper_usd(i) = record.objective_upper;
+    has_incumbent(i) = record.has_incumbent;
+    is_infeasible(i) = record.is_infeasible;
+    status(i) = string(record.status);
+    source(i) = cache(i).source;
+end
+points = table(K, cost_lower_usd, cost_upper_usd, has_incumbent, ...
+    is_infeasible, status, source, objective_kind);
+points = sortrows(points, 'K');
+end
+
 % Stage1缓存签名：用于验证缓存的有效性
 function signature = build_stage1_cache_signature(config, params)
 signature = struct();
-signature.schema_version = 1;
+signature.schema_version = 2;
 signature.nh3_target_t = config.nh3_target_t;
 signature.change_epsilon = config.change_epsilon;
 signature.model_parameters = struct( ...
@@ -528,32 +830,6 @@ end
 platform_starts = unique(platform_starts, 'stable');
 end
 
-function best = choose_count_start(initial_solution, candidates, ...
-        system_cost_usd, cost_cap)
-all_candidates = [{initial_solution}, candidates];
-best = struct();
-best_count = Inf;
-cost_tolerance = 1e-8 * max(1, abs(cost_cap));
-for i = 1:numel(all_candidates)
-    candidate = all_candidates{i};
-    if ~isstruct(candidate) || isempty(fieldnames(candidate)) || ...
-            ~isfield(candidate, 'O1_HB_change')
-        continue
-    end
-    try
-        candidate_cost = evaluate(system_cost_usd, candidate);
-    catch
-        continue
-    end
-    candidate_count = round(sum(candidate.O1_HB_change));
-    if candidate_cost <= cost_cap + cost_tolerance && ...
-            candidate_count < best_count
-        best = candidate;
-        best_count = candidate_count;
-    end
-end
-end
-
 function record = solve_record(problem, options, objective_kind, initial_solution)
 record = struct('objective_kind', objective_kind, 'has_incumbent', false, ...
     'objective_lower', NaN, 'objective_upper', NaN, ...
@@ -638,9 +914,6 @@ fprintf('[DBG] HB_load range: [%.4g, %.4g]\n', ...
     min(sol.HB_load), max(sol.HB_load));
 end
 
-
-
-
 function check = solution_check(solution, model, config)
 HB_load = solution.HB_load(:);
 HB_change = [HB_load(2:end); HB_load(1)] - HB_load;
@@ -670,17 +943,18 @@ check.maximum_change = max(abs(HB_change));
 check.change_epsilon = config.change_epsilon;
 check.nh3_total_t = NH3_total_t;
 check.nh3_residual_t = NH3_total_t - config.nh3_target_t;
-P_AEL_start = model.start_power_per_module_kw * solution.SU_AEL;
-power_residual = model.context.P_total + solution.p_purchase ...
-    - solution.P_AEL - P_AEL_start ...
+P_AEL_start = model.start_power_per_module_kw * solution.SU_AEL(:);
+power_residual = model.context.P_total(:) + solution.p_purchase(:) ...
+    - solution.P_AEL(:) - P_AEL_start ...
     - HB_load * model.context.HB_power_kw ...
-    - solution.p_sell - solution.p_curt;
-H2_production = solution.P_AEL * model.params.time.step ...
+    - solution.p_sell(:) - solution.p_curt(:);
+H2_production = solution.P_AEL(:) * model.params.time.step ...
     / model.context.AEL_spec_energy * model.context.H2_density;
 H2_use = HB_load * model.context.NH3_rate * model.params.time.step ...
     * model.params.HB.lit_h2;
-storage_residual = solution.storage_H2(2:end) ...
-    - solution.storage_H2(1:end-1) - H2_production + H2_use;
+storage_H2 = solution.storage_H2(:);
+storage_residual = storage_H2(2:end) ...
+    - storage_H2(1:end-1) - H2_production + H2_use;
 check.max_power_residual_kw = max(abs(power_residual));
 check.max_storage_residual_kg = max(abs(storage_residual));
 end

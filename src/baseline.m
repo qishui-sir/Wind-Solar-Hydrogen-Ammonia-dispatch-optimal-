@@ -70,8 +70,9 @@ function results = baseline(params, renewable_data, algorithm)
         P_grid_contract = optimvar('grid_contract_kw', 1, ...
             'LowerBound', 0, 'UpperBound', transformer_kw);
     end
-    SU_AEL = optimvar('SU_AEL',T,'Type','integer','LowerBound',0,'UpperBound',Num_AEL);
-    SD_AEL = optimvar('SD_AEL',T,'Type','integer','LowerBound',0,'UpperBound',Num_AEL);
+    % 启停量由整数在线台数和方向变量唯一确定，无需重复声明为整数。
+    SU_AEL = optimvar('SU_AEL',T,'LowerBound',0,'UpperBound',Num_AEL);
+    SD_AEL = optimvar('SD_AEL',T,'LowerBound',0,'UpperBound',Num_AEL);
     I_AEL_up = optimvar('I_AEL_up', T, 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1);
     P_AEL_start = AEL_start_power_per_module * SU_AEL;
 
