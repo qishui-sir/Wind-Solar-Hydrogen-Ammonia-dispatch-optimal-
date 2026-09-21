@@ -9,14 +9,15 @@ algorithm_dir = fullfile(source_dir, 'algorithm');
 addpath(source_dir, params_dir, results_dir, class_dir, algorithm_dir);
 
 data_cfg = struct();
-data_cfg.pv_year = 2022;
-data_cfg.pw_year = 2022;
+study_year = 2022;
+data_cfg.pv_year = study_year;
+data_cfg.pw_year = study_year;
 data_cfg.pv_capacity_kw = 200000;
 data_cfg.pw_capacity_kw = 200000;
 renewable_data = load_res_year(data_cfg);
 
 params = my_system('s2');
-params.AEL.common.startup = true;   % S2 baseline with the S3 startup electricity
+params.AEL.common.startup = true;
 params.solver.relative_gap = 0.02;
 
 ael_output = qi_ael_model(2000, 0, params.AEL.detail); 
@@ -27,19 +28,25 @@ fprintf('[main] AEL startup electricity=%d (%.2f load fraction/h), no extra char
 o1_config = struct();
 o1_config.nh3_target_t = 80000;
 o1_config.cost_allowance_usd_t = [0, 1, 5, 10];
-o1_config.frontier_k = []; % Add selected K values after locating boundaries.
+o1_config.frontier_k = [];
 o1_config.max_time_s = 1200;
 o1_config.cost_relative_gap = 1e-3;
-o1_config.change_epsilon = 0.01; % 1% nominal HB-load scheduling deadband.
-o1_config.penalty_alpha = [0.1, 1, 10];
-o1_config.penalty_max_time_s = 300;
-o1_config.penalty_relative_gap = 0.02;
-o1_config.max_count_bound_width = 20;
+o1_config.count_absolute_gap = 0.99;
+o1_config.change_epsilon = 0.01;
+o1_config.max_count_bound_width = 0;
 o1_config.max_k_search_points = 16;
+o1_config.enable_window_cuts = true;
+o1_config.window_lengths_h = [72, 168];
+o1_config.window_candidates_per_length = 2;
+o1_config.max_window_cuts = 4;
+o1_config.window_lp_max_time_s = 45;
+o1_config.enable_start_repair = true;
+o1_config.repair_max_time_s = 300;
+o1_config.use_cache = true;
 o1_config.display = 'iter';
 fprintf('[main] baseline relative gap=%.4f; O1 cost gap=%.4f; ', ...
     params.solver.relative_gap, o1_config.cost_relative_gap);
-fprintf('O1 fixed-K points/boundary=%d; epsilon=%.2f%%\n', ...
+fprintf('O1 exact count search, fixed-K fallback=%d; epsilon=%.2f%%\n', ...
     o1_config.max_k_search_points, 100 * o1_config.change_epsilon);
 
 O1_results = baseline(params, renewable_data, ...

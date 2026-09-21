@@ -125,6 +125,8 @@ function results = baseline(params, renewable_data, algorithm)
     prob.Constraints.AEL_stop_available = SD_AEL <= N_AEL_previous;
     prob.Constraints.AEL_start_indicator = SU_AEL <= Num_AEL * I_AEL_up;
     prob.Constraints.AEL_stop_indicator = SD_AEL <= Num_AEL * (1 - I_AEL_up);
+    % 无启动时固定方向变量，减少二元对称。
+    prob.Constraints.AEL_idle_direction = I_AEL_up <= SU_AEL;
     % min stable start time 
     min_run_h = 1;   
     L_run = ceil(min_run_h / dt);
