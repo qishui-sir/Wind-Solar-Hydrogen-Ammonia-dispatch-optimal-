@@ -167,8 +167,10 @@ function results = baseline(params, renewable_data, algorithm)
     sales_revenue_usd = sum(C_sell .* P_sell * dt);
     water_cost_usd = C_water * sum(water_use_t);
     catalyst_cost_usd = C_catalyst * sum(NH3_prod_t);
+    % NH3 income remains available for reporting, but is intentionally
+    % excluded from the optimization objective.
     obj_formula = curtailment_cost_usd + purchase_cost_usd - ...
-        sales_revenue_usd - NH3_income + water_cost_usd + ...
+        sales_revenue_usd + water_cost_usd + ...
         catalyst_cost_usd;
     if grid_contract_is_fixed
         fixed_cost = annual_fixed_cost(params);

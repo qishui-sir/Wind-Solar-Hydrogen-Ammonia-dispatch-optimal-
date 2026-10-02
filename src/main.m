@@ -12,7 +12,9 @@ params_dir = fullfile(source_dir, 'params');
 results_dir = fullfile(source_dir, 'results');
 class_dir = fullfile(source_dir, 'class');
 algorithm_dir = fullfile(source_dir, 'algorithm');
-addpath(source_dir, params_dir, results_dir, class_dir, algorithm_dir);
+o1_dir = fullfile(algorithm_dir, 'O1');
+addpath(source_dir, params_dir, results_dir, class_dir, ...
+    algorithm_dir, o1_dir);
 
 data_cfg = struct();
 data_cfg.pv_year = study_year;
