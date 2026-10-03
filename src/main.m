@@ -35,15 +35,64 @@ fprintf('[main] AEL startup electricity=%d (%.2f load fraction/h), no extra char
     params.AEL.common.startup, params.AEL.common.startup_elec);
 
 o1_config = struct();
+% main始终复用src缓存，不受调用时MATLAB当前目录影响；数据签名仍严格校验。
+o1_config.cache_directory = source_dir;
+o1_config.progress_file = fullfile(project_dir, '会话记录.md');
 o1_config.nh3_target_t = 80000;
 o1_config.cost_allowance_usd_t = [0, 1, 5, 10];
 o1_config.frontier_k = [];
 o1_config.frontier_all_k = true;
-o1_config.frontier_max_time_s = 60;
+o1_config.frontier_max_time_s = 30;
 o1_config.frontier_max_attempts = 1;
 o1_config.frontier_solution_interval = 25;
 o1_config.frontier_run_budget_s = 1800;
 o1_config.frontier_points_per_run = 200;
+% 先用少量锚点识别前沿结构，再只认证关键K，避免逐点消耗求解预算。
+o1_config.frontier_anchor_count = 12;
+o1_config.frontier_key_k = 111;
+o1_config.frontier_auto_key_count = 2;
+o1_config.frontier_certification_tolerance_usd_t = 0.5;
+o1_config.frontier_certification_max_time_s = 3600;
+o1_config.frontier_certification_max_attempts = 4;
+o1_config.frontier_certification_points_per_run = 3;
+o1_config.frontier_certification_run_budget_s = 1800;
+% 先尝试缓存HB模式的上界改进；失败只表示受限模式失败，不抬高全局下界。
+o1_config.frontier_polish_enabled = true;
+o1_config.frontier_polish_only = false;
+o1_config.frontier_polish_max_time_s = 840;
+o1_config.frontier_polish_max_attempts = 1;
+% 固定模式失败后，自动搜索缓存模式并集及其循环时间邻域。
+o1_config.frontier_pattern_pool_enabled = true;
+o1_config.frontier_pattern_pool_radii_h = [0, 1, 3, 6, 12];
+o1_config.frontier_pattern_pool_max_time_s = 240;
+% 候选池失败后，依次采用全局成本帽、可热启动超额模型与台数外松弛认证。
+% 新上界一律恢复原整数台数与方向变量，认证精度始终按原成本区间计算。
+o1_config.frontier_global_bisection_enabled = true;
+o1_config.frontier_global_bisection_max_time_s = 840;
+o1_config.frontier_global_bisection_max_attempts = 6;
+% 按购电增量选择少量局部窗口，仅改进可行上界，不把局部下界用于认证。
+o1_config.frontier_local_cost_enabled = true;
+o1_config.frontier_local_cost_window_h = 168;
+o1_config.frontier_local_cost_max_time_s = 60;
+o1_config.frontier_local_cost_max_windows = 3;
+% 既有全局策略用尽后，再尝试少量更新时刻的全年远距离重定位。
+o1_config.frontier_relocation_cost_enabled = true;
+o1_config.frontier_relocation_cost_radii = [2, 4, 8];
+o1_config.frontier_relocation_cost_max_time_s = 240;
+% 只改变求解器内部连续变量单位；目标、整数变量和原物理矩阵不变。
+o1_config.frontier_scale_solver = true;
+% Gurobi先求解原MILP，不叠加旧后端的冗余成本底线；旧下界仍在记录层保留。
+o1_config.frontier_bound_floor = false;
+% 高精度认证恢复原启停方向整数性，避免依赖启动方向外松弛的弱证书。
+o1_config.frontier_keep_startup_binary = true;
+% 仅替换固定K经济后端；计数求解暂保留旧实现，原模型和缓存签名不变。
+% 接口路径先复用MATLAB路径，再从GUROBI_HOME或系统命令路径发现。
+o1_config.frontier_solver = 'gurobi';
+o1_config.gurobi_matlab_directory = '';
+% -1表示按缓存尝试次数选择0/3/1/2策略；不是传给Gurobi的原生参数值。
+o1_config.gurobi_mip_focus = -1;
+o1_config.gurobi_method = -1;
+o1_config.gurobi_threads = 0;
 o1_config.compute_frontier_during_search = true;
 o1_config.max_time_s = 1200;
 o1_config.count_max_time_s = 900;
@@ -73,14 +122,27 @@ fprintf('[main] baseline relative gap=%.4f; O1 cost gap=%.4f; ', ...
     params.solver.relative_gap, o1_config.cost_relative_gap);
 fprintf('O1 count-continuation budget=%d; epsilon=%.2f%%\n', ...
     o1_config.max_k_search_points, 100 * o1_config.change_epsilon);
-fprintf(['[main] all certified-feasible K values are queued; ', ...
-    'per-point limit=%g s, ', ...
-    'retry limit=%d.\n'], o1_config.frontier_max_time_s, ...
+fprintf(['[main] 全K前沿通过锚点界值包络生成，关键K另行认证；', ...
+    '锚点单次上限=%g s，尝试上限=%d。\n'], o1_config.frontier_max_time_s, ...
     o1_config.frontier_max_attempts);
+fprintf('[main] 固定K经济后端=%s；原约束、参数和目标函数保持不变。\n', ...
+    o1_config.frontier_solver);
 fprintf(['[main] autonomous O1 enabled: feasibility budget=%g s, ', ...
     'frontier budget=%g s, frontier points/run=%d.\n'], ...
     o1_config.run_budget_s, o1_config.frontier_run_budget_s, ...
     o1_config.frontier_points_per_run);
+if o1_config.frontier_polish_enabled
+    fprintf(['[main] 关键K定向上界精修已启用：单次上限=%g s，', ...
+        '仅精修=%d。\n'], o1_config.frontier_polish_max_time_s, ...
+        o1_config.frontier_polish_only);
+end
+if o1_config.frontier_pattern_pool_enabled
+    fprintf(['[main] HB候选池半径=%s h，单阶段上限=%g s；', ...
+        '全局成本帽二分=%d。\n'], ...
+        mat2str(o1_config.frontier_pattern_pool_radii_h), ...
+        o1_config.frontier_pattern_pool_max_time_s, ...
+        o1_config.frontier_global_bisection_enabled);
+end
 
 O1_results = baseline(params, renewable_data, ...
     @(model) O1(model, o1_config));

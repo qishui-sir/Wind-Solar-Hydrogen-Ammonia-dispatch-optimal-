@@ -127,23 +127,16 @@ function results = baseline(params, renewable_data, algorithm)
     prob.Constraints.AEL_stop_indicator = SD_AEL <= Num_AEL * (1 - I_AEL_up);
     % 无启动时固定方向变量，减少二元对称。
     prob.Constraints.AEL_idle_direction = I_AEL_up <= SU_AEL;
-    % min stable start time 
+    % 保留原最小运行时间语义：本时段台数覆盖之前L_run时段的启动台数。
     min_run_h = 1;   
     L_run = ceil(min_run_h / dt);
-    AEL_min_run = optimconstr(T, 1);
-    for tau = 1:T
-        k1 = max(1, tau - L_run);
-        k2 = tau - 1;
-
-        if k1 <= k2
-            AEL_min_run(tau) = ...
-                N_AEL(tau) >= sum(SU_AEL(k1:k2));
-        else
-            AEL_min_run(tau) = ...
-                N_AEL(tau) >= 0;
-        end
+    startup_window = sparse(T, T);
+    for lag = 1:min(L_run, T - 1)
+        rows = (lag + 1:T).';
+        startup_window = startup_window + sparse(rows, rows - lag, ...
+            ones(numel(rows), 1), T, T);
     end
-    prob.Constraints.AEL_min_run = AEL_min_run;
+    prob.Constraints.AEL_min_run = N_AEL >= startup_window * SU_AEL;
 
     if params.environment.co2_enabled
         prob.Constraints.co2_limit = ...

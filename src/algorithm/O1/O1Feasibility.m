@@ -34,10 +34,89 @@ for i = 1:numel(entries)
         search_start_count = record.count_upper;
     end
 end
+% 经济优化也可能减少实际更新次数；同一数据签名下的完整可行解可作计数种子。
+% 只继承可行上界，绝不能把美元下界误当作更新次数下界。
+economic_seed_imported = false;
+seed_validation_build_count = 0;
+cost_entries = ctx.services.fixed_point_store(ctx.point_cache_file, ...
+    ctx.cost_signature, "load", "frontier_cost", Inf, struct());
+candidate = search_start;
+candidate_count = search_start_count;
+for i = 1:numel(cost_entries)
+    r = cost_entries(i).record;
+    if ~r.has_incumbent || ~isfield(r, 'solution') || ...
+            isempty(fieldnames(r.solution))
+        continue
+    end
+    count = round(sum(r.solution.O1_HB_change));
+    if count < candidate_count && ...
+            (~isfinite(cost_cap) || ...
+            evaluate(ctx.system_cost_usd, r.solution) <= cost_cap + cost_tolerance)
+        candidate = r.solution;
+        candidate_count = count;
+    end
+end
+if candidate_count < search_start_count
+    validation_problem = boundary_problem;
+    validation_problem.Objective = 0;
+    validation_problem.Constraints.O1_update_limit = ctx.update_count <= ctx.T;
+    [validation_solver, ~] = ctx.services.build_fixed_solver( ...
+        validation_problem, ctx, candidate);
+    seed_validation_build_count = 1;
+    p = validation_solver.problem;
+    x = p.x0(:);
+    violation = max([0; p.Aineq * x - p.bineq(:); ...
+        abs(p.Aeq * x - p.beq(:)); p.lb(:) - x; x - p.ub(:)]);
+    integer_error = max(abs(x(p.intcon) - round(x(p.intcon))));
+    if violation <= ctx.model.options.ConstraintTolerance && integer_error <= 1e-6
+        search_start = candidate;
+        search_start_count = candidate_count;
+        economic_seed_imported = true;
+        fprintf('[O1] 从经济解导入已复核计数种子：K=%g，原矩阵残差=%.3g。\n', ...
+            candidate_count, violation);
+    else
+        warning('O1:invalid_economic_count_seed', ...
+            '经济计数种子未通过原矩阵复核，保留既有可行上界。');
+    end
+end
 initial_count = round(sum(initial_solution.O1_HB_change));
 if search_start_count < initial_count
     fprintf('[O1] Reusing cached feasible start: K=%g.\n', ...
         search_start_count);
+end
+search_budget_s = ctx.config.run_budget_s;
+search_point_limit = ctx.config.max_k_search_points;
+priority_certification_pending = false;
+feasible_key_K = ctx.config.frontier_key_k( ...
+    ctx.config.frontier_key_k >= search_start_count);
+if ~isempty(feasible_key_K)
+    certification_entries = ctx.services.fixed_point_store( ...
+        ctx.point_cache_file, ctx.cost_signature, ...
+        "load", "frontier_cost", Inf, struct());
+    for key_index = 1:numel(feasible_key_K)
+        entry_index = find([certification_entries.K] == ...
+            feasible_key_K(key_index), 1);
+        if isempty(entry_index)
+            priority_certification_pending = true;
+            break
+        end
+        record = certification_entries(entry_index).record;
+        if ~isfield(record, 'objective_lower') || ...
+                ~isfield(record, 'objective_upper') || ...
+                ~isfinite(record.objective_lower) || ...
+                ~isfinite(record.objective_upper) || ...
+                (record.objective_upper - record.objective_lower) / ...
+                ctx.config.nh3_target_t > ...
+                ctx.config.frontier_certification_tolerance_usd_t
+            priority_certification_pending = true;
+            break
+        end
+    end
+end
+if priority_certification_pending
+    search_point_limit = 0;
+    fprintf(['[O1] 关键K已有可行解但经济精度尚未达标；', ...
+        '本轮跳过新的K收缩任务，优先执行经济认证。\n']);
 end
 boundary_problem.Objective = ctx.update_count;
 fixed_problem = boundary_problem;
@@ -50,7 +129,8 @@ fixed_problem.Objective = 0;
     solver_data, ctx, string(mode) == "feasibility");
 window_cut_count = matrix_window_info.cut_count;
 build_info = struct('elapsed_s', elapsed_s, ...
-    'window_cuts', matrix_window_info);
+    'window_cuts', matrix_window_info, ...
+    'seed_validation_model_build_count', seed_validation_build_count);
 cached_direct = find(string({entries.source}) == "direct_bound" & ...
     arrayfun(@(entry) isfield(entry.record, 'window_cut_count') && ...
     entry.record.window_cut_count == window_cut_count, entries), 1);
@@ -105,6 +185,19 @@ if ~direct.has_incumbent || seed_count < direct.count_upper
     best_record.system_cost_upper = evaluate( ...
         ctx.system_cost_usd, search_start);
     best_record.status = "seed_incumbent";
+    best_record.absolute_gap = max(0, seed_count - best_record.objective_lower);
+    best_record.relative_gap = best_record.absolute_gap / max(1, seed_count);
+    best_record.is_proven = isfinite(best_record.count_lower) && ...
+        best_record.count_lower == seed_count;
+end
+if economic_seed_imported
+    best_record.solve_backend = "verified_economic_count_seed";
+    best_record.elapsed_s = 0;
+    seed_entry = struct('mode', string(mode), 'cost_cap', cost_cap, ...
+        'K', seed_count, 'record', best_record, 'source', "economic_feasible_seed");
+    entries = update_entry(entries, seed_entry);
+    ctx.services.fixed_point_store(ctx.point_cache_file, ctx.signature, ...
+        "append", mode, cost_cap, seed_entry);
 end
 lower = 0;
 if isfinite(direct.count_lower)
@@ -135,15 +228,15 @@ certified = arrayfun(@(e) e.record.has_incumbent || ...
 tried = [entries(certified).K];
 search_started = tic;
 budget_exhausted = false;
-for iteration = 1:ctx.config.max_k_search_points
+for iteration = 1:search_point_limit
     if lower >= upper
         break
     end
     if ctx.config.autonomous_search && ...
-            toc(search_started) >= ctx.config.run_budget_s
+            toc(search_started) >= search_budget_s
         budget_exhausted = true;
         fprintf('[O1] autonomous run budget %.1f s exhausted; state cached.\n', ...
-            ctx.config.run_budget_s);
+            search_budget_s);
         break
     end
     candidates = setdiff(lower:(upper - 1), tried);
@@ -231,7 +324,8 @@ summary = struct('minimum_updates', minimum_updates, ...
     'VariableNames', {'K', 'classification', 'attempt'}), ...
     'scheduler', struct('autonomous', ctx.config.autonomous_search, ...
     'elapsed_s', toc(search_started), ...
-    'run_budget_s', ctx.config.run_budget_s, ...
+    'run_budget_s', search_budget_s, ...
+    'priority_certification_pending', priority_certification_pending, ...
     'budget_exhausted', budget_exhausted));
 
 display_entries = entries(string({entries.source}) ~= "direct_bound");
