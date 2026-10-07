@@ -19,7 +19,7 @@ end
 function [representative, frontier, frontier_state, structure, ...
         certification] = solve_cost_outputs( ...
         ctx, feasibility, requested_K, reference)
-% 稀疏锚点提供初始界；全K模式逐行认证，旧模式仅认证关键K。
+% 固定K缓存提供初始界，统一调度选定点的短遍历及后续认证。
 upper = feasibility.K_upper;
 initial = feasibility.minimum_updates.solution;
 reference_count = round(sum(reference.solution.O1_HB_change));
@@ -45,24 +45,41 @@ if ctx.config.defer_feasibility_search || ctx.config.certify_all_frontier_k
     ctx.verified_count_seed = seed;
 end
 if ctx.config.frontier_all_k
-    % 从匹配缓存的次数下界开始；该下界本身不代表已有可行解。
-    % 目标区间止于本轮参考经济解的实际次数，不生成全年剩余K的重复行。
+    % 自动起点采用匹配缓存的次数界，也允许指定研究区间起点。
+    % 下界或指定起点不代表已存在可行解；端点保留，整步长点按K的倍数取样。
     if ctx.config.certify_all_frontier_k
         first_K = max(0, ceil(feasibility.K_lower));
-        last_K = min(ctx.T, reference_count);
     else
         first_K = max(0, ceil(feasibility.K_upper));
-        last_K = min(ctx.T, reference_count);
     end
-    frontier_K = (first_K:last_K).';
+    if ~isempty(ctx.config.frontier_k_start)
+        first_K = ctx.config.frontier_k_start;
+    end
+    last_K = min(ctx.T, reference_count);
+    if first_K > last_K
+        error('O1:empty_frontier_interval', ...
+            '固定K起点%g超过参考解K=%g，请调整frontier_k_start。', first_K, last_K);
+    end
+    step = ctx.config.frontier_k_step;
+    sampled_K = (ceil(first_K / step) * step:step:last_K).';
+    frontier_K = unique([first_K; sampled_K; last_K; ...
+        requested_K(:); ctx.config.frontier_key_k(:)]);
+    frontier_K = frontier_K(frontier_K >= first_K & frontier_K <= last_K);
 else
     frontier_K = unique(round([requested_K(:); ...
         ctx.config.frontier_key_k(:); upper]));
     frontier_K = frontier_K(frontier_K >= 0 & frontier_K <= ctx.T);
 end
+deferred_integer_points = 0;
+if ctx.config.frontier_all_k
+    deferred_integer_points = last_K - first_K + 1 - numel(frontier_K);
+end
+sampled_interval = deferred_integer_points > 0;
 if ctx.config.frontier_all_k && ctx.config.certify_all_frontier_k
-    fprintf('[O1] 目标经济区间：K=%g:%g，共%d个整数点；参考解实际K=%g。\n', ...
-        first_K, last_K, numel(frontier_K), reference_count);
+    fprintf(['[O1] 目标经济区间：K=%g:%g，步长=%g，共%d个选定点；', ...
+        '参考解实际K=%g，其余%d个整数点暂缓。\n'], ...
+        first_K, last_K, ctx.config.frontier_k_step, numel(frontier_K), ...
+        reference_count, deferred_integer_points);
 end
 
 variable_types = {'double', 'double', 'double', 'double', 'double', ...
@@ -124,10 +141,14 @@ for row = 1:height(frontier)
     end
 end
 
-if ctx.config.frontier_all_k
+if ctx.config.certify_all_frontier_k
+    % 每个选定点直接进入统一认证，不先另解未选中的锚点或计数上界。
+    solve_K = zeros(0, 1);
+elseif ctx.config.frontier_all_k
     solve_K = select_frontier_anchors(first_K, reference_count - 1, ...
         ctx.config.frontier_anchor_count, requested_K, ...
         ctx.config.frontier_key_k);
+    solve_K = intersect(solve_K, frontier_K);
 else
     solve_K = unique([upper; requested_K(:)]);
     solve_K = solve_K(solve_K >= upper & solve_K < reference_count);
@@ -147,7 +168,7 @@ if ctx.config.frontier_scale_solver
             units(cost_solver.indices.(names{i})(:)) = 1000;
         end
     end
-    % 仅用于长时原模型认证；快速锚点与局部搜索继续使用已验证的原单位。
+    % 仅改变固定K原模型认证的内部单位，候选解仍按原单位验证。
     cost_solver.variable_units = units;
 end
 fprintf(['[O1] Cost frontier: %d anchor candidates, %d total rows; ', ...
@@ -307,541 +328,14 @@ interval_batch = ctx.config.certify_all_frontier_k && ...
     isinf(ctx.config.frontier_certification_points_per_run);
 certification_retry_exhausted = false;
 certification_retry_exhausted_K = zeros(0, 1);
-legacy_critical_K = critical_K;
+screening_enabled = ctx.config.certify_all_frontier_k && ...
+    ctx.config.frontier_screening_max_time_s > 0;
+screening_new_points = 0;
+screening_done = repmat(~screening_enabled, height(frontier), 1);
 if ctx.config.certify_all_frontier_k
     critical_K = frontier.K;
-    legacy_critical_K = zeros(0, 1);
-    certify_each_cost_point();
 end
-for critical_index = 1:numel(legacy_critical_K)
-    K = legacy_critical_K(critical_index);
-    cached_index = find([cost_entries.K] == K, 1);
-    cached = struct();
-    if ~isempty(cached_index)
-        cached = cost_entries(cached_index).record;
-        cached = strengthen_anchor_bound(cached, K, cost_entries, reference, ctx);
-        cost_entries(cached_index).record = cached;
-    end
-    uncertainty = record_uncertainty_usd_t(cached, ctx);
-    certification_attempts = record_field(cached, ...
-        'certification_attempts', 0);
-    % 旧单位的认证额度用完后，允许一次独立的等价缩放认证，不清空旧历史。
-    needs_scaled_certification = ctx.config.frontier_scale_solver && ...
-        record_field(cached, 'scaled_certification_attempts', 0) < 1;
-    needs_floor_certification = ctx.config.frontier_bound_floor && ...
-        record_field(cached, 'floor_certification_attempts', 0) < 1;
-    needs_startup_certification = ctx.config.frontier_keep_startup_binary && ...
-        record_field(cached, 'startup_binary_certification_attempts', 0) < 1;
-    use_gurobi = strcmp(ctx.config.frontier_solver, 'gurobi');
-    gurobi_attempts = record_field(cached, 'gurobi_certification_attempts', 0);
-    needs_partition_certification = use_gurobi && ctx.config.gurobi_partition_enabled && ...
-        record_field(cached,'gurobi_partition_attempts',0)<ctx.config.gurobi_partition_max_attempts;
-    needs_gurobi_certification = use_gurobi && ...
-        (gurobi_attempts < ctx.config.frontier_certification_max_attempts || needs_partition_certification);
-    prefer_direct_certification = needs_floor_certification || ...
-        needs_startup_certification || use_gurobi;
-    if uncertainty <= ...
-            ctx.config.frontier_certification_tolerance_usd_t
-        continue
-    end
-    if certification_new_points >= ...
-            ctx.config.frontier_certification_points_per_run || ...
-            toc(certification_started) >= ...
-            ctx.config.frontier_certification_run_budget_s
-        certification_budget_exhausted = true;
-        break
-    end
-    certification_start = best_feasible_seed( ...
-        K, cost_entries, initial, ctx);
-    if isempty(cached_index)
-        % 自动关键点可能不是锚点：先建立真实种子记录，不能访问空记录的界值。
-        cached = monotonic_anchor_envelope(K, cost_entries, reference, ctx);
-        cached.solution = certification_start;
-        cached.has_incumbent = true;
-        cached.objective_upper = evaluate(ctx.system_cost_usd, certification_start);
-        cached.system_cost_upper = cached.objective_upper;
-        cached.count_upper = round(sum(certification_start.O1_HB_change));
-        cached.absolute_gap = cached.objective_upper - cached.objective_lower;
-        cached.frontier_phase = "certification_seed";
-        cached.status = "seed_cost_bound";
-        cached.is_certified = record_uncertainty_usd_t(cached, ctx) <= ...
-            ctx.config.frontier_certification_tolerance_usd_t;
-        if cached.is_certified
-            cached.status = "certified_tolerance";
-        end
-        cached.cost_components = ctx.services.evaluate_cost_components( ...
-            certification_start, ctx);
-        cached.operation_metrics = ctx.services.evaluate_operation_metrics( ...
-            certification_start, ctx);
-        entry = struct('mode', cache_mode, 'cost_cap', Inf, ...
-            'K', K, 'record', cached, 'source', "frontier_certification_seed");
-        ctx.services.fixed_point_store(ctx.point_cache_file, ...
-            ctx.cost_signature, "append", cache_mode, Inf, entry);
-        cost_entries(end + 1) = entry; %#ok<AGROW>
-        cached_index = numel(cost_entries);
-        if cached.is_certified
-            continue
-        end
-    end
-    polish_attempts = record_field(cached, 'polish_attempts', 0);
-    can_polish = ctx.config.frontier_polish_enabled && ...
-        ~prefer_direct_certification && ...
-        ~isempty(fieldnames(cached)) && cached.has_incumbent && ...
-        polish_attempts < ctx.config.frontier_polish_max_attempts;
-    if can_polish
-        remaining_budget_s = ...
-            ctx.config.frontier_certification_run_budget_s - ...
-            toc(certification_started);
-        if remaining_budget_s <= 61
-            certification_budget_exhausted = true;
-            break
-        end
-        stage_ctx = ctx;
-        stage_ctx.polish_options = optimoptions(ctx.polish_options, ...
-            'MaxTime', min(ctx.config.frontier_polish_max_time_s, ...
-            remaining_budget_s - 60));
-        total_attempts = record_field(cached, 'frontier_attempts', 0) + 1;
-        point = polish_cost_upper_bound(cost_solver, K, ...
-            certification_start, stage_ctx, total_attempts, cached);
-        certification_new_points = certification_new_points + 1;
-        entry = struct('mode', cache_mode, 'cost_cap', Inf, 'K', K, ...
-            'record', point, 'source', "frontier_polish");
-        ctx.services.fixed_point_store(ctx.point_cache_file, ...
-            ctx.cost_signature, "append", cache_mode, Inf, entry);
-        if isempty(cached_index)
-            cost_entries(end + 1) = entry; %#ok<AGROW>
-            cached_index = numel(cost_entries);
-        else
-            cost_entries(cached_index) = entry;
-        end
-        fprintf(['[O1] 关键点K=%g定向上界精修：[%g, %g] USD，', ...
-            '不确定性=%.6g USD/t，目标<=%.6g USD/t，%s，%.1f s。\n'], ...
-            K, point.objective_lower, point.objective_upper, ...
-            record_uncertainty_usd_t(point, ctx), ...
-            ctx.config.frontier_certification_tolerance_usd_t, ...
-            point.polish_status, point.polish_elapsed_s);
-        cached = point;
-        uncertainty = record_uncertainty_usd_t(cached, ctx);
-        if uncertainty <= ...
-                ctx.config.frontier_certification_tolerance_usd_t
-            continue
-        end
-        if ctx.config.frontier_polish_only
-            continue
-        end
-    end
-
-    % 先在缓存模式并集及其循环时间邻域内寻找达标上界。
-    local_search_pending = false;
-    if ctx.config.frontier_pattern_pool_enabled && ~prefer_direct_certification && ...
-            ~isempty(fieldnames(cached)) && cached.has_incumbent
-        [base_hours, pattern_count] = collect_cached_pattern_pool( ...
-            K, cost_entries, initial, ctx.T);
-        same_pool = isfield(cached, 'pattern_pool_base_hours') && ...
-            isequal(cached.pattern_pool_base_hours(:), base_hours(:));
-        if same_pool
-            completed_radii = record_field(cached, ...
-                'pattern_pool_completed_radii_h', zeros(0, 1));
-            pool_status = string(record_field(cached, ...
-                'pattern_pool_status', strings(0, 1)));
-            pool_elapsed = record_field(cached, ...
-                'pattern_pool_elapsed_s', zeros(0, 1));
-            pool_sizes = record_field(cached, ...
-                'pattern_pool_candidate_hours', zeros(0, 1));
-        else
-            completed_radii = zeros(0, 1);
-            pool_status = strings(0, 1);
-            pool_elapsed = zeros(0, 1);
-            pool_sizes = zeros(0, 1);
-        end
-        radii = ctx.config.frontier_pattern_pool_radii_h(:);
-        remaining_radii = radii(~ismember(radii, completed_radii));
-        if pattern_count == 1 && polish_attempts > 0
-            % 单一模式的0小时邻域与已经完成的固定模式精修完全等价。
-            remaining_radii(remaining_radii == 0) = [];
-        end
-        while ~isempty(remaining_radii) && ...
-                certification_new_points < ...
-                ctx.config.frontier_certification_points_per_run
-            remaining_budget_s = ...
-                ctx.config.frontier_certification_run_budget_s - ...
-                toc(certification_started);
-            if remaining_budget_s <= 61
-                certification_budget_exhausted = true;
-                break
-            end
-            radius_h = remaining_radii(1);
-            allowed_z = expand_cyclic_hours(base_hours, radius_h, ctx.T);
-            stage_time_s = min( ...
-                ctx.config.frontier_pattern_pool_max_time_s, ...
-                remaining_budget_s - 60);
-            certification_start = best_feasible_seed( ...
-                K, cost_entries, initial, ctx);
-            target_upper = cached.objective_lower + ...
-                ctx.config.frontier_certification_tolerance_usd_t * ...
-                ctx.config.nh3_target_t;
-            outcome = solve_cost_cap_domain(cost_solver, K, ...
-                certification_start, ctx, target_upper, allowed_z, ...
-                stage_time_s, ctx.pattern_pool_options);
-            total_attempts = record_field(cached, ...
-                'frontier_attempts', 0) + 1;
-            point = merge_cost_cap_outcome(cached, outcome, ctx, K, ...
-                total_attempts, "pattern_pool", ...
-                "intlinprog_hb_pattern_pool_target_cap", ...
-                target_upper, false);
-            completed_radii(end + 1, 1) = radius_h; %#ok<AGROW>
-            pool_status(end + 1, 1) = outcome.status; %#ok<AGROW>
-            pool_elapsed(end + 1, 1) = outcome.elapsed_s; %#ok<AGROW>
-            pool_sizes(end + 1, 1) = outcome.candidate_hours; %#ok<AGROW>
-            point.pattern_pool_base_hours = base_hours;
-            point.pattern_pool_pattern_count = pattern_count;
-            point.pattern_pool_completed_radii_h = completed_radii;
-            point.pattern_pool_status = pool_status;
-            point.pattern_pool_elapsed_s = pool_elapsed;
-            point.pattern_pool_candidate_hours = pool_sizes;
-            entry = struct('mode', cache_mode, 'cost_cap', Inf, ...
-                'K', K, 'record', point, 'source', "frontier_pattern_pool");
-            ctx.services.fixed_point_store(ctx.point_cache_file, ...
-                ctx.cost_signature, "append", cache_mode, Inf, entry);
-            cost_entries(cached_index) = entry;
-            cached = point;
-            certification_new_points = certification_new_points + 1;
-            fprintf(['[O1] 关键点K=%g候选池：独立模式=%d，半径=%g h，', ...
-                '候选时刻=%d，[%g, %g] USD，不确定性=%.6g USD/t，', ...
-                '%s，%.1f s。\n'], K, pattern_count, radius_h, ...
-                outcome.candidate_hours, point.objective_lower, ...
-                point.objective_upper, ...
-                record_uncertainty_usd_t(point, ctx), ...
-                outcome.status, outcome.elapsed_s);
-            if point.is_certified
-                break
-            end
-            remaining_radii = radii(~ismember(radii, completed_radii));
-            if pattern_count == 1 && polish_attempts > 0
-                remaining_radii(remaining_radii == 0) = [];
-            end
-        end
-        local_search_pending = ~isempty(remaining_radii);
-        if cached.is_certified
-            continue
-        end
-    end
-    if certification_budget_exhausted || ...
-            certification_new_points >= ...
-            ctx.config.frontier_certification_points_per_run
-        certification_budget_exhausted = true;
-        break
-    end
-    if ctx.config.frontier_polish_only && local_search_pending
-        break
-    end
-
-    % 少量高购电增量窗口只改进原模型上界；完成时刻落盘后不重复搜索。
-    if ctx.config.frontier_local_cost_enabled && ~local_search_pending && ...
-            ~prefer_direct_certification
-        completed = record_field(cached, 'local_cost_completed_starts', zeros(0, 1));
-        while numel(completed) < ctx.config.frontier_local_cost_max_windows && ...
-                certification_new_points < ...
-                ctx.config.frontier_certification_points_per_run
-            remaining_s = ctx.config.frontier_certification_run_budget_s - ...
-                toc(certification_started);
-            if remaining_s <= 61
-                certification_budget_exhausted = true;
-                break
-            end
-            certification_start = best_feasible_seed(K, cost_entries, initial, ctx);
-            starts = rank_cost_windows(certification_start, reference, ctx);
-            starts = starts(~ismember(starts, completed));
-            if isempty(starts)
-                break
-            end
-            first = starts(1);
-            last = min(ctx.T, first + ctx.config.frontier_local_cost_window_h - 1);
-            local_solver = restrict_cost_window(cost_solver, ...
-                certification_start, first:last, ctx.T);
-            upper_options = optimoptions(ctx.pattern_pool_options, ...
-                'MaxFeasiblePoints', Inf, 'AbsoluteGapTolerance', ...
-                ctx.config.frontier_certification_tolerance_usd_t * ...
-                ctx.config.nh3_target_t / 4);
-            outcome = solve_cost_cap_domain(local_solver, K, ...
-                certification_start, ctx, Inf, true(ctx.T, 1), ...
-                min(ctx.config.frontier_local_cost_max_time_s, remaining_s - 60), ...
-                upper_options);
-            point = merge_cost_cap_outcome(cached, outcome, ctx, K, ...
-                record_field(cached, 'frontier_attempts', 0) + 1, ...
-                "local_cost", "intlinprog_seeded_local_cost", Inf, false);
-            completed(end + 1, 1) = first; %#ok<AGROW>
-            point.local_cost_completed_starts = completed;
-            point.local_cost_window_h = ctx.config.frontier_local_cost_window_h;
-            entry = struct('mode', cache_mode, 'cost_cap', Inf, 'K', K, ...
-                'record', point, 'source', "frontier_local_cost");
-            ctx.services.fixed_point_store(ctx.point_cache_file, ...
-                ctx.cost_signature, "append", cache_mode, Inf, entry);
-            cost_entries(cached_index) = entry;
-            cached = point;
-            certification_new_points = certification_new_points + 1;
-            fprintf(['[O1] K=%g局部成本窗口%d:%d：[%g, %g] USD，', ...
-                '不确定性=%.6g USD/t，%s，%.1f s。\n'], ...
-                K, first, last, point.objective_lower, point.objective_upper, ...
-                record_uncertainty_usd_t(point, ctx), outcome.status, outcome.elapsed_s);
-            if point.is_certified
-                break
-            end
-        end
-        if cached.is_certified
-            continue
-        end
-    end
-    if certification_budget_exhausted || certification_new_points >= ...
-            ctx.config.frontier_certification_points_per_run
-        certification_budget_exhausted = true;
-        break
-    end
-
-    % 全局阶段停滞后，允许少量新更新时刻出现在全年任意位置。
-    if ctx.config.frontier_relocation_cost_enabled && ~local_search_pending && ...
-            ~prefer_direct_certification && ...
-            (~ctx.config.frontier_global_bisection_enabled || ...
-            record_field(cached, 'global_bisection_attempts', 0) >= ...
-            ctx.config.frontier_global_bisection_max_attempts)
-        completed_q = record_field(cached, 'relocation_cost_completed_radii', zeros(0, 1));
-        radii_q = unique(ctx.config.frontier_relocation_cost_radii(:), 'stable');
-        pending_q = radii_q(~ismember(radii_q, completed_q));
-        while ~isempty(pending_q) && certification_new_points < ...
-                ctx.config.frontier_certification_points_per_run
-            remaining_s = ctx.config.frontier_certification_run_budget_s - ...
-                toc(certification_started);
-            if remaining_s <= 61
-                certification_budget_exhausted = true;
-                break
-            end
-            q = pending_q(1);
-            certification_start = best_feasible_seed(K, cost_entries, initial, ctx);
-            branch_solver = cost_solver;
-            branch_solver.restricted_cost_domain = true;
-            z_positions = branch_solver.indices.O1_HB_change(:);
-            outside = z_positions(certification_start.O1_HB_change(:) < 0.5);
-            branch_solver.problem.Aineq(end + 1, :) = sparse( ...
-                ones(numel(outside), 1), outside, ones(numel(outside), 1), ...
-                1, numel(branch_solver.problem.lb));
-            branch_solver.problem.bineq(end + 1, 1) = q;
-            upper_options = optimoptions(ctx.pattern_pool_options, ...
-                'MaxFeasiblePoints', Inf, 'AbsoluteGapTolerance', ...
-                ctx.config.frontier_certification_tolerance_usd_t * ...
-                ctx.config.nh3_target_t / 4);
-            outcome = solve_cost_cap_domain(branch_solver, K, ...
-                certification_start, ctx, Inf, true(ctx.T, 1), ...
-                min(ctx.config.frontier_relocation_cost_max_time_s, remaining_s - 60), ...
-                upper_options);
-            point = merge_cost_cap_outcome(cached, outcome, ctx, K, ...
-                record_field(cached, 'frontier_attempts', 0) + 1, ...
-                "relocation_cost", "intlinprog_seeded_global_relocation", Inf, false);
-            completed_q(end + 1, 1) = q; %#ok<AGROW>
-            point.relocation_cost_completed_radii = completed_q;
-            entry = struct('mode', cache_mode, 'cost_cap', Inf, 'K', K, ...
-                'record', point, 'source', "frontier_relocation_cost");
-            ctx.services.fixed_point_store(ctx.point_cache_file, ...
-                ctx.cost_signature, "append", cache_mode, Inf, entry);
-            cost_entries(cached_index) = entry;
-            cached = point;
-            certification_new_points = certification_new_points + 1;
-            fprintf(['[O1] K=%g远距离成本搜索q=%d：[%g, %g] USD，', ...
-                '不确定性=%.6g USD/t，%s，%.1f s。\n'], ...
-                K, q, point.objective_lower, point.objective_upper, ...
-                record_uncertainty_usd_t(point, ctx), outcome.status, outcome.elapsed_s);
-            if point.is_certified
-                break
-            end
-            pending_q = radii_q(~ismember(radii_q, completed_q));
-        end
-        if cached.is_certified
-            continue
-        end
-    end
-    if certification_budget_exhausted || certification_new_points >= ...
-            ctx.config.frontier_certification_points_per_run
-        certification_budget_exhausted = true;
-        break
-    end
-
-    % 候选池穷尽后，放开全部HB时刻并用成本帽二分压缩全局区间。
-    if ctx.config.frontier_global_bisection_enabled && ~prefer_direct_certification && ...
-            ~local_search_pending
-        bisection_attempts = record_field(cached, ...
-            'global_bisection_attempts', 0);
-        while bisection_attempts < ...
-                ctx.config.frontier_global_bisection_max_attempts && ...
-                certification_new_points < ...
-                ctx.config.frontier_certification_points_per_run
-            remaining_budget_s = ...
-                ctx.config.frontier_certification_run_budget_s - ...
-                toc(certification_started);
-            if remaining_budget_s <= 61
-                certification_budget_exhausted = true;
-                break
-            end
-            target_upper = select_untried_cost_cap(cached);
-            stage_time_s = min( ...
-                ctx.config.frontier_global_bisection_max_time_s, ...
-                remaining_budget_s - 60);
-            certification_start = best_feasible_seed( ...
-                K, cost_entries, initial, ctx);
-            % 两次无首解后换用可热启动的成本帽超额模型，避免重复冷启动。
-            use_warm_cap = bisection_attempts >= 2;
-            pool_cost_attempts = record_field(cached, ...
-                'pool_cost_optimization_attempts', 0);
-            use_pool_cost = bisection_attempts >= 4 && ...
-                pool_cost_attempts == 0 && ctx.config.frontier_pattern_pool_enabled;
-            stage_phase = "global_bisection";
-            stage_label = "全局成本认证";
-            raise_global_lower = true;
-            if use_pool_cost
-                % 先前硬目标帽失败不代表候选池没有中间上界改善。
-                [base_hours, ~] = collect_cached_pattern_pool( ...
-                    K, cost_entries, initial, ctx.T);
-                radius_h = max([0; ctx.config.frontier_pattern_pool_radii_h(:)]);
-                allowed_z = expand_cyclic_hours(base_hours, radius_h, ctx.T);
-                stage_time_s = min(stage_time_s, ...
-                    ctx.config.frontier_pattern_pool_max_time_s);
-                upper_options = optimoptions(ctx.pattern_pool_options, ...
-                    'MaxFeasiblePoints', Inf, ...
-                    'AbsoluteGapTolerance', ...
-                    ctx.config.frontier_certification_tolerance_usd_t * ...
-                    ctx.config.nh3_target_t / 4);
-                target_upper = Inf;
-                outcome = solve_cost_cap_domain(cost_solver, K, ...
-                    certification_start, ctx, target_upper, allowed_z, ...
-                    stage_time_s, upper_options);
-                cost_cap_backend = "intlinprog_seeded_pool_cost_minimum";
-                stage_phase = "pool_optimization";
-                stage_label = "候选池原成本精修";
-                raise_global_lower = false;
-            elseif use_warm_cap
-                % 已有全局下界L时，以L为基准最小化成本超额，避免在
-                % 高成本帽以下出现大块平坦目标区；最终目标仍是原成本。
-                target_upper = cached.objective_lower;
-                relax_ael_counts = bisection_attempts >= 3;
-                outcome = solve_warm_cost_cap(cost_solver, K, ...
-                    certification_start, ctx, target_upper, stage_time_s, ...
-                    relax_ael_counts);
-                cost_cap_backend = "intlinprog_warm_cost_cap_excess";
-            else
-                outcome = solve_cost_cap_domain(cost_solver, K, ...
-                    certification_start, ctx, target_upper, ...
-                    true(ctx.T, 1), stage_time_s, ...
-                    ctx.global_bisection_options);
-                cost_cap_backend = "intlinprog_global_cost_cap";
-            end
-            total_attempts = record_field(cached, ...
-                'frontier_attempts', 0) + 1;
-            point = merge_cost_cap_outcome(cached, outcome, ctx, K, ...
-                total_attempts, stage_phase, ...
-                cost_cap_backend, target_upper, raise_global_lower);
-            if use_pool_cost
-                point.pool_cost_optimization_attempts = pool_cost_attempts + 1;
-            end
-            cap_history = record_field(cached, ...
-                'global_bisection_caps_usd', zeros(0, 1));
-            status_history = string(record_field(cached, ...
-                'global_bisection_status', strings(0, 1)));
-            elapsed_history = record_field(cached, ...
-                'global_bisection_elapsed_s', zeros(0, 1));
-            cap_history(end + 1, 1) = target_upper;
-            status_history(end + 1, 1) = outcome.status;
-            elapsed_history(end + 1, 1) = outcome.elapsed_s;
-            bisection_attempts = bisection_attempts + 1;
-            point.global_bisection_attempts = bisection_attempts;
-            point.global_bisection_caps_usd = cap_history;
-            point.global_bisection_status = status_history;
-            point.global_bisection_elapsed_s = elapsed_history;
-            entry = struct('mode', cache_mode, 'cost_cap', Inf, ...
-                'K', K, 'record', point, ...
-                'source', "frontier_" + stage_phase);
-            ctx.services.fixed_point_store(ctx.point_cache_file, ...
-                ctx.cost_signature, "append", cache_mode, Inf, entry);
-            cost_entries(cached_index) = entry;
-            cached = point;
-            certification_new_points = certification_new_points + 1;
-            fprintf(['[O1] 关键点K=%g%s，成本基准=%g USD：', ...
-                '[%g, %g] USD，不确定性=%.6g USD/t，%s，%.1f s。\n'], ...
-                K, stage_label, target_upper, point.objective_lower, ...
-                point.objective_upper, ...
-                record_uncertainty_usd_t(point, ctx), ...
-                outcome.status, outcome.elapsed_s);
-            if raise_global_lower && isfinite(outcome.raw_best_bound_usd)
-                fprintf('[O1] 本轮全局求解器有效下界=%g USD。\n', ...
-                    outcome.raw_best_bound_usd);
-            end
-            if point.is_certified
-                break
-            end
-        end
-        if cached.is_certified
-            continue
-        end
-        if bisection_attempts >= ...
-                ctx.config.frontier_global_bisection_max_attempts
-            fprintf('[O1] 关键点K=%g多策略阶段已用完，转入剩余原模型认证。\n', K);
-            if certification_attempts >= ...
-                    ctx.config.frontier_certification_max_attempts && ...
-                    ~needs_scaled_certification && ~needs_floor_certification && ...
-                    ~needs_startup_certification && ~needs_gurobi_certification
-                % 单个关键点的全部预算耗尽不能永久阻塞其他关键点。
-                continue
-            end
-        else
-            break
-        end
-    end
-
-    if certification_attempts >= ...
-            ctx.config.frontier_certification_max_attempts && ...
-            ~needs_scaled_certification && ~needs_floor_certification && ...
-            ~needs_startup_certification && ~needs_gurobi_certification
-        continue
-    end
-    if use_gurobi && ~needs_gurobi_certification
-        continue
-    end
-    if certification_new_points >= ...
-            ctx.config.frontier_certification_points_per_run || ...
-            toc(certification_started) >= ...
-            ctx.config.frontier_certification_run_budget_s
-        certification_budget_exhausted = true;
-        break
-    end
-    total_attempts = record_field(cached, 'frontier_attempts', 0) + 1;
-    remaining_budget_s = ctx.config.frontier_certification_run_budget_s - ...
-        toc(certification_started);
-    if remaining_budget_s <= 61
-        certification_budget_exhausted = true;
-        break
-    end
-    stage_ctx = ctx;
-    stage_ctx.certification_options = optimoptions(ctx.certification_options, ...
-        'MaxTime', min(ctx.config.frontier_certification_max_time_s, ...
-        remaining_budget_s - 60));
-    point = solve_cost_frontier_point(cost_solver, K, ...
-        certification_start, stage_ctx, reference, total_attempts, ...
-        "certification", cached);
-    certification_new_points = certification_new_points + 1;
-    entry = struct('mode', cache_mode, 'cost_cap', Inf, 'K', K, ...
-        'record', point, 'source', "frontier_certification");
-    ctx.services.fixed_point_store(ctx.point_cache_file, ...
-        ctx.cost_signature, "append", cache_mode, Inf, entry);
-    if isempty(cached_index)
-        cost_entries(end + 1) = entry; %#ok<AGROW>
-    else
-        cost_entries(cached_index) = entry;
-    end
-    fprintf(['[O1] 关键点K=%g认证：[%g, %g] USD，', ...
-        '不确定性=%.6g USD/t，目标<=%.6g USD/t，%.1f s。\n'], ...
-        K, point.objective_lower, point.objective_upper, ...
-        record_uncertainty_usd_t(point, ctx), ...
-        ctx.config.frontier_certification_tolerance_usd_t, ...
-        point.elapsed_s);
-end
-
+certify_each_cost_point();
 structure = analyze_frontier_structure(cost_entries, reference, ...
     upper, reference_count, ctx);
 % 认证阶段可能改进上界；代表解必须与最新缓存一致，不能保留锚点旧解。
@@ -895,7 +389,11 @@ if isempty(certification) || all(certification.is_resolved)
     next_pending_K = NaN;
 elseif ctx.config.certify_all_frontier_k
     pending_K = certification.K(~certification.is_resolved);
-    if interval_batch
+    unscanned_K = frontier.K(~screening_done & ...
+        ~frontier.is_certified & ~frontier.is_infeasible);
+    if ~isempty(unscanned_K)
+        next_pending_K = min(unscanned_K);
+    elseif interval_batch
         next_pending_K = min(pending_K); % 下一轮从首个未达标K开始遍历。
     else
         next_pending_K = next_cost_certification_K(pending_K, cost_entries);
@@ -918,6 +416,13 @@ frontier_state = struct('elapsed_s', toc(frontier_started), ...
     'next_pending_K', next_pending_K, ...
     'total_points', height(frontier), ...
     'reference_K', reference_count, 'interval_batch', interval_batch, ...
+    'selection_step', ctx.config.frontier_k_step, ...
+    'sampled_interval', sampled_interval, ...
+    'deferred_integer_points', deferred_integer_points, ...
+    'screening_new_points', screening_new_points, ...
+    'screening_complete', all(screening_done | frontier.is_certified | frontier.is_infeasible), ...
+    'difficult_K', frontier.K(screening_enabled & screening_done & ...
+        ~frontier.is_certified & ~frontier.is_infeasible), ...
     'anchor_K', solve_K, 'critical_K', critical_K, ...
     'certification_new_points', certification_new_points, ...
     'certification_budget_exhausted', ...
@@ -938,12 +443,19 @@ if ctx.config.certify_all_frontier_k
 end
 
     function certify_each_cost_point()
-        % 批量模式逐轮遍历整个区间；限额模式仍按累计次数公平续算。
+        % 所有选定点先完成一次短遍历；标记落在原缓存内，重启不重复首轮。
         attempts_this_run = zeros(height(frontier), 1);
+        difficult_announced = false;
         for certification_row = 1:height(frontier)
             K_value = frontier.K(certification_row);
-            if K_value >= reference_count
+            if K_value < feasibility.K_lower
+                assign_row(certification_row, make_non_solved_point( ...
+                    K_value, Inf, Inf, "infeasible_certified", "count_bound"));
+                screening_done(certification_row) = true;
+                continue
+            elseif K_value >= reference_count
                 assign_row(certification_row, reference);
+                screening_done(certification_row) = true;
                 continue
             end
             match = find([cost_entries.K] == K_value, 1);
@@ -952,12 +464,19 @@ end
             else
                 bound = strengthen_anchor_bound(cost_entries(match).record, ...
                     K_value, cost_entries, reference, ctx);
+                if screening_enabled
+                    screening_done(certification_row) = ...
+                        record_field(bound, 'screening_attempts', 0) > 0 && ...
+                        record_field(bound, 'screening_max_time_s', 0) >= ...
+                        ctx.config.frontier_screening_max_time_s;
+                end
             end
             assign_row(certification_row, bound);
         end
         frontier = apply_monotonic_closure(frontier);
         while true
-            pending = find(~frontier.is_certified & ~frontier.is_infeasible);
+            pending = find(~frontier.is_certified & ~frontier.is_infeasible & ...
+                ismember(frontier.K, critical_K));
             if isempty(pending)
                 return
             end
@@ -966,21 +485,42 @@ end
                 certification_budget_exhausted = true;
                 return
             end
+            screening_pass = screening_enabled && any(~screening_done(pending));
+            eligible = pending;
+            if screening_pass
+                eligible = pending(~screening_done(pending));
+            elseif screening_enabled && ~difficult_announced
+                fprintf(['[O1] %g秒短遍历阶段已完成，剩余%d个困难点；', ...
+                    '开始集中认证，单次时限=%g s。\n'], ...
+                    ctx.config.frontier_screening_max_time_s, ...
+                    numel(pending), ctx.config.frontier_certification_max_time_s);
+                difficult_announced = true;
+            end
             if interval_batch
-                eligible = pending(attempts_this_run(pending) < ...
+                eligible = eligible(attempts_this_run(eligible) < ...
                     ctx.config.frontier_certification_max_attempts);
                 if isempty(eligible)
                     certification_retry_exhausted = true;
                     certification_retry_exhausted_K = frontier.K(pending);
-                    fprintf(['[O1] 整区间已遍历，本轮每K最多%d次；', ...
+                    fprintf(['[O1] 选定点已遍历，本轮每K最多%d次；', ...
                         '剩余%d个未达标点已缓存，保留待认证。\n'], ...
                         ctx.config.frontier_certification_max_attempts, numel(pending));
                     return
                 end
-                K_value = next_cost_certification_K(frontier.K(eligible), ...
-                    cost_entries, attempts_this_run(eligible));
+            end
+            if screening_pass
+                K_value = min(frontier.K(eligible));
+                stage_name = "短遍历";
+                point_max_time_s = ctx.config.frontier_screening_max_time_s;
             else
-                K_value = next_cost_certification_K(frontier.K(pending), cost_entries);
+                if interval_batch
+                    K_value = next_cost_certification_K(frontier.K(eligible), ...
+                        cost_entries, attempts_this_run(eligible));
+                else
+                    K_value = next_cost_certification_K(frontier.K(eligible), cost_entries);
+                end
+                stage_name = "困难点认证";
+                point_max_time_s = ctx.config.frontier_certification_max_time_s;
             end
             certification_row = find(frontier.K == K_value, 1);
             match = find([cost_entries.K] == K_value, 1);
@@ -990,26 +530,55 @@ end
                     K_value, cost_entries, reference, ctx);
             end
             start = best_feasible_seed(K_value, cost_entries, initial, ctx, true);
+            % 上一点的完整可行解保留在内存中，即使该点只缓存了标量成本界。
+            if round(sum(current_start.O1_HB_change)) <= K_value && ...
+                    (round(sum(start.O1_HB_change)) > K_value || ...
+                    evaluate(ctx.system_cost_usd, current_start) < ...
+                    evaluate(ctx.system_cost_usd, start))
+                start = current_start;
+            end
             point_ctx = ctx;
             remaining = ctx.config.frontier_certification_run_budget_s - toc(certification_started);
             point_ctx.certification_options = optimoptions(ctx.certification_options, ...
                 'RelativeGapTolerance', 0, 'MaxTime', ...
-                min(ctx.config.frontier_certification_max_time_s, max(0.01, remaining)));
-            point_ctx.config.gurobi_partition_enabled = ctx.config.gurobi_partition_enabled && ...
+                min(point_max_time_s, max(0.01, remaining)));
+            point_ctx.config.gurobi_partition_enabled = ~screening_pass && ...
+                ctx.config.gurobi_partition_enabled && ...
                 round(sum(start.O1_HB_change)) <= K_value && ...
                 record_field(prior, 'gurobi_partition_attempts', 0) < ...
                 ctx.config.gurobi_partition_max_attempts;
-            fprintf('[O1] 全K经济认证K=%g，第%d次，目标<=%.3g USD/t。\n', ...
-                K_value, record_field(prior, 'certification_attempts', 0) + 1, ...
+            fprintf('[O1] 固定K经济%sK=%g，第%d次，时限=%g s，目标<=%.3g USD/t。\n', ...
+                stage_name, K_value, record_field(prior, 'certification_attempts', 0) + 1, ...
+                point_ctx.certification_options.MaxTime, ...
                 ctx.config.frontier_certification_tolerance_usd_t);
             point = solve_cost_frontier_point(cost_solver, K_value, start, ...
                 point_ctx, reference, record_field(prior, 'frontier_attempts', 0) + 1, ...
                 "certification", prior);
             certification_new_points = certification_new_points + 1;
             attempts_this_run(certification_row) = attempts_this_run(certification_row) + 1;
+            if screening_pass
+                screening_new_points = screening_new_points + 1;
+                point.screening_attempts = record_field(prior, 'screening_attempts', 0) + 1;
+                point.screening_max_time_s = point_ctx.certification_options.MaxTime;
+                point.screening_elapsed_s = point.elapsed_s;
+                point.screening_status = "pending";
+                if point.is_certified || point.is_infeasible
+                    point.screening_status = "resolved";
+                end
+                screening_done(certification_row) = point.screening_max_time_s >= ...
+                    ctx.config.frontier_screening_max_time_s;
+            end
             stored = point;
+            keep_by_spacing = mod(K_value - frontier.K(1), ...
+                ctx.config.frontier_solution_interval) == 0;
+            if ctx.config.frontier_all_k && ctx.config.frontier_k_step > 1
+                % 稀疏网格按行间隔留解，避免84起点与整十点永远错过25K间隔。
+                solution_stride = max(1, ceil(ctx.config.frontier_solution_interval / ...
+                    ctx.config.frontier_k_step));
+                keep_by_spacing = mod(certification_row - 1, solution_stride) == 0;
+            end
             keep_vector = point.has_incumbent && (point.count_upper <= upper || ...
-                mod(K_value - frontier.K(1), ctx.config.frontier_solution_interval) == 0 || ...
+                keep_by_spacing || ...
                 any(K_value == ctx.config.frontier_key_k));
             if ~keep_vector
                 stored.solution = struct();
@@ -1025,14 +594,23 @@ end
                 cost_entries(match) = entry;
             end
             assign_row(certification_row, point);
+            if point.has_incumbent && ~isempty(fieldnames(point.solution))
+                current_start = point.solution;
+            end
             if point.has_incumbent && ~isempty(fieldnames(point.solution)) && ...
                     point.count_upper <= representative.count_upper
                 representative = point;
             end
             frontier = apply_monotonic_closure(frontier);
-            fprintf(['[O1] K=%g经济求解结果：%s，成本=[%.6g, %.6g] USD，', ...
-                '不确定性=%.6g USD/t；区间待认证=%d。\n'], K_value, point.status, ...
-                point.objective_lower, point.objective_upper, ...
+            result_note = "待认证，已缓存进度，未计最终结果";
+            if frontier.is_certified(certification_row)
+                result_note = "精度达标";
+            elseif frontier.is_infeasible(certification_row)
+                result_note = "已证不可行";
+            end
+            fprintf(['[O1] K=%g：%s，%s，成本界=[%.6g, %.6g] USD，', ...
+                '不确定性=%.6g USD/t；目标点待认证=%d。\n'], K_value, point.status, ...
+                result_note, point.objective_lower, point.objective_upper, ...
                 record_uncertainty_usd_t(point, ctx), ...
                 sum(~frontier.is_certified & ~frontier.is_infeasible));
         end
@@ -1488,64 +1066,6 @@ uncertainty = max(0, ...
     / ctx.config.nh3_target_t;
 end
 
-function [base_hours, pattern_count] = collect_cached_pattern_pool( ...
-        K, entries, fallback, T)
-%COLLECT_CACHED_PATTERN_POOL 汇总不超过K的独立HB变动模式。
-patterns = false(T, 0);
-append_solution(fallback);
-for entry_index = 1:numel(entries)
-    record = entries(entry_index).record;
-    if ~isfield(record, 'solution')
-        continue
-    end
-    append_solution(record.solution);
-end
-pattern_count = size(patterns, 2);
-base_hours = find(any(patterns, 2));
-
-    function append_solution(solution)
-        if ~isstruct(solution) || ...
-                ~isfield(solution, 'O1_HB_change') || ...
-                numel(solution.O1_HB_change) ~= T
-            return
-        end
-        pattern = round(solution.O1_HB_change(:)) > 0.5;
-        if sum(pattern) > K
-            return
-        end
-        if ~isempty(patterns) && any(all(patterns == pattern, 1))
-            return
-        end
-        patterns(:, end + 1) = pattern; %#ok<AGROW>
-    end
-end
-
-function allowed = expand_cyclic_hours(base_hours, radius_h, T)
-%EXPAND_CYCLIC_HOURS 按全年循环时间轴扩展候选变动时刻。
-allowed = false(T, 1);
-for offset = -radius_h:radius_h
-    hours = mod(base_hours(:) - 1 + offset, T) + 1;
-    allowed(hours) = true;
-end
-end
-
-function cap = select_untried_cost_cap(record)
-%SELECT_UNTRIED_COST_CAP 在当前区间最大的未检验子区间取中点。
-lower = record.objective_lower;
-upper = record.objective_upper;
-attempted = record_field(record, ...
-    'global_bisection_caps_usd', zeros(0, 1));
-tolerance = max(1e-4, 1e-10 * max(abs([lower, upper])));
-attempted = attempted(attempted > lower + tolerance & ...
-    attempted < upper - tolerance);
-knots = unique([lower; attempted(:); upper]);
-gaps = diff(knots);
-largest_gap = max(gaps);
-% 等长时优先上半区，提高先找到可行上界的概率。
-interval = find(gaps >= largest_gap - tolerance, 1, 'last');
-cap = (knots(interval) + knots(interval + 1)) / 2;
-end
-
 function value = record_field(record, name, default_value)
 %RECORD_FIELD 读取兼容新旧缓存的可选字段。
 value = default_value;
@@ -1571,544 +1091,6 @@ end
 K = K_values(order(1));
 end
 
-function outcome = solve_cost_cap_domain( ...
-        solver_data, K, start, ctx, target_upper, allowed_z, ...
-        max_time_s, base_options)
-%SOLVE_COST_CAP_DOMAIN 在指定HB候选时刻内搜索满足成本帽的可行解。
-problem = solver_data.problem;
-problem.bineq(solver_data.update_row) = ...
-    solver_data.update_coefficient * K;
-problem.options = optimoptions(base_options, 'MaxTime', max_time_s);
-indices = solver_data.indices;
-seed_vector = solution_to_vector(indices, start, numel(problem.lb));
-if isempty(seed_vector)
-    error('O1:no_cost_cap_seed', ...
-        '关键K=%g没有完整的成本帽搜索初值。', K);
-end
-seed_upper = evaluate(ctx.system_cost_usd, start);
-objective_offset = seed_upper - problem.f(:).' * seed_vector(:);
-
-z_indices = indices.O1_HB_change(:);
-allowed_z = logical(allowed_z(:));
-if numel(allowed_z) ~= numel(z_indices)
-    error('O1:bad_cost_cap_domain', ...
-        'HB候选时刻向量长度与模型不一致。');
-end
-fixed_zero = z_indices(~allowed_z);
-problem.lb(fixed_zero) = 0;
-problem.ub(fixed_zero) = 0;
-problem.intcon = setdiff(problem.intcon(:), fixed_zero);
-
-target_solver_upper = target_upper - objective_offset;
-if isfinite(target_upper)
-    problem.Aineq(end + 1, :) = sparse(problem.f(:).');
-    problem.bineq(end + 1, 1) = target_solver_upper + ...
-        max(1e-6, 1e-10 * abs(target_solver_upper));
-    problem.x0 = [];
-else
-    % 不设硬帽时直接最小化原成本，并保留位于候选池内的原可行初值。
-    problem.x0 = seed_vector;
-end
-
-relaxed_grid = zeros(0, 1);
-relaxed_ael = zeros(0, 1);
-if isfield(indices, 'u_purchase') && ...
-        isfield(indices, 'p_purchase') && isfield(indices, 'p_sell') && ...
-        all(ctx.model.context.C_purchase(:) >= ...
-        ctx.model.context.C_sell(:) - 1e-12)
-    relaxed_grid = indices.u_purchase(:);
-    problem.intcon = setdiff(problem.intcon(:), relaxed_grid);
-end
-if isfield(indices, 'I_AEL_up') && isfield(indices, 'n_ael')
-    relaxed_ael = indices.I_AEL_up(:);
-    problem.intcon = setdiff(problem.intcon(:), relaxed_ael);
-end
-
-outcome = struct('has_candidate', false, 'solution', struct(), ...
-    'candidate_cost', Inf, 'candidate_count', NaN, ...
-    'exitflag', NaN, 'elapsed_s', NaN, 'status', "求解异常", ...
-    'message', "", 'is_infeasible', false, ...
-    'candidate_hours', sum(allowed_z), 'raw_best_bound_usd', -Inf);
-started = tic;
-candidate_x = [];
-search_fval = NaN;
-recovery_failed = false;
-try
-    if all(allowed_z)
-        stop_bound = target_solver_upper;
-    else
-        stop_bound = Inf;
-    end
-    bound_label = "全局有效下界";
-    if ~all(allowed_z) || record_field(solver_data, 'restricted_cost_domain', false)
-        bound_label = "局部条件下界（不用于全局认证）";
-    end
-    [candidate_x, search_fval, exitflag, output] = run_cost_milp( ...
-        problem, K, objective_offset, stop_bound, bound_label);
-    if ~isempty(candidate_x) && ...
-            (~isempty(relaxed_grid) || ~isempty(relaxed_ael))
-        recovery_time_s = min(60, max(1, max_time_s));
-        [candidate_x, recovery_flag, recovery_output] = ...
-            ctx.services.recover_direction_binaries( ...
-            problem, candidate_x, indices, recovery_time_s);
-        if recovery_flag <= 0 || isempty(candidate_x)
-            candidate_x = [];
-            recovery_failed = true;
-            output.recovery = recovery_output;
-            output.message = ...
-                "方向变量恢复失败，未接收本轮候选上界。";
-        end
-    end
-catch exception
-    exitflag = NaN;
-    output = struct('message', exception.message);
-end
-outcome.elapsed_s = toc(started);
-outcome.exitflag = exitflag;
-if isfield(output, 'message')
-    outcome.message = string(output.message);
-end
-if isfield(output, 'trace_dualbound') && ...
-        isscalar(output.trace_dualbound) && isfinite(output.trace_dualbound)
-    outcome.raw_best_bound_usd = output.trace_dualbound + objective_offset;
-elseif isfield(output, 'bestbound') && ...
-        isscalar(output.bestbound) && isfinite(output.bestbound)
-    outcome.raw_best_bound_usd = output.bestbound + objective_offset;
-elseif isscalar(search_fval) && isfinite(search_fval) && ...
-        isfield(output, 'absolutegap') && ...
-        isscalar(output.absolutegap) && isfinite(output.absolutegap)
-    outcome.raw_best_bound_usd = search_fval + objective_offset ...
-        - max(0, output.absolutegap);
-end
-
-if ~isempty(candidate_x)
-    solution = vector_to_solution(candidate_x, indices);
-    solution = ctx.services.add_change_indicators(solution, ctx);
-    candidate_count = round(sum(solution.O1_HB_change));
-    candidate_cost = evaluate(ctx.system_cost_usd, solution);
-    acceptance_tolerance = max(1e-4, 1e-9 * abs(target_upper));
-    if candidate_count <= K && isfinite(candidate_cost) && ...
-            candidate_cost <= target_upper + acceptance_tolerance
-        outcome.has_candidate = true;
-        outcome.solution = solution;
-        outcome.candidate_cost = candidate_cost;
-        outcome.candidate_count = candidate_count;
-        if isfinite(target_upper)
-            outcome.status = "已找到达标上界";
-        else
-            outcome.status = "已取得可验证原成本上界";
-        end
-    else
-        outcome.status = "候选点未通过原模型复核";
-    end
-elseif exitflag == -2 && ~recovery_failed
-    outcome.status = "成本帽不可行";
-    outcome.is_infeasible = true;
-elseif exitflag == 0
-    outcome.status = "达到时限但未找到可行点";
-elseif exitflag == -1 && isfinite(outcome.raw_best_bound_usd)
-    outcome.status = "回调保留有效下界";
-elseif recovery_failed
-    outcome.status = "方向变量恢复失败";
-end
-end
-
-function outcome = solve_warm_cost_cap( ...
-        solver_data, K, start, ctx, certified_lower, max_time_s, ...
-        relax_ael_counts)
-%SOLVE_WARM_COST_CAP 用超额变量保留原可行热启动，不松弛任何物理约束。
-% 基准必须是已有的有效全局下界L，不能传入任意未经证明的成本帽。
-% 内部最小化s，满足原约束及L<=C(x)<=L+s、s>=0。
-% 正对偶界s_L给出更强下界L+s_L；零对偶界只保留已有下界L。
-problem = solver_data.problem;
-problem.bineq(solver_data.update_row) = solver_data.update_coefficient * K;
-indices = solver_data.indices;
-seed = solution_to_vector(indices, start, numel(problem.lb));
-seed_cost = evaluate(ctx.system_cost_usd, start);
-if isempty(seed) || ~isfinite(seed_cost) || ...
-        round(sum(start.O1_HB_change)) > K
-    error('O1:bad_warm_cap_seed', 'K=%g缺少原模型可行热启动。', K);
-end
-offset = seed_cost - problem.f(:).' * seed(:);
-if isfield(indices, 'u_purchase') && ...
-        all(ctx.model.context.C_purchase(:) >= ...
-        ctx.model.context.C_sell(:) - 1e-12)
-    problem.intcon = setdiff(problem.intcon(:), indices.u_purchase(:));
-end
-if isfield(indices, 'I_AEL_up') && isfield(indices, 'n_ael')
-    problem.intcon = setdiff(problem.intcon(:), indices.I_AEL_up(:));
-end
-% 恢复阶段在未添加辅助变量的原矩阵上最小化原成本。
-recovery_problem = problem;
-if relax_ael_counts && isfield(indices, 'n_ael')
-    % 此处是原整数模型的外松弛，下界有效；分数台数不能作为原模型上界。
-    problem.intcon = setdiff(problem.intcon(:), indices.n_ael(:));
-    fprintf('[O1] K=%g采用AEL在线台数外松弛认证：HB更新仍保留整数。\n', K);
-end
-n = numel(problem.f);
-problem.Aineq(:, n + 1) = 0;
-problem.Aeq(:, n + 1) = 0;
-% 已有全局证书给出的冗余成本底线保留原整数可行域。
-problem.Aineq(end + 1, :) = [-sparse(problem.f(:).'), 0];
-problem.bineq(end + 1, 1) = -(certified_lower - offset) + 1e-5;
-problem.Aineq(end + 1, :) = [sparse(problem.f(:).'), -1];
-problem.bineq(end + 1, 1) = certified_lower - offset;
-problem.lb = [problem.lb(:); 0];
-problem.ub = [problem.ub(:); Inf];
-problem.f = [zeros(n, 1); 1];
-problem.x0 = [seed(:); max(0, seed_cost - certified_lower) + 1e-5];
-problem.options = optimoptions(ctx.global_bisection_options, ...
-    'MaxTime', max_time_s, 'MaxFeasiblePoints', Inf, ...
-    'AbsoluteGapTolerance', ...
-    ctx.config.frontier_certification_tolerance_usd_t * ctx.config.nh3_target_t);
-% 辅助目标的尺度不同，不能继承原成本的求解器截断值。
-problem.options = optimoptions(problem.options, 'ObjectiveCutOff', Inf);
-outcome = struct('has_candidate', false, 'solution', struct(), ...
-    'candidate_cost', Inf, 'candidate_count', NaN, ...
-    'exitflag', NaN, 'elapsed_s', NaN, 'status', "热启动求解异常", ...
-    'message', "", 'is_infeasible', false, 'candidate_hours', ctx.T, ...
-    'raw_best_bound_usd', -Inf, 'uncapped_global_bound', true, ...
-    'relaxed_ael_counts', relax_ael_counts);
-started = tic;
-try
-    stop_bound = seed_cost - certified_lower - ...
-        ctx.config.frontier_certification_tolerance_usd_t * ctx.config.nh3_target_t;
-    if relax_ael_counts
-        problem.options = optimoptions(problem.options, ...
-            'AbsoluteGapTolerance', ...
-            ctx.config.frontier_certification_tolerance_usd_t * ...
-            ctx.config.nh3_target_t / 4);
-    end
-    [candidate, ~, flag, output] = run_cost_milp( ...
-        problem, K, 0, stop_bound, "成本帽超额下界");
-    outcome.exitflag = flag;
-    outcome.message = string(output.message);
-    % 超额问题的正下界才可转换为原问题成本下界，零下界不作转换。
-    if isfinite(output.trace_dualbound) && output.trace_dualbound >= -1e-4
-        outcome.raw_best_bound_usd = certified_lower + max(0, output.trace_dualbound);
-    end
-    if ~isempty(candidate)
-        projected = candidate(1:n);
-        if relax_ael_counts
-            % 原恢复矩阵保留n_ael整数位置，固定向上投影的台数后做严格LP。
-            projected(indices.n_ael(:)) = min( ...
-                recovery_problem.ub(indices.n_ael(:)), ...
-                ceil(projected(indices.n_ael(:)) - 1e-7));
-        end
-        [restored, recovery_flag, recovery_output] = ...
-            ctx.services.recover_direction_binaries( ...
-            recovery_problem, projected, indices, min(60, max_time_s));
-        if (recovery_flag <= 0 || isempty(restored)) && relax_ael_counts
-            % 向上投影不可行时再尝试最近整数，不反复调整原模型参数。
-            projected(indices.n_ael(:)) = round(candidate(indices.n_ael(:)));
-            [restored, recovery_flag, recovery_output] = ...
-                ctx.services.recover_direction_binaries( ...
-                recovery_problem, projected, indices, min(30, max_time_s));
-        end
-        if recovery_flag > 0 && ~isempty(restored)
-            solution = vector_to_solution(restored, indices);
-            solution = ctx.services.add_change_indicators(solution, ctx);
-            count = round(sum(solution.O1_HB_change));
-            cost = evaluate(ctx.system_cost_usd, solution);
-            original_integer_error = max(abs( ...
-                restored(recovery_problem.intcon) - ...
-                round(restored(recovery_problem.intcon))));
-            if count <= K && isfinite(cost) && original_integer_error <= 1e-6
-                outcome.has_candidate = true;
-                outcome.solution = solution;
-                outcome.candidate_count = count;
-                outcome.candidate_cost = cost;
-                if cost < seed_cost - 1e-4
-                    outcome.status = "热启动得到更低原成本上界";
-                else
-                    outcome.status = "热启动保留原可行上界";
-                end
-            else
-                outcome.status = "热启动候选未通过原模型复核";
-            end
-        else
-            outcome.status = "热启动候选方向恢复失败";
-            outcome.message = string(recovery_output.message);
-        end
-    elseif flag == 0
-        outcome.status = "热启动限时无候选，保留已取得下界";
-    end
-catch exception
-    outcome.message = string(exception.message);
-end
-outcome.elapsed_s = toc(started);
-end
-
-function local_solver = restrict_cost_window(solver_data, start, hours, T)
-%RESTRICT_COST_WINDOW 只构造原问题的受限上界搜索，不用于全局下界。
-local_solver = solver_data;
-local_solver.restricted_cost_domain = true;
-problem = solver_data.problem;
-indices = solver_data.indices;
-seed = solution_to_vector(indices, start, numel(problem.lb));
-free = false(numel(seed), 1);
-names = fieldnames(indices);
-for i = 1:numel(names)
-    positions = indices.(names{i});
-    if numel(positions) == T
-        free(positions(hours)) = true;
-    elseif numel(positions) == T + 1 && strcmp(names{i}, 'storage_H2')
-        % 两端储氢状态保留原值，内部状态自由，全年质量守恒不变。
-        free(positions(hours(1) + 1:hours(end))) = true;
-    elseif isscalar(positions)
-        free(positions) = true;
-    end
-end
-% 电网功率连续变量可全年重平衡，窗口外离散运行模式仍保持原值。
-grid_names = {'p_purchase', 'p_sell', 'p_curt'};
-for i = 1:numel(grid_names)
-    if isfield(indices, grid_names{i})
-        free(indices.(grid_names{i})(:)) = true;
-    end
-end
-% 允许窗口入口发生平台更新，出口保留电解槽台数以衔接后续启停。
-previous_hour = mod(hours(1) - 2, T) + 1;
-free(indices.O1_HB_change(previous_hour)) = true;
-if hours(end) < T
-    free(indices.n_ael(hours(end))) = false;
-end
-fixed = find(~free);
-problem.lb(fixed) = seed(fixed);
-problem.ub(fixed) = seed(fixed);
-problem.intcon = setdiff(problem.intcon(:), fixed);
-local_solver.problem = problem;
-end
-
-function starts = rank_cost_windows(start, reference, ctx)
-%RANK_COST_WINDOWS 优先搜索相对经济参考增加购电费用最多的时段。
-starts = (1:ctx.config.frontier_local_cost_window_h:ctx.T).';
-extra = ctx.model.context.C_purchase(:) .* ...
-    (start.p_purchase(:) - reference.solution.p_purchase(:));
-score = zeros(size(starts));
-for i = 1:numel(starts)
-    last = min(ctx.T, starts(i) + ctx.config.frontier_local_cost_window_h - 1);
-    score(i) = sum(extra(starts(i):last));
-end
-[~, order] = sort(score, 'descend');
-starts = starts(order);
-end
-
-function record = merge_cost_cap_outcome( ...
-        prior, outcome, ctx, K, attempt, phase, backend, ...
-        target_upper, raise_global_lower)
-%MERGE_COST_CAP_OUTCOME 合并成本帽结果，并区分全局下界与受限搜索结论。
-record = prior;
-record.frontier_attempts = attempt;
-record.frontier_phase = string(phase);
-record.elapsed_s = outcome.elapsed_s;
-record.last_cost_cap_usd = target_upper;
-record.last_cost_cap_status = outcome.status;
-record.last_cost_cap_exitflag = outcome.exitflag;
-record.last_cost_cap_message = outcome.message;
-record.last_cost_cap_candidate_hours = outcome.candidate_hours;
-record.last_cost_cap_best_bound_usd = outcome.raw_best_bound_usd;
-record.last_cost_cap_relaxed_ael_counts = record_field(outcome, ...
-    'relaxed_ael_counts', false);
-candidate_contradicts_bound = outcome.has_candidate && ...
-    outcome.candidate_cost < record.objective_lower - ...
-    max(1e-4, 1e-9 * abs(record.objective_lower));
-if candidate_contradicts_bound
-    fprintf('[O1] K=%g候选成本低于已有认证下界，拒绝形成认证并保留原记录。\n', K);
-    record.last_cost_cap_bound_rejected = true;
-end
-if outcome.has_candidate && ~candidate_contradicts_bound && ...
-        outcome.candidate_cost < record.objective_upper
-    record.has_incumbent = true;
-    record.solution = outcome.solution;
-    record.objective_upper = outcome.candidate_cost;
-    record.system_cost_upper = outcome.candidate_cost;
-    record.count_upper = outcome.candidate_count;
-    record.solve_backend = string(backend);
-    record.cost_components = ...
-        ctx.services.evaluate_cost_components(outcome.solution, ctx);
-    record.operation_metrics = ...
-        ctx.services.evaluate_operation_metrics(outcome.solution, ctx);
-end
-if raise_global_lower && isfinite(outcome.raw_best_bound_usd)
-    if record_field(outcome, 'uncapped_global_bound', false)
-        proposed_lower = outcome.raw_best_bound_usd;
-    else
-        proposed_lower = min(outcome.raw_best_bound_usd, target_upper);
-    end
-    bound_tolerance = max(1e-4, 1e-9 * abs(record.objective_upper));
-    if proposed_lower <= record.objective_upper + bound_tolerance
-        record.objective_lower = max(record.objective_lower, proposed_lower);
-    else
-        % 界值矛盾不能通过直接截成上界而伪造认证，保留旧的有效区间。
-        fprintf('[O1] K=%g新下界超过已验证上界，拒绝合并：%.3f > %.3f USD。\n', ...
-            K, proposed_lower, record.objective_upper);
-        record.last_cost_cap_bound_rejected = true;
-    end
-end
-if raise_global_lower && outcome.is_infeasible
-    record.objective_lower = max(record.objective_lower, target_upper);
-    record.system_cost_lower = record.objective_lower;
-end
-record.objective_lower = min(record.objective_lower, ...
-    record.objective_upper);
-record.system_cost_lower = record.objective_lower;
-record.absolute_gap = record.objective_upper - record.objective_lower;
-record.relative_gap = record.absolute_gap / ...
-    max(1, abs(record.objective_upper));
-record.is_proven = record.absolute_gap <= ...
-    max(1e-7, eps(abs(record.objective_upper)));
-record.is_certified = record.has_incumbent && ...
-    record_uncertainty_usd_t(record, ctx) <= ...
-    ctx.config.frontier_certification_tolerance_usd_t + 1e-12;
-if record.is_proven
-    record.status = "proven";
-elseif record.is_certified
-    record.status = "certified_tolerance";
-elseif record.has_incumbent
-    record.status = "incumbent_with_bound";
-end
-record.K_limit = K;
-end
-
-function record = polish_cost_upper_bound( ...
-        solver_data, K, start, ctx, attempt, prior)
-%POLISH_COST_UPPER_BOUND 固定HB变动时刻，寻找足以达到认证目标的新上界。
-% 本步骤求解的是原问题的受限子集，因此只接收可行上界，不使用其下界。
-problem = solver_data.problem;
-problem.bineq(solver_data.update_row) = ...
-    solver_data.update_coefficient * K;
-problem.options = ctx.polish_options;
-indices = solver_data.indices;
-seed_vector = solution_to_vector(indices, start, numel(problem.lb));
-if isempty(seed_vector)
-    error('O1:no_polish_seed', ...
-        '关键K=%g没有完整的定向上界精修初值。', K);
-end
-seed_count = round(sum(start.O1_HB_change));
-seed_upper = evaluate(ctx.system_cost_usd, start);
-if seed_count > K || ~isfinite(seed_upper)
-    error('O1:bad_polish_seed', ...
-        '关键K=%g的定向上界精修初值不可行。', K);
-end
-
-z_indices = indices.O1_HB_change(:);
-z_values = round(seed_vector(z_indices));
-problem.lb(z_indices) = z_values;
-problem.ub(z_indices) = z_values;
-problem.intcon = setdiff(problem.intcon(:), z_indices);
-
-objective_offset = seed_upper - problem.f(:).' * seed_vector(:);
-target_upper = prior.objective_lower + ...
-    ctx.config.frontier_certification_tolerance_usd_t * ...
-    ctx.config.nh3_target_t;
-target_solver_upper = target_upper - objective_offset;
-% 把论文要求的0.5 USD/t直接写成成本帽；找到任一可行点即可结束。
-problem.Aineq(end + 1, :) = sparse(problem.f(:).');
-problem.bineq(end + 1, 1) = target_solver_upper + ...
-    max(1e-6, 1e-10 * abs(target_solver_upper));
-problem.x0 = [];
-
-relaxed_grid = zeros(0, 1);
-relaxed_ael = zeros(0, 1);
-if isfield(indices, 'u_purchase') && ...
-        isfield(indices, 'p_purchase') && isfield(indices, 'p_sell') && ...
-        all(ctx.model.context.C_purchase(:) >= ...
-        ctx.model.context.C_sell(:) - 1e-12)
-    relaxed_grid = indices.u_purchase(:);
-    problem.intcon = setdiff(problem.intcon(:), relaxed_grid);
-end
-if isfield(indices, 'I_AEL_up') && isfield(indices, 'n_ael')
-    relaxed_ael = indices.I_AEL_up(:);
-    problem.intcon = setdiff(problem.intcon(:), relaxed_ael);
-end
-
-record = prior;
-record.frontier_attempts = attempt;
-record.polish_attempts = record_field(prior, 'polish_attempts', 0) + 1;
-record.frontier_phase = "polish";
-record.polish_target_upper_usd = target_upper;
-record.polish_before_upper_usd = prior.objective_upper;
-record.polish_after_upper_usd = prior.objective_upper;
-record.polish_pattern_update_hours = find(z_values > 0.5);
-record.polish_exitflag = NaN;
-record.polish_elapsed_s = NaN;
-record.polish_status = "未找到达标上界";
-record.polish_message = "";
-
-started = tic;
-candidate_x = [];
-try
-    [candidate_x, ~, polish_exitflag, polish_output] = ...
-        intlinprog(problem);
-    if ~isempty(candidate_x) && ...
-            (~isempty(relaxed_grid) || ~isempty(relaxed_ael))
-        [candidate_x, recovery_flag, recovery_output] = ...
-            ctx.services.recover_direction_binaries( ...
-            problem, candidate_x, indices, 60);
-        if recovery_flag <= 0 || isempty(candidate_x)
-            candidate_x = [];
-            polish_output.recovery = recovery_output;
-            polish_output.message = ...
-                "方向变量恢复失败，未接收本轮候选上界。";
-        end
-    end
-catch exception
-    polish_exitflag = NaN;
-    polish_output = struct('message', exception.message);
-end
-record.polish_elapsed_s = toc(started);
-record.elapsed_s = record.polish_elapsed_s;
-record.polish_exitflag = polish_exitflag;
-record.polish_output = polish_output;
-if isfield(polish_output, 'message')
-    record.polish_message = string(polish_output.message);
-end
-
-if ~isempty(candidate_x)
-    solution = vector_to_solution(candidate_x, indices);
-    solution = ctx.services.add_change_indicators(solution, ctx);
-    candidate_count = round(sum(solution.O1_HB_change));
-    candidate_cost = evaluate(ctx.system_cost_usd, solution);
-    acceptance_tolerance = max(1e-4, 1e-9 * abs(target_upper));
-    if candidate_count <= K && isfinite(candidate_cost) && ...
-            candidate_cost <= target_upper + acceptance_tolerance
-        record.has_incumbent = true;
-        record.solution = solution;
-        record.objective_upper = min(record.objective_upper, candidate_cost);
-        record.system_cost_upper = record.objective_upper;
-        record.count_upper = candidate_count;
-        record.polish_after_upper_usd = record.objective_upper;
-        record.polish_status = "已找到达标上界";
-        record.solve_backend = ...
-            "intlinprog_fixed_hb_pattern_target_cap";
-        record.cost_components = ...
-            ctx.services.evaluate_cost_components(solution, ctx);
-        record.operation_metrics = ...
-            ctx.services.evaluate_operation_metrics(solution, ctx);
-    else
-        record.polish_status = "候选点未通过原模型复核";
-    end
-elseif polish_exitflag == -2
-    record.polish_status = "当前HB变动模式下目标成本不可行";
-elseif polish_exitflag == 0
-    record.polish_status = "达到时限但未找到达标上界";
-elseif isnan(polish_exitflag)
-    record.polish_status = "精修求解异常";
-end
-
-record.absolute_gap = record.objective_upper - record.objective_lower;
-record.relative_gap = record.absolute_gap / ...
-    max(1, abs(record.objective_upper));
-record.is_certified = record.has_incumbent && ...
-    record_uncertainty_usd_t(record, ctx) <= ...
-    ctx.config.frontier_certification_tolerance_usd_t + 1e-12;
-if record.is_certified
-    record.status = "certified_tolerance";
-elseif record.has_incumbent
-    record.status = "incumbent_with_bound";
-end
-end
-
 function record = solve_cost_frontier_point( ...
         solver_data, K, start, ctx, reference, attempt, phase, prior)
 problem = solver_data.problem;
@@ -2127,7 +1109,8 @@ use_gurobi = strcmp(ctx.config.frontier_solver, 'gurobi');
 gurobi_focus = NaN;
 if use_gurobi
     problem.cost_solver = 'gurobi';
-    problem.gurobi_checkpoint = struct('enabled', phase == "certification", ...
+    problem.gurobi_checkpoint = struct('enabled', phase == "certification" && ...
+        ctx.config.gurobi_checkpoint_enabled, ...
         'signature', ctx.cost_signature, 'indices', indices, ...
         'progress_file', char(ctx.config.progress_file));
     gurobi_focus = ctx.config.gurobi_mip_focus;
@@ -2182,6 +1165,11 @@ if seed_is_feasible
     solver_cutoff = seed_upper - objective_offset;
     problem.options = optimoptions(problem.options, 'ObjectiveCutOff', ...
         solver_cutoff + max(1e-6, 1e-10 * abs(solver_cutoff)));
+end
+if use_gurobi && ctx.config.gurobi_mip_focus == -1 && ~seed_is_feasible
+    % 尚无本K可行首解时先建立上界，避免自动轮换到纯界值策略。
+    gurobi_focus = 1;
+    problem.gurobi_parameters.MIPFocus = gurobi_focus;
 end
 original_intcon = problem.intcon(:);
 relaxed_grid = zeros(0, 1);

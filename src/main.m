@@ -40,49 +40,25 @@ o1_config.cache_directory = source_dir;
 o1_config.progress_file = fullfile(project_dir, '会话记录.md');
 o1_config.nh3_target_t = 80000;
 o1_config.cost_allowance_usd_t = [0, 1, 5, 10];
+% 默认只计算84、90、100、110……及参考解的实际K端点。
+% 后续补点：例如frontier_k=[85,86,95]；全部整数点：frontier_k_step=1。
 o1_config.frontier_k = [];
 o1_config.frontier_all_k = true;
+o1_config.frontier_k_start = 84;
+o1_config.frontier_k_step = 10;
 o1_config.defer_feasibility_search = true;
 o1_config.certify_all_frontier_k = true;
-o1_config.frontier_max_time_s = 30;
-o1_config.frontier_max_attempts = 1;
 o1_config.frontier_solution_interval = 25;
-o1_config.frontier_run_budget_s = 1800;
-o1_config.frontier_points_per_run = 200;
-% 锚点先提供成本界；目标区间内每个整数K都按0.5 USD/t验收。
-o1_config.frontier_anchor_count = 12;
-o1_config.frontier_key_k = 111;
-o1_config.frontier_auto_key_count = 2;
+% 仅选定点按0.5 USD/t验收，未选中的点不进入求解队列。
+o1_config.frontier_key_k = [];
 o1_config.frontier_certification_tolerance_usd_t = 0.5;
+o1_config.frontier_screening_max_time_s = 600;
 o1_config.frontier_certification_max_time_s = 3600;
 o1_config.frontier_certification_max_attempts = 4;
-% 单次main连续遍历次数下界至参考解K；每轮每K最多尝试4次。
-% 单K仍保留3600秒时限，超时轮转到其他K；未达标点按缓存续算。
+% 先按每K 600秒遍历所有选定点；全部完成后再按3600秒处理困难点。
+% 每次main每K最多4次（含本轮短遍历）；超时未达标只缓存进度，不计最终结果。
 o1_config.frontier_certification_points_per_run = Inf;
 o1_config.frontier_certification_run_budget_s = Inf;
-% 先尝试缓存HB模式的上界改进；失败只表示受限模式失败，不抬高全局下界。
-o1_config.frontier_polish_enabled = true;
-o1_config.frontier_polish_only = false;
-o1_config.frontier_polish_max_time_s = 840;
-o1_config.frontier_polish_max_attempts = 1;
-% 固定模式失败后，自动搜索缓存模式并集及其循环时间邻域。
-o1_config.frontier_pattern_pool_enabled = true;
-o1_config.frontier_pattern_pool_radii_h = [0, 1, 3, 6, 12];
-o1_config.frontier_pattern_pool_max_time_s = 240;
-% 候选池失败后，依次采用全局成本帽、可热启动超额模型与台数外松弛认证。
-% 新上界一律恢复原整数台数与方向变量，认证精度始终按原成本区间计算。
-o1_config.frontier_global_bisection_enabled = true;
-o1_config.frontier_global_bisection_max_time_s = 840;
-o1_config.frontier_global_bisection_max_attempts = 6;
-% 按购电增量选择少量局部窗口，仅改进可行上界，不把局部下界用于认证。
-o1_config.frontier_local_cost_enabled = true;
-o1_config.frontier_local_cost_window_h = 168;
-o1_config.frontier_local_cost_max_time_s = 60;
-o1_config.frontier_local_cost_max_windows = 3;
-% 既有全局策略用尽后，再尝试少量更新时刻的全年远距离重定位。
-o1_config.frontier_relocation_cost_enabled = true;
-o1_config.frontier_relocation_cost_radii = [2, 4, 8];
-o1_config.frontier_relocation_cost_max_time_s = 240;
 % 只改变求解器内部连续变量单位；目标、整数变量和原物理矩阵不变。
 o1_config.frontier_scale_solver = true;
 % Gurobi先求解原MILP，不叠加旧后端的冗余成本底线；旧下界仍在记录层保留。
@@ -93,8 +69,10 @@ o1_config.frontier_keep_startup_binary = true;
 % 接口路径先复用MATLAB路径，再从GUROBI_HOME或系统命令路径发现。
 o1_config.frontier_solver = 'gurobi';
 o1_config.gurobi_matlab_directory = '';
-% -1表示按缓存尝试次数选择0/3/1/2策略；不是传给Gurobi的原生参数值。
+% -1自动选择策略；无可行首解时优先1，有首解时按缓存次数选择0/3/1/2。
 o1_config.gurobi_mip_focus = -1;
+% 逐K结果及短遍历标记保存在固定K缓存，不再为每次求解复制完整模型和.sol文件。
+o1_config.gurobi_checkpoint_enabled = false;
 o1_config.gurobi_method = -1;
 o1_config.gurobi_threads = 0;
 % 下一轮将块长增至672小时以保留更多跨时段耦合；原模型完整MILP仍负责最终认证。
@@ -113,14 +91,8 @@ o1_config.fixed_max_time_s = 180;
 o1_config.cost_relative_gap = 1e-3;
 o1_config.count_absolute_gap = 0.99;
 o1_config.change_epsilon = 0.01;
-% Kfeas保留严格区间也继续计算逐K经济成本，避免单点unknown阻塞O1。
+% Kfeas保留严格区间也继续计算选定K的经济成本。
 o1_config.max_count_bound_width = Inf;
-% 自主认证K*：单次运行限时、逐任务缓存，中断后再次运行自动续算。
-o1_config.max_k_search_points = 160;
-o1_config.feasibility_probe_k = [];
-o1_config.autonomous_search = true;
-o1_config.run_budget_s = 3600;
-o1_config.max_k_attempts_per_source = 2;
 % 启用由原模型LP严格推导的冗余窗口覆盖割，只加强求解、不改变可行域。
 o1_config.enable_window_cuts = false;
 o1_config.window_lengths_h = 720;
@@ -133,33 +105,20 @@ o1_config.use_cache = true;
 o1_config.display = 'iter';
 fprintf('[main] baseline relative gap=%.4f; O1 cost gap=%.4f; ', ...
     params.solver.relative_gap, o1_config.cost_relative_gap);
-fprintf('O1 count-continuation budget=%d; epsilon=%.2f%%\n', ...
-    o1_config.max_k_search_points, 100 * o1_config.change_epsilon);
-fprintf(['[main] 目标区间为次数下界至参考经济解K，每个整数K均验收；', ...
-    '锚点单次上限=%g s，尝试上限=%d。\n'], o1_config.frontier_max_time_s, ...
-    o1_config.frontier_max_attempts);
+fprintf('epsilon=%.2f%%\n', 100 * o1_config.change_epsilon);
+fprintf(['[main] 目标点：起点K=%g、区间内%g的整数倍、参考经济解K；', ...
+    '额外补点=%s，其余整数点暂缓。\n'], ...
+    o1_config.frontier_k_start, o1_config.frontier_k_step, ...
+    mat2str(o1_config.frontier_k));
 fprintf('[main] 固定K经济后端=%s；原约束、参数和目标函数保持不变。\n', ...
     o1_config.frontier_solver);
 fprintf('[main] K认证分区下界=%d；分区时长=%s h；本轮单点时限=%g s。\n', ...
     o1_config.gurobi_partition_enabled, mat2str(o1_config.gurobi_partition_hours), ...
     o1_config.frontier_certification_max_time_s);
-fprintf(['[main] Kfeas搜索暂缓；整区间连续经济认证，', ...
-    '单K时限=%g s，每轮每K最多%d次，目标<=%.3g USD/t。\n'], ...
-    o1_config.frontier_certification_max_time_s, ...
+fprintf(['[main] Kfeas搜索暂缓；先逐K短遍历%g s，再处理困难点%g s；', ...
+    '每次main每K最多%d次，最终目标<=%.3g USD/t。\n'], ...
+    o1_config.frontier_screening_max_time_s, o1_config.frontier_certification_max_time_s, ...
     o1_config.frontier_certification_max_attempts, ...
     o1_config.frontier_certification_tolerance_usd_t);
-if o1_config.frontier_polish_enabled
-    fprintf(['[main] 关键K定向上界精修已启用：单次上限=%g s，', ...
-        '仅精修=%d。\n'], o1_config.frontier_polish_max_time_s, ...
-        o1_config.frontier_polish_only);
-end
-if o1_config.frontier_pattern_pool_enabled
-    fprintf(['[main] HB候选池半径=%s h，单阶段上限=%g s；', ...
-        '全局成本帽二分=%d。\n'], ...
-        mat2str(o1_config.frontier_pattern_pool_radii_h), ...
-        o1_config.frontier_pattern_pool_max_time_s, ...
-        o1_config.frontier_global_bisection_enabled);
-end
-
 O1_results = baseline(params, renewable_data, ...
     @(model) O1(model, o1_config));
