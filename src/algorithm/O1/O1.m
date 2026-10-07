@@ -48,10 +48,16 @@ reference.operation_metrics = evaluate_operation_metrics(reference.solution, ctx
 study.reference = reference;
 study.check.reference = solution_check(reference.solution, ctx);
 
-fprintf('[O1] Stage 2: direct minimum-count solve, initial K=%g\n', ...
-    reference.count_upper);
-[feasibility, feasibility_points, build_info] = ...
-    O1Feasibility(ctx, reference.solution, Inf, "feasibility");
+if config.defer_feasibility_search
+    fprintf('[O1] 可行性搜索暂缓：仅复用同模型次数下界与已验证种子。\n');
+    [feasibility, feasibility_points, build_info] = ...
+        load_deferred_feasibility(ctx, reference);
+else
+    fprintf('[O1] Stage 2: direct minimum-count solve, initial K=%g\n', ...
+        reference.count_upper);
+    [feasibility, feasibility_points, build_info] = ...
+        O1Feasibility(ctx, reference.solution, Inf, "feasibility");
+end
 study.feasibility = feasibility;
 if isfield(build_info, 'window_cuts')
     study.window_cuts = build_info.window_cuts;
@@ -69,7 +75,7 @@ end
 
 if (~isfinite(feasibility.bound_width) || ...
         feasibility.bound_width > config.max_count_bound_width) && ...
-        ~config.compute_frontier_during_search
+        ~config.compute_frontier_during_search && ~config.defer_feasibility_search
     fprintf(['[O1] Stop after Stage 2: K_feas bound width %g exceeds ', ...
         'the configured limit %g.\n'], feasibility.bound_width, ...
         config.max_count_bound_width);
@@ -82,7 +88,23 @@ economic_outputs = O1Economics(ctx, feasibility, reference);
 representative = economic_outputs.representative;
 frontier = economic_outputs.frontier;
 frontier_state = economic_outputs.frontier_state;
-if representative.has_incumbent && representative.count_upper < feasibility.K_upper
+if config.defer_feasibility_search && representative.has_incumbent && ...
+        representative.count_upper < feasibility.K_upper && ...
+        ~isempty(fieldnames(representative.solution))
+    % 成本求解本身已复核原矩阵；直接登记可行见证，不重启计数搜索。
+    feasibility.K_upper = representative.count_upper;
+    feasibility.bound_width = feasibility.K_upper - feasibility.K_lower;
+    feasibility.is_proven = feasibility.bound_width == 0;
+    feasibility.minimum_updates.solution = representative.solution;
+    feasibility.minimum_updates.count_upper = feasibility.K_upper;
+    feasibility.minimum_updates.objective_upper = feasibility.K_upper;
+    feasibility.minimum_updates.absolute_gap = feasibility.bound_width;
+    feasibility.minimum_updates.relative_gap = feasibility.bound_width / ...
+        max(1, feasibility.K_upper);
+    feasibility.minimum_updates.is_proven = feasibility.is_proven;
+    study.feasibility = feasibility;
+    study.check.minimum_updates = solution_check(representative.solution, ctx);
+elseif representative.has_incumbent && representative.count_upper < feasibility.K_upper
     % 经济优化发现更小实际计数时，立即刷新计数缓存；只读原矩阵，不启动K搜索。
     previous_upper = feasibility.K_upper;
     refresh_ctx = ctx;
@@ -134,7 +156,8 @@ if representative.has_incumbent && isfield(representative, 'solution') && ...
         max(1e-4, 1e-9 * abs(representative.objective_upper));
 end
 
-if ~feasibility.is_proven
+study.economic = economic_outputs.boundaries;
+if ~feasibility.is_proven && ~config.defer_feasibility_search
     study.status = 'incomplete_feasibility_with_frontier';
     print_summary(study);
     return
@@ -146,11 +169,12 @@ if ~isfinite(reference.objective_lower)
     return
 end
 
-study.economic = economic_outputs.boundaries;
 if ~frontier_state.certification_complete
     study.status = 'incomplete_cost_certification';
 elseif isempty(study.economic) && ~isempty(config.cost_allowance_usd_t)
     study.status = 'incomplete_economic_boundaries';
+elseif config.defer_feasibility_search
+    study.status = 'complete_economics_with_count_bounds';
 elseif feasibility.is_proven && ...
         (isempty(study.economic) || all([study.economic.is_proven]))
     study.status = 'complete';
@@ -158,6 +182,90 @@ else
     study.status = 'complete_with_bounds';
 end
 print_summary(study);
+end
+
+function [summary, points, info] = load_deferred_feasibility(ctx, reference)
+% 84等下界来自相同数据及物理参数签名的证书，不能硬编码到其他算例。
+entries = struct('mode', {}, 'cost_cap', {}, 'K', {}, 'record', {}, 'source', {});
+if ctx.config.use_cache
+    entries = ctx.services.fixed_point_store(ctx.point_cache_file, ...
+        ctx.signature, "load", "feasibility", Inf, struct());
+    for signature = {ctx.signature, ctx.cost_signature}
+        costs = ctx.services.fixed_point_store(ctx.point_cache_file, ...
+            signature{1}, "load", "frontier_cost", Inf, struct());
+        entries = [entries, costs]; %#ok<AGROW>
+    end
+end
+lower = 0;
+initial = reference.solution;
+upper = reference.count_upper;
+validation_solver = struct();
+validation_builds = 0;
+validation_elapsed = 0;
+for i = 1:numel(entries)
+    r = entries(i).record;
+    if string(entries(i).mode) == "feasibility"
+        if isfield(r, 'objective_kind') && string(r.objective_kind) == "count" && ...
+                isfield(r, 'count_lower') && isfinite(r.count_lower)
+            lower = max(lower, ceil(r.count_lower));
+        end
+        if r.is_infeasible && entries(i).K <= ctx.T
+            lower = max(lower, entries(i).K + 1);
+        end
+    end
+    if ~r.has_incumbent || ~isfield(r, 'solution') || ...
+            isempty(fieldnames(r.solution))
+        continue
+    end
+    candidate = ctx.services.add_change_indicators(r.solution, ctx);
+    count = round(sum(candidate.O1_HB_change));
+    if count >= upper
+        continue
+    end
+    if isempty(fieldnames(validation_solver))
+        p = ctx.problem;
+        p.Constraints.O1_update_limit = ctx.update_count <= ctx.T;
+        [validation_solver, validation_elapsed] = ...
+            ctx.services.build_fixed_solver(p, ctx, initial);
+        validation_builds = 1;
+    end
+    vector = validation_solver.problem.x0(:);
+    names = fieldnames(validation_solver.indices);
+    for j = 1:numel(names)
+        vector(validation_solver.indices.(names{j})(:)) = candidate.(names{j})(:);
+    end
+    p = validation_solver.problem;
+    violation = max([0; p.Aineq * vector - p.bineq(:); ...
+        abs(p.Aeq * vector - p.beq(:)); p.lb(:) - vector; vector - p.ub(:)]);
+    integer_error = max([0; abs(vector(p.intcon) - round(vector(p.intcon)))]);
+    if violation <= ctx.model.options.ConstraintTolerance && integer_error <= 1e-6
+        initial = candidate;
+        upper = count;
+    end
+end
+if lower > upper
+    error('O1:inconsistent_count_cache', '缓存次数下界超过已验证可行上界。');
+end
+minimum = struct('objective_kind', "count", 'has_incumbent', true, ...
+    'objective_lower', lower, 'objective_upper', upper, ...
+    'count_lower', lower, 'count_upper', upper, 'absolute_gap', upper - lower, ...
+    'relative_gap', (upper - lower) / max(1, upper), 'is_proven', lower == upper, ...
+    'solution', initial, 'status', "deferred_cached_bounds");
+cost_seed = reference;
+cost_seed.solution = initial;
+cost_seed.count_upper = upper;
+cost_seed.objective_upper = evaluate(ctx.system_cost_usd, initial);
+cost_seed.system_cost_upper = cost_seed.objective_upper;
+cost_seed.cost_components = evaluate_cost_components(initial, ctx);
+cost_seed.operation_metrics = evaluate_operation_metrics(initial, ctx);
+summary = struct('minimum_updates', minimum, 'minimum_cost_at_upper_bound', cost_seed, ...
+    'K_lower', lower, 'K_upper', upper, 'bound_width', upper - lower, ...
+    'is_proven', lower == upper, 'deferred', true, ...
+    'scheduler', struct('autonomous', false, 'elapsed_s', 0, 'budget_exhausted', false));
+points = table();
+info = struct('seed_validation_model_build_count', validation_builds, ...
+    'elapsed_s', validation_elapsed);
+fprintf('[O1] 保留次数区间[%g, %g]；不求解最小可行次数。\n', lower, upper);
 end
 
 function seed = promote_cost_seed(prior, solution, K, ctx)
@@ -196,6 +304,7 @@ seed.scaled_certification_attempts = 0;
 seed.floor_certification_attempts = 0;
 seed.startup_binary_certification_attempts = 0;
 seed.gurobi_certification_attempts = 0;
+seed.gurobi_partition_attempts = 0;
 seed.cost_components = evaluate_cost_components(solution, ctx);
 seed.operation_metrics = evaluate_operation_metrics(solution, ctx);
 end
@@ -206,6 +315,8 @@ defaults = struct( ...
     'cost_allowance_usd_t', [0, 1, 5, 10], ...
     'frontier_k', [], ...
     'frontier_all_k', false, ...
+    'defer_feasibility_search', [], ...
+    'certify_all_frontier_k', [], ...
     'frontier_max_time_s', 180, ...
     'frontier_max_attempts', 2, ...
     'frontier_solution_interval', 25, ...
@@ -244,6 +355,15 @@ defaults = struct( ...
     'gurobi_mip_focus', 0, ...
     'gurobi_method', -1, ...
     'gurobi_threads', 0, ...
+    'gurobi_relax_grid', false, ...
+    'gurobi_partition_enabled', false, ...
+    'gurobi_partition_hours', [168, 336], ...
+    'gurobi_partition_time_s', [5, 10], ...
+    'gurobi_partition_refine_blocks', 6, ...
+    'gurobi_partition_refine_time_s', 180, ...
+    'gurobi_partition_max_attempts', 2, ...
+    'gurobi_partition_upper_time_s', 300, ...
+    'gurobi_partition_outer_time_s', 0, ...
     'compute_frontier_during_search', true, ...
     'max_time_s', 1200, ...
     'count_max_time_s', 900, ...
@@ -285,6 +405,15 @@ for i = 1:numel(allowed)
     end
 end
 
+% 全K研究默认暂缓计数搜索，并逐点认证；独立小规模旧接口仍可显式选择。
+for name = {'defer_feasibility_search', 'certify_all_frontier_k'}
+    if isempty(config.(name{1}))
+        config.(name{1}) = config.frontier_all_k;
+    end
+    validateattributes(config.(name{1}), {'logical', 'numeric'}, {'scalar', 'binary'});
+    config.(name{1}) = logical(config.(name{1}));
+end
+
 if ~(ischar(config.cache_directory) || ...
         (isstring(config.cache_directory) && isscalar(config.cache_directory)))
     error('O1:bad_cache_directory', '缓存目录须为字符路径。');
@@ -315,6 +444,21 @@ validateattributes(config.gurobi_method, {'numeric'}, ...
     {'scalar', 'integer', '>=', -1, '<=', 5});
 validateattributes(config.gurobi_threads, {'numeric'}, ...
     {'scalar', 'integer', '>=', 0});
+validateattributes(config.gurobi_relax_grid, {'logical', 'numeric'}, ...
+    {'scalar', 'binary'});
+validateattributes(config.gurobi_partition_enabled, {'logical','numeric'}, {'scalar','binary'});
+validateattributes(config.gurobi_partition_hours, {'numeric'}, {'vector','positive','finite'});
+validateattributes(config.gurobi_partition_time_s, {'numeric'}, {'vector','positive','finite'});
+hours=config.gurobi_partition_hours(:); ratios=hours(2:end)./hours(1:end-1);
+if numel(hours)~=numel(config.gurobi_partition_time_s) || any(diff(hours)<=0) || ...
+        any(abs(ratios-round(ratios))>1e-12)
+    error('O1:bad_partition_levels','分区时长须递增且逐层为整数倍，各层时限须一一对应。');
+end
+validateattributes(config.gurobi_partition_refine_blocks, {'numeric'}, {'scalar','integer','nonnegative','finite'});
+validateattributes(config.gurobi_partition_refine_time_s, {'numeric'}, {'scalar','positive','finite'});
+validateattributes(config.gurobi_partition_max_attempts, {'numeric'}, {'scalar','integer','positive','finite'});
+validateattributes(config.gurobi_partition_upper_time_s, {'numeric'}, {'scalar','nonnegative','finite'});
+validateattributes(config.gurobi_partition_outer_time_s, {'numeric'}, {'scalar','nonnegative','finite'});
 if strcmp(config.frontier_solver, 'gurobi')
     gurobi_dir = char(config.gurobi_matlab_directory);
     if isempty(gurobi_dir) && ~ismember(exist('gurobi', 'file'), [2, 3])
@@ -349,6 +493,9 @@ must_be_positive_scalar(config.frontier_certification_max_time_s, ...
     'frontier_certification_max_time_s');
 must_be_positive_scalar(config.frontier_certification_tolerance_usd_t, ...
     'frontier_certification_tolerance_usd_t');
+if config.certify_all_frontier_k && config.frontier_certification_tolerance_usd_t > 0.5
+    error('O1:cost_precision_too_loose', '全K经济结果的认证误差上限不能超过0.5 USD/t。');
+end
 must_be_positive_scalar(config.frontier_polish_max_time_s, ...
     'frontier_polish_max_time_s');
 must_be_positive_scalar(config.frontier_pattern_pool_max_time_s, ...
@@ -426,7 +573,6 @@ integer_fields = {'max_k_search_points', 'window_candidates_per_length', ...
     'frontier_solution_interval', 'frontier_points_per_run', ...
     'frontier_anchor_count', 'frontier_auto_key_count', ...
     'frontier_certification_max_attempts', ...
-    'frontier_certification_points_per_run', ...
     'frontier_polish_max_attempts', ...
     'frontier_global_bisection_max_attempts', ...
     'frontier_local_cost_window_h', 'frontier_local_cost_max_windows', ...
@@ -459,9 +605,14 @@ if config.frontier_certification_max_attempts < 1
     error('O1:bad_frontier_certification_attempts', ...
         'frontier_certification_max_attempts必须为正整数。');
 end
-if config.frontier_certification_points_per_run < 1
+certification_limit = config.frontier_certification_points_per_run;
+if ~isnumeric(certification_limit) || ~isreal(certification_limit) || ...
+        ~isscalar(certification_limit) || isnan(certification_limit) || ...
+        certification_limit < 1 || ...
+        (~isinf(certification_limit) && ...
+        abs(certification_limit - round(certification_limit)) > 1e-9)
     error('O1:bad_frontier_certification_points', ...
-        'frontier_certification_points_per_run必须为正整数。');
+        'frontier_certification_points_per_run必须为正整数或Inf；Inf表示遍历整个区间。');
 end
 if config.frontier_polish_max_attempts < 1
     error('O1:bad_frontier_polish_attempts', ...
@@ -1480,14 +1631,30 @@ if isfield(study, 'frontier') && ~isempty(study.frontier)
 end
 if isfield(study, 'frontier_state')
     state = study.frontier_state;
-    fprintf(['前沿进度：直接求解=%d/%d，本轮新增锚点=%d，', ...
-        '未直接求解=%d，下一关键K=%g\n'], state.completed_points, ...
-        state.total_points, state.new_points, state.pending_points, ...
-        state.next_pending_K);
+    if study.config.certify_all_frontier_k
+        fprintf(['全K前沿进度：达标=%d/%d，已证不可行=%d，待认证=%d，', ...
+            '本轮认证=%d，下一待认证K=%g。\n'], state.certified_points, ...
+            state.total_points, state.infeasible_points, state.unresolved_points, ...
+            state.certification_new_points, state.next_pending_K);
+    else
+        fprintf(['前沿进度：直接求解=%d/%d，本轮新增锚点=%d，', ...
+            '未直接求解=%d，下一关键K=%g\n'], state.completed_points, ...
+            state.total_points, state.new_points, state.pending_points, ...
+            state.next_pending_K);
+    end
 end
 if isfield(study, 'cost_certification') && ...
         ~isempty(study.cost_certification)
-    for index = 1:height(study.cost_certification)
+    displayed = 1:height(study.cost_certification);
+    if study.config.certify_all_frontier_k
+        pending = find(~study.cost_certification.is_resolved);
+        displayed = pending(1:min(10, numel(pending))).';
+        fprintf('[O1] 全K验收：达标%d，已证不可行%d，待认证%d，目标<=%.3g USD/t。\n', ...
+            sum(study.cost_certification.is_certified), ...
+            sum(study.cost_certification.is_infeasible), numel(pending), ...
+            study.config.frontier_certification_tolerance_usd_t);
+    end
+    for index = displayed
         row = study.cost_certification(index, :);
         fprintf(['关键K=%g：成本区间=[%.6g, %.6g] USD，', ...
             '不确定性=%.6g USD/t，目标<=%.6g，认证=%d\n'], ...

@@ -5,7 +5,9 @@ function outputs = O1Economics(ctx, feasibility, reference)
     solve_cost_outputs( ...
     ctx, feasibility, ctx.config.frontier_k, reference);
 economic = struct([]);
-if feasibility.is_proven && isfinite(reference.objective_lower)
+if ctx.config.defer_feasibility_search || ctx.config.certify_all_frontier_k
+    economic = economic_boundaries_from_frontier(frontier, reference, feasibility, ctx);
+elseif isfinite(reference.objective_lower)
     economic = solve_economic_boundaries(ctx, reference, feasibility);
 end
 outputs = struct('representative', representative, ...
@@ -17,20 +19,50 @@ end
 function [representative, frontier, frontier_state, structure, ...
         certification] = solve_cost_outputs( ...
         ctx, feasibility, requested_K, reference)
-% 先用稀疏锚点识别C*(K)前沿，再对少量关键K执行高精度认证。
+% 稀疏锚点提供初始界；全K模式逐行认证，旧模式仅认证关键K。
 upper = feasibility.K_upper;
 initial = feasibility.minimum_updates.solution;
 reference_count = round(sum(reference.solution.O1_HB_change));
+if ctx.config.defer_feasibility_search || ctx.config.certify_all_frontier_k
+    % 经原矩阵验证的计数方案本身就是成本上界，无需先求某个锚点。
+    seed = reference;
+    seed.solution = initial;
+    seed.count_upper = upper;
+    seed.K_limit = upper;
+    seed.objective_upper = evaluate(ctx.system_cost_usd, initial);
+    seed.system_cost_upper = seed.objective_upper;
+    seed.absolute_gap = seed.objective_upper - seed.objective_lower;
+    seed.relative_gap = seed.absolute_gap / max(1, abs(seed.objective_upper));
+    seed.is_proven = false;
+    seed.is_infeasible = false;
+    seed.is_certified = record_uncertainty_usd_t(seed, ctx) <= ...
+        ctx.config.frontier_certification_tolerance_usd_t;
+    seed.status = "seed_cost_bound";
+    seed.frontier_phase = "verified_seed";
+    seed.solve_backend = "verified_count_seed";
+    seed.cost_components = ctx.services.evaluate_cost_components(initial, ctx);
+    seed.operation_metrics = ctx.services.evaluate_operation_metrics(initial, ctx);
+    ctx.verified_count_seed = seed;
+end
 if ctx.config.frontier_all_k
-    % 已知K_upper严格可行，因此[K_upper, reference_count]均可直接
-    % 进行成本优化；无需等待最小K的下界与上界闭合。
-    first_K = max(0, ceil(feasibility.K_upper));
-    last_K = min(ctx.T, reference_count);
+    % 从匹配缓存的次数下界开始；该下界本身不代表已有可行解。
+    % 目标区间止于本轮参考经济解的实际次数，不生成全年剩余K的重复行。
+    if ctx.config.certify_all_frontier_k
+        first_K = max(0, ceil(feasibility.K_lower));
+        last_K = min(ctx.T, reference_count);
+    else
+        first_K = max(0, ceil(feasibility.K_upper));
+        last_K = min(ctx.T, reference_count);
+    end
     frontier_K = (first_K:last_K).';
 else
     frontier_K = unique(round([requested_K(:); ...
         ctx.config.frontier_key_k(:); upper]));
     frontier_K = frontier_K(frontier_K >= 0 & frontier_K <= ctx.T);
+end
+if ctx.config.frontier_all_k && ctx.config.certify_all_frontier_k
+    fprintf('[O1] 目标经济区间：K=%g:%g，共%d个整数点；参考解实际K=%g。\n', ...
+        first_K, last_K, numel(frontier_K), reference_count);
 end
 
 variable_types = {'double', 'double', 'double', 'double', 'double', ...
@@ -61,6 +93,7 @@ frontier.solve_backend(:) = "";
 frontier.uncertainty_usd_t(:) = NaN;
 frontier.elapsed_s(:) = 0;
 frontier.attempts(:) = 0;
+frontier.is_infeasible = false(height(frontier), 1);
 component_names = fieldnames(ctx.cost_components);
 for component_index = 1:numel(component_names)
     frontier.(component_names{component_index}) = ...
@@ -92,7 +125,7 @@ for row = 1:height(frontier)
 end
 
 if ctx.config.frontier_all_k
-    solve_K = select_frontier_anchors(upper, reference_count - 1, ...
+    solve_K = select_frontier_anchors(first_K, reference_count - 1, ...
         ctx.config.frontier_anchor_count, requested_K, ...
         ctx.config.frontier_key_k);
 else
@@ -117,7 +150,7 @@ if ctx.config.frontier_scale_solver
     % 仅用于长时原模型认证；快速锚点与局部搜索继续使用已验证的原单位。
     cost_solver.variable_units = units;
 end
-fprintf(['[O1] Cost frontier: %d optimized K points, %d total rows; ', ...
+fprintf(['[O1] Cost frontier: %d anchor candidates, %d total rows; ', ...
     'matrix build %.1f s.\n'], numel(solve_K), numel(frontier_K), ...
     build_elapsed_s);
 
@@ -139,6 +172,9 @@ for legacy_index = 1:numel(legacy_entries)
 end
 current_start = initial;
 representative = reference;
+if isfield(ctx, 'verified_count_seed')
+    representative = ctx.verified_count_seed;
+end
 frontier_started = tic;
 new_point_count = 0;
 budget_exhausted = false;
@@ -263,13 +299,22 @@ else
 end
 critical_K = unique([ctx.config.frontier_key_k(:); upper; ...
     automatic_K], 'stable');
-critical_K = critical_K(critical_K >= upper & ...
-    critical_K < reference_count);
+critical_K = critical_K(critical_K >= upper & critical_K < reference_count);
 certification_started = tic;
 certification_new_points = 0;
 certification_budget_exhausted = false;
-for critical_index = 1:numel(critical_K)
-    K = critical_K(critical_index);
+interval_batch = ctx.config.certify_all_frontier_k && ...
+    isinf(ctx.config.frontier_certification_points_per_run);
+certification_retry_exhausted = false;
+certification_retry_exhausted_K = zeros(0, 1);
+legacy_critical_K = critical_K;
+if ctx.config.certify_all_frontier_k
+    critical_K = frontier.K;
+    legacy_critical_K = zeros(0, 1);
+    certify_each_cost_point();
+end
+for critical_index = 1:numel(legacy_critical_K)
+    K = legacy_critical_K(critical_index);
     cached_index = find([cost_entries.K] == K, 1);
     cached = struct();
     if ~isempty(cached_index)
@@ -289,8 +334,10 @@ for critical_index = 1:numel(critical_K)
         record_field(cached, 'startup_binary_certification_attempts', 0) < 1;
     use_gurobi = strcmp(ctx.config.frontier_solver, 'gurobi');
     gurobi_attempts = record_field(cached, 'gurobi_certification_attempts', 0);
+    needs_partition_certification = use_gurobi && ctx.config.gurobi_partition_enabled && ...
+        record_field(cached,'gurobi_partition_attempts',0)<ctx.config.gurobi_partition_max_attempts;
     needs_gurobi_certification = use_gurobi && ...
-        gurobi_attempts < ctx.config.frontier_certification_max_attempts;
+        (gurobi_attempts < ctx.config.frontier_certification_max_attempts || needs_partition_certification);
     prefer_direct_certification = needs_floor_certification || ...
         needs_startup_certification || use_gurobi;
     if uncertainty <= ...
@@ -808,6 +855,17 @@ if ~isempty(representative_index) && ...
             upper, cost_entries, initial, ctx);
     end
 end
+if ctx.config.certify_all_frontier_k
+    % 包括快速锚点发现的更小计数见证，不要求该点恰好等于旧可行上界。
+    for i = 1:numel(cost_entries)
+        r = cost_entries(i).record;
+        if r.has_incumbent && isfield(r, 'solution') && ...
+                ~isempty(fieldnames(r.solution)) && ...
+                r.count_upper < representative.count_upper
+            representative = r;
+        end
+    end
+end
 for row = 1:height(frontier)
     K = frontier.K(row);
     if K < feasibility.K_lower
@@ -826,18 +884,25 @@ for row = 1:height(frontier)
         envelope = monotonic_anchor_envelope( ...
             K, cost_entries, reference, ctx);
         if isfinite(envelope.objective_lower) || ...
-                isfinite(envelope.objective_upper)
+                isfinite(envelope.objective_upper) || envelope.is_infeasible
             assign_row(row, envelope);
         end
     end
 end
 frontier = apply_monotonic_closure(frontier);
 certification = build_certification_table(critical_K, frontier, ctx);
-if isempty(certification) || all(certification.is_certified)
+if isempty(certification) || all(certification.is_resolved)
     next_pending_K = NaN;
+elseif ctx.config.certify_all_frontier_k
+    pending_K = certification.K(~certification.is_resolved);
+    if interval_batch
+        next_pending_K = min(pending_K); % 下一轮从首个未达标K开始遍历。
+    else
+        next_pending_K = next_cost_certification_K(pending_K, cost_entries);
+    end
 else
     next_pending_K = certification.K( ...
-        find(~certification.is_certified, 1));
+        find(~certification.is_resolved, 1));
 end
 direct_points = sum(ismember(frontier.phase, ...
     ["anchor", "legacy_anchor", "certification", "polish", ...
@@ -852,14 +917,126 @@ frontier_state = struct('elapsed_s', toc(frontier_started), ...
     'pending_points', max(0, height(frontier) - direct_points), ...
     'next_pending_K', next_pending_K, ...
     'total_points', height(frontier), ...
+    'reference_K', reference_count, 'interval_batch', interval_batch, ...
     'anchor_K', solve_K, 'critical_K', critical_K, ...
     'certification_new_points', certification_new_points, ...
     'certification_budget_exhausted', ...
     certification_budget_exhausted, ...
+    'certification_retry_exhausted', certification_retry_exhausted, ...
+    'certification_retry_exhausted_K', certification_retry_exhausted_K, ...
+    'certified_points', sum(frontier.is_certified), ...
+    'infeasible_points', sum(frontier.is_infeasible), ...
+    'unresolved_points', sum(~frontier.is_certified & ~frontier.is_infeasible), ...
     'certification_complete', isempty(certification) || ...
-    all(certification.is_certified), ...
+    all(certification.is_resolved), ...
     'certification_target_usd_t', ...
     ctx.config.frontier_certification_tolerance_usd_t);
+if ctx.config.certify_all_frontier_k
+    frontier_state.completed_points = ...
+        frontier_state.certified_points + frontier_state.infeasible_points;
+    frontier_state.pending_points = frontier_state.unresolved_points;
+end
+
+    function certify_each_cost_point()
+        % 批量模式逐轮遍历整个区间；限额模式仍按累计次数公平续算。
+        attempts_this_run = zeros(height(frontier), 1);
+        for certification_row = 1:height(frontier)
+            K_value = frontier.K(certification_row);
+            if K_value >= reference_count
+                assign_row(certification_row, reference);
+                continue
+            end
+            match = find([cost_entries.K] == K_value, 1);
+            if isempty(match)
+                bound = monotonic_anchor_envelope(K_value, cost_entries, reference, ctx);
+            else
+                bound = strengthen_anchor_bound(cost_entries(match).record, ...
+                    K_value, cost_entries, reference, ctx);
+            end
+            assign_row(certification_row, bound);
+        end
+        frontier = apply_monotonic_closure(frontier);
+        while true
+            pending = find(~frontier.is_certified & ~frontier.is_infeasible);
+            if isempty(pending)
+                return
+            end
+            if certification_new_points >= ctx.config.frontier_certification_points_per_run || ...
+                    toc(certification_started) >= ctx.config.frontier_certification_run_budget_s
+                certification_budget_exhausted = true;
+                return
+            end
+            if interval_batch
+                eligible = pending(attempts_this_run(pending) < ...
+                    ctx.config.frontier_certification_max_attempts);
+                if isempty(eligible)
+                    certification_retry_exhausted = true;
+                    certification_retry_exhausted_K = frontier.K(pending);
+                    fprintf(['[O1] 整区间已遍历，本轮每K最多%d次；', ...
+                        '剩余%d个未达标点已缓存，保留待认证。\n'], ...
+                        ctx.config.frontier_certification_max_attempts, numel(pending));
+                    return
+                end
+                K_value = next_cost_certification_K(frontier.K(eligible), ...
+                    cost_entries, attempts_this_run(eligible));
+            else
+                K_value = next_cost_certification_K(frontier.K(pending), cost_entries);
+            end
+            certification_row = find(frontier.K == K_value, 1);
+            match = find([cost_entries.K] == K_value, 1);
+            prior = monotonic_anchor_envelope(K_value, cost_entries, reference, ctx);
+            if ~isempty(match)
+                prior = strengthen_anchor_bound(cost_entries(match).record, ...
+                    K_value, cost_entries, reference, ctx);
+            end
+            start = best_feasible_seed(K_value, cost_entries, initial, ctx, true);
+            point_ctx = ctx;
+            remaining = ctx.config.frontier_certification_run_budget_s - toc(certification_started);
+            point_ctx.certification_options = optimoptions(ctx.certification_options, ...
+                'RelativeGapTolerance', 0, 'MaxTime', ...
+                min(ctx.config.frontier_certification_max_time_s, max(0.01, remaining)));
+            point_ctx.config.gurobi_partition_enabled = ctx.config.gurobi_partition_enabled && ...
+                round(sum(start.O1_HB_change)) <= K_value && ...
+                record_field(prior, 'gurobi_partition_attempts', 0) < ...
+                ctx.config.gurobi_partition_max_attempts;
+            fprintf('[O1] 全K经济认证K=%g，第%d次，目标<=%.3g USD/t。\n', ...
+                K_value, record_field(prior, 'certification_attempts', 0) + 1, ...
+                ctx.config.frontier_certification_tolerance_usd_t);
+            point = solve_cost_frontier_point(cost_solver, K_value, start, ...
+                point_ctx, reference, record_field(prior, 'frontier_attempts', 0) + 1, ...
+                "certification", prior);
+            certification_new_points = certification_new_points + 1;
+            attempts_this_run(certification_row) = attempts_this_run(certification_row) + 1;
+            stored = point;
+            keep_vector = point.has_incumbent && (point.count_upper <= upper || ...
+                mod(K_value - frontier.K(1), ctx.config.frontier_solution_interval) == 0 || ...
+                any(K_value == ctx.config.frontier_key_k));
+            if ~keep_vector
+                stored.solution = struct();
+                stored.upper_bound_has_full_solution = false;
+            end
+            entry = struct('mode', cache_mode, 'cost_cap', Inf, 'K', K_value, ...
+                'record', stored, 'source', "frontier_all_k_certification");
+            ctx.services.fixed_point_store(ctx.point_cache_file, ctx.cost_signature, ...
+                "append", cache_mode, Inf, entry);
+            if isempty(match)
+                cost_entries(end + 1) = entry; %#ok<AGROW>
+            else
+                cost_entries(match) = entry;
+            end
+            assign_row(certification_row, point);
+            if point.has_incumbent && ~isempty(fieldnames(point.solution)) && ...
+                    point.count_upper <= representative.count_upper
+                representative = point;
+            end
+            frontier = apply_monotonic_closure(frontier);
+            fprintf(['[O1] K=%g经济求解结果：%s，成本=[%.6g, %.6g] USD，', ...
+                '不确定性=%.6g USD/t；区间待认证=%d。\n'], K_value, point.status, ...
+                point.objective_lower, point.objective_upper, ...
+                record_uncertainty_usd_t(point, ctx), ...
+                sum(~frontier.is_certified & ~frontier.is_infeasible));
+        end
+    end
 
     function point = make_non_solved_point(K, lower_cost, upper_cost, ...
             status, backend)
@@ -896,14 +1073,13 @@ frontier_state = struct('elapsed_s', toc(frontier_started), ...
             frontier.actual_updates(row) = point.count_upper;
         end
         frontier.has_incumbent(row) = point.has_incumbent;
+        frontier.is_infeasible(row) = record_field(point, 'is_infeasible', false) || ...
+            string(point.status) == "infeasible_certified";
         frontier.is_proven(row) = point.is_proven;
-        if isfield(point, 'is_certified')
-            frontier.is_certified(row) = point.is_certified;
-        else
-            frontier.is_certified(row) = ...
-                record_uncertainty_usd_t(point, ctx) <= ...
-                ctx.config.frontier_certification_tolerance_usd_t;
-        end
+        % 不信任旧缓存认证布尔值；每次按当前Q和金额区间重新验收。
+        frontier.is_certified(row) = point.has_incumbent && ...
+            record_uncertainty_usd_t(point, ctx) <= ...
+            ctx.config.frontier_certification_tolerance_usd_t;
         frontier.status(row) = string(point.status);
         if isfield(point, 'frontier_phase')
             frontier.phase(row) = string(point.frontier_phase);
@@ -959,6 +1135,9 @@ frontier_state = struct('elapsed_s', toc(frontier_started), ...
                     (~isfinite(closed.cost_upper_usd(current_row)) || ...
                     closed.cost_upper_usd(previous_row) < ...
                     closed.cost_upper_usd(current_row))
+                if closed.is_infeasible(current_row)
+                    error('O1:inconsistent_cost_bounds', '不可行证书与可行见证冲突。');
+                end
                 closed.cost_upper_usd(current_row) = ...
                     closed.cost_upper_usd(previous_row);
                 closed.has_incumbent(current_row) = ...
@@ -973,7 +1152,15 @@ frontier_state = struct('elapsed_s', toc(frontier_started), ...
         end
         for current_row = row_count - 1:-1:1
             next_row = current_row + 1;
-            if isfinite(closed.cost_lower_usd(next_row)) && ...
+            if closed.is_infeasible(next_row)
+                if closed.has_incumbent(current_row)
+                    error('O1:inconsistent_cost_bounds', '不可行证书与较小K的可行见证冲突。');
+                end
+                closed.is_infeasible(current_row) = true;
+                closed.cost_lower_usd(current_row) = Inf;
+                closed.cost_upper_usd(current_row) = Inf;
+                closed.status(current_row) = "infeasible_certified";
+            elseif isfinite(closed.cost_lower_usd(next_row)) && ...
                     (~isfinite(closed.cost_lower_usd(current_row)) || ...
                     closed.cost_lower_usd(next_row) > ...
                     closed.cost_lower_usd(current_row))
@@ -995,6 +1182,10 @@ frontier_state = struct('elapsed_s', toc(frontier_started), ...
                 (upper_cost - reference.objective_lower) / ...
                 ctx.config.nh3_target_t;
             if isfinite(lower_cost) && isfinite(upper_cost)
+                if lower_cost > upper_cost + max(1e-4, 1e-9 * abs(upper_cost))
+                    error('O1:inconsistent_cost_bounds', 'K=%g的成本下界超过有效上界。', ...
+                        closed.K(current_row));
+                end
                 closed.uncertainty_usd_t(current_row) = ...
                     max(0, upper_cost - lower_cost) / ...
                     ctx.config.nh3_target_t;
@@ -1123,6 +1314,10 @@ end
 function record = strengthen_anchor_bound(record, K, entries, reference, ctx)
 %STRENGTHEN_ANCHOR_BOUND 统一更新有效区间及认证字段，避免旧记录与展示脱节。
 envelope = monotonic_anchor_envelope(K, entries, reference, ctx);
+if envelope.is_infeasible
+    record = envelope;
+    return
+end
 record.objective_lower = max(record.objective_lower, envelope.objective_lower);
 record.system_cost_lower = record.objective_lower;
 record.absolute_gap = record.objective_upper - record.objective_lower;
@@ -1139,6 +1334,10 @@ function point = monotonic_anchor_envelope(K, entries, reference, ctx)
 lower_bound = -Inf;
 upper_bound = Inf;
 upper_count = NaN;
+if isfield(ctx, 'verified_count_seed') && ctx.verified_count_seed.count_upper <= K
+    upper_bound = ctx.verified_count_seed.objective_upper;
+    upper_count = ctx.verified_count_seed.count_upper;
+end
 for entry_index = 1:numel(entries)
     entry_K = entries(entry_index).K;
     record = entries(entry_index).record;
@@ -1146,7 +1345,18 @@ for entry_index = 1:numel(entries)
             isfinite(record.objective_lower)
         lower_bound = max(lower_bound, record.objective_lower);
     end
-    if entry_K <= K && isfield(record, 'has_incumbent') && ...
+    if record_field(record,'partition_affine_bounds_version',0)==1 && ...
+            isfield(record,'partition_affine_bounds')
+        lines=record.partition_affine_bounds;
+        if size(lines,2)==2 && all(isfinite(lines(:))) && all(lines(:,2)<=0)
+            lower_bound=max([lower_bound;lines(:,1)+K*lines(:,2)]);
+        end
+    end
+    if record_field(record, 'is_infeasible', false) && entry_K >= K
+        lower_bound = Inf;
+    end
+    if record_field(record, 'count_upper', entry_K) <= K && ...
+            isfield(record, 'has_incumbent') && ...
             record.has_incumbent && isfield(record, 'objective_upper') && ...
             isfinite(record.objective_upper) && ...
             record.objective_upper < upper_bound
@@ -1157,9 +1367,11 @@ end
 if isfinite(reference.objective_lower)
     lower_bound = max(lower_bound, reference.objective_lower);
 end
-if isfinite(lower_bound) && isfinite(upper_bound) && ...
-        lower_bound > upper_bound
-    lower_bound = upper_bound;
+if lower_bound > upper_bound + max(1e-4, 1e-9 * abs(upper_bound))
+    error('O1:inconsistent_cost_bounds', 'K=%g的缓存成本界矛盾，不能伪造认证。', K);
+end
+if isfinite(lower_bound) && isfinite(upper_bound) && lower_bound > upper_bound
+    lower_bound = upper_bound; % 仅消除不超过矩阵数值容差的舍入偏差。
 end
 point = struct('objective_kind', "cost", ...
     'has_incumbent', isfinite(upper_bound), ...
@@ -1172,6 +1384,16 @@ point = struct('objective_kind', "cost", ...
     'solution', struct(), 'solve_backend', "monotonic_anchor_bounds", ...
     'K_limit', K, 'elapsed_s', 0, 'frontier_attempts', 0, ...
     'frontier_phase', "envelope", 'is_certified', false);
+if isfield(ctx, 'verified_count_seed') && ...
+        upper_bound == ctx.verified_count_seed.objective_upper && ...
+        upper_count == ctx.verified_count_seed.count_upper
+    point.cost_components = ctx.verified_count_seed.cost_components;
+    point.operation_metrics = ctx.verified_count_seed.operation_metrics;
+end
+if isinf(lower_bound) && lower_bound > 0
+    point.is_infeasible = true;
+    point.status = "infeasible_certified";
+end
 if isfinite(upper_bound)
     point.relative_gap = point.absolute_gap / max(1, abs(upper_bound));
     point.is_certified = record_uncertainty_usd_t(point, ctx) <= ...
@@ -1179,7 +1401,7 @@ if isfinite(upper_bound)
 end
 end
 
-function start = best_feasible_seed(K, entries, fallback, ctx)
+function start = best_feasible_seed(K, entries, fallback, ctx, allow_missing)
 %BEST_FEASIBLE_SEED 为关键K选择成本最低的已缓存可行热启动。
 start = fallback;
 best_cost = evaluate(ctx.system_cost_usd, fallback);
@@ -1203,7 +1425,7 @@ for entry_index = 1:numel(entries)
         best_cost = cost;
     end
 end
-if ~isfinite(best_cost)
+if ~isfinite(best_cost) && (nargin < 5 || ~allow_missing)
     error('O1:no_certification_seed', ...
         '关键K=%g没有可用于认证的可行热启动。', K);
 end
@@ -1221,6 +1443,8 @@ certification = table('Size', [numel(K_values), numel(variable_names)], ...
 certification.K = K_values(:);
 certification.target_usd_t(:) = ...
     ctx.config.frontier_certification_tolerance_usd_t;
+certification.is_infeasible = false(numel(K_values), 1);
+certification.is_resolved = false(numel(K_values), 1);
 for index = 1:numel(K_values)
     row = find(frontier.K == K_values(index), 1);
     if isempty(row)
@@ -1238,6 +1462,9 @@ for index = 1:numel(K_values)
         certification.is_certified(index) = frontier.is_certified(row);
         certification.status(index) = frontier.status(row);
         certification.attempts(index) = frontier.attempts(row);
+        certification.is_infeasible(index) = frontier.is_infeasible(row);
+        certification.is_resolved(index) = certification.is_certified(index) || ...
+            certification.is_infeasible(index);
     end
 end
 end
@@ -1250,6 +1477,10 @@ if ~isstruct(record) || isempty(fieldnames(record)) || ...
         ~isfield(record, 'objective_upper') || ...
         ~isfinite(record.objective_lower) || ...
         ~isfinite(record.objective_upper)
+    return
+end
+if record.objective_lower > record.objective_upper + ...
+        max(1e-4, 1e-9 * abs(record.objective_upper))
     return
 end
 uncertainty = max(0, ...
@@ -1322,6 +1553,22 @@ if isstruct(record) && ~isempty(fieldnames(record)) && ...
         isfield(record, name) && ~isempty(record.(name))
     value = record.(name);
 end
+end
+
+function K = next_cost_certification_K(K_values, entries, attempts)
+% 实际调度和进度展示共用同一优先级，避免重复等待首个unknown。
+if nargin < 3
+    attempts = zeros(numel(K_values), 1);
+    for point_index = 1:numel(K_values)
+        match = find([entries.K] == K_values(point_index), 1);
+        if ~isempty(match)
+            attempts(point_index) = record_field(entries(match).record, ...
+                'certification_attempts', 0);
+        end
+    end
+end
+[~, order] = sortrows([attempts(:), K_values(:)], [1, 2]);
+K = K_values(order(1));
 end
 
 function outcome = solve_cost_cap_domain( ...
@@ -1880,6 +2127,9 @@ use_gurobi = strcmp(ctx.config.frontier_solver, 'gurobi');
 gurobi_focus = NaN;
 if use_gurobi
     problem.cost_solver = 'gurobi';
+    problem.gurobi_checkpoint = struct('enabled', phase == "certification", ...
+        'signature', ctx.cost_signature, 'indices', indices, ...
+        'progress_file', char(ctx.config.progress_file));
     gurobi_focus = ctx.config.gurobi_mip_focus;
     if gurobi_focus == -1
         % 自动策略仅按该K的新后端历史推进，不能清空旧额度重复均衡策略。
@@ -1898,6 +2148,9 @@ if use_gurobi
 end
 seed_count = round(sum(start.O1_HB_change));
 seed_cost = evaluate(ctx.system_cost_usd, start);
+% 目标常数与K无关；即使热启动不满足本K，也必须保留固定费用的币值换算。
+offset_vector = solution_to_vector(indices, start, numel(problem.lb));
+objective_offset = seed_cost - problem.f(:).' * offset_vector(:);
 seed_is_feasible = seed_count <= K && isfinite(seed_cost);
 if seed_is_feasible
     problem.x0 = solution_to_vector(indices, start, numel(problem.lb));
@@ -1929,15 +2182,18 @@ if seed_is_feasible
     solver_cutoff = seed_upper - objective_offset;
     problem.options = optimoptions(problem.options, 'ObjectiveCutOff', ...
         solver_cutoff + max(1e-6, 1e-10 * abs(solver_cutoff)));
-else
-    objective_offset = 0;
 end
+original_intcon = problem.intcon(:);
 relaxed_grid = zeros(0, 1);
 relaxed_ael = zeros(0, 1);
-if ~use_gurobi && isfield(indices, 'u_purchase') && ...
+grid_equivalent = false;
+if use_gurobi && ctx.config.gurobi_relax_grid
+    grid_equivalent = grid_direction_is_redundant(problem, indices);
+end
+if ((~use_gurobi && isfield(indices, 'u_purchase') && ...
         isfield(indices, 'p_purchase') && isfield(indices, 'p_sell') && ...
         all(ctx.model.context.C_purchase(:) >= ...
-        ctx.model.context.C_sell(:) - 1e-12)
+        ctx.model.context.C_sell(:) - 1e-12)) || grid_equivalent)
     relaxed_grid = indices.u_purchase(:);
     problem.intcon = setdiff(problem.intcon(:), relaxed_grid);
 end
@@ -1998,6 +2254,10 @@ record = struct('objective_kind', "cost", ...
     'gurobi_certification_attempts', record_field(prior, ...
     'gurobi_certification_attempts', 0) + double(use_gurobi && phase == "certification"), ...
     'gurobi_mip_focus', gurobi_focus, ...
+    'gurobi_partition_attempts', record_field(prior,'gurobi_partition_attempts',0) + ...
+        double(use_gurobi && phase=="certification" && ctx.config.gurobi_partition_enabled), ...
+    'solver_grid_direction_relaxed', grid_equivalent, ...
+    'solver_integer_count', numel(problem.intcon), ...
     'scaled_certification_attempts', record_field(prior, ...
     'scaled_certification_attempts', 0) + ...
     double(phase == "certification" && ctx.config.frontier_scale_solver), ...
@@ -2016,6 +2276,17 @@ if seed_is_feasible
     record.cost_components = ctx.services.evaluate_cost_components(seed_solution, ctx);
     record.operation_metrics = ctx.services.evaluate_operation_metrics(seed_solution, ctx);
 end
+if use_gurobi && phase=="certification" && ctx.config.gurobi_partition_enabled && seed_is_feasible
+    problem.gurobi_partition = struct('config',ctx.config,'indices',indices, ...
+        'dt',ctx.model.context.dt,'signature',ctx.cost_signature, ...
+        'prior_state_file',record_field(record_field(prior,'output',struct()),'partition_state_file',''), ...
+        'known_lower_usd',reference_lower,'known_upper_usd',seed_upper, ...
+        'affine_globally_valid',~cost_floor_added, ...
+        'update_row',solver_data.update_row,'update_coefficient',solver_data.update_coefficient, ...
+        'original_intcon',original_intcon,'relaxed_grid',relaxed_grid, ...
+        'implied_starts',ael_start_counts_are_integral(problem,indices));
+    problem.partition_progress = @(state) persist_partition_progress(ctx,record,prior,indices,state);
+end
 started = tic;
 candidate_x = [];
 search_output = struct();
@@ -2023,7 +2294,7 @@ search_fval = NaN;
 recovery_failed = false;
 try
     stop_bound = Inf;
-    if phase == "certification" && seed_is_feasible
+    if phase == "certification"
         known_upper = seed_upper;
         if record_field(prior, 'has_incumbent', false) && ...
                 record_field(prior, 'count_upper', Inf) <= K
@@ -2052,8 +2323,8 @@ try
         original_violation = max([0; problem.Aineq * candidate_x - problem.bineq(:); ...
             abs(problem.Aeq * candidate_x - problem.beq(:)); ...
             problem.lb(:) - candidate_x; candidate_x - problem.ub(:)]);
-        integer_violation = max([0; abs(candidate_x(problem.intcon) - ...
-            round(candidate_x(problem.intcon)))]);
+        integer_violation = max([0; abs(candidate_x(original_intcon) - ...
+            round(candidate_x(original_intcon)))]);
         output.recovered_original_matrix_violation = original_violation;
         output.recovered_integer_violation = integer_violation;
         if original_violation > ctx.model.options.ConstraintTolerance || ...
@@ -2066,10 +2337,28 @@ try
 catch exception
     exitflag = NaN;
     output = struct('message', exception.message);
+    if isfield(problem,'gurobi_partition')
+        saved=ctx.services.fixed_point_store(ctx.point_cache_file,ctx.cost_signature, ...
+            "load","frontier_cost",Inf);
+        index=find([saved.K]==K,1);
+        if ~isempty(index) && saved(index).record.objective_lower>=record.objective_lower
+            record=saved(index).record; reference_lower=max(reference_lower,record.objective_lower);
+            output=record.output; output.message="本阶段异常；已保存证书不回退："+string(exception.message);
+        end
+    end
 end
 record.elapsed_s = toc(started);
 record.exitflag = exitflag;
 record.output = output;
+if isfield(output,'partition_affine_bounds')
+    % 中间检查点与最终记录必须保存同一组证书；不能被旧prior覆盖。
+    prior_lines=zeros(0,2);
+    if record_field(prior,'partition_affine_bounds_version',0)==1
+        prior_lines=record_field(prior,'partition_affine_bounds',zeros(0,2));
+    end
+    record.partition_affine_bounds=unique([prior_lines;output.partition_affine_bounds],'rows');
+    record.partition_affine_bounds_version=1;
+end
 if use_gurobi && isfield(search_output, 'solver_backend')
     record.solve_backend = "gurobi_matrix_cost_" + string(phase);
 end
@@ -2170,6 +2459,10 @@ if lower_bound > record.objective_upper + bound_tolerance
     lower_bound = reference_lower;
     record.solver_bound_rejected = true;
 end
+if reference_lower > record.objective_upper + bound_tolerance
+    error('O1:inconsistent_cost_bounds', ...
+        'K=%g的已验证成本低于参考下界，须核查数值证书，不能截断下界伪造认证。', K);
+end
 record.objective_lower = min(lower_bound, record.objective_upper);
 record.system_cost_lower = record.objective_lower;
 record.absolute_gap = record.objective_upper - record.objective_lower;
@@ -2210,6 +2503,48 @@ end
     end
 end
 
+function eligible = grid_direction_is_redundant(problem, indices)
+% 逐项核对矩阵，不依赖年份、价格常量或碳排系数的硬编码。
+% 同时扣除min(购电,售电)保持净功率，其他约束及目标只能改善；
+% 仅购售互斥两行随方向重建。条件不满足时自动保留原整数模型。
+eligible = false;
+if ~all(isfield(indices, {'u_purchase','p_purchase','p_sell'})), return; end
+u = indices.u_purchase(:); p = indices.p_purchase(:); s = indices.p_sell(:);
+T = numel(u);
+if numel(p) ~= T || numel(s) ~= T || ...
+        any(problem.lb([p;s;u]) ~= 0) || any(problem.ub(u) ~= 1) || ...
+        any(problem.f(u) ~= 0) || any(problem.f(p) + problem.f(s) < 0) || ...
+        nnz(problem.Aeq(:,u)) ~= 0
+    return
+end
+A = problem.Aineq;
+Au = A(:,u);
+if any(full(sum(spones(Au),1)) ~= 2), return; end
+[br,bc,bv] = find(min(Au,0)); [sr,sc,sv] = find(max(Au,0));
+if numel(br) ~= T || numel(sr) ~= T || ...
+        ~isequal(bc,(1:T).') || ~isequal(sc,(1:T).') || ...
+        numel(unique([br;sr])) ~= 2*T
+    return
+end
+% 各方向行必须只包含该小时电量及该小时方向，不接纳额外耦合。
+if any(full(sum(spones(A([br;sr],:)),2)) ~= 2), return; end
+bp = full(diag(A(br,p))); ss = full(diag(A(sr,s)));
+if any(bp <= 0) || any(ss <= 0) || ...
+        nnz(A(br,p)-spdiags(bp,0,T,T)) ~= 0 || ...
+        nnz(A(sr,s)-spdiags(ss,0,T,T)) ~= 0 || ...
+        any(problem.bineq(br) ~= 0) || any(problem.bineq(sr) ~= sv) || ...
+        any(problem.ub(p) > -bv./bp) || any(problem.ub(s) > sv./ss)
+    return
+end
+other = true(size(A,1),1); other([br;sr]) = false;
+% 非互斥不等式沿共同减量的系数必须非负；等式必须完全抵消。
+if any(nonzeros(A(other,p)+A(other,s)) < 0) || ...
+        nnz(problem.Aeq(:,p)+problem.Aeq(:,s)) ~= 0
+    return
+end
+eligible = true;
+end
+
 function [x, fval, exitflag, output] = run_cost_milp( ...
         problem, K, objective_offset, stop_bound, bound_label)
 %RUN_COST_MILP 从官方回调保留当前求解域对偶界，并可等价缩放连续变量。
@@ -2224,6 +2559,7 @@ started = tic;
 unit_scaled = isfield(problem, 'variable_units');
 original_problem = problem;
 units = ones(numel(problem.lb), 1);
+row_units = ones(size(problem.Aineq,1)+size(problem.Aeq,1),1);
 if unit_scaled
     original_units = problem.variable_units(:);
     problem = rmfield(problem, 'variable_units');
@@ -2243,6 +2579,7 @@ if unit_scaled
         problem.Aineq = spdiags(1 ./ row_norm, 0, numel(row_norm), ...
             numel(row_norm)) * problem.Aineq;
         problem.bineq = problem.bineq(:) ./ row_norm;
+        row_units(1:size(problem.Aineq,1)) = row_norm;
     end
     if ~isempty(problem.Aeq)
         problem.Aeq = problem.Aeq * D;
@@ -2250,6 +2587,7 @@ if unit_scaled
         problem.Aeq = spdiags(1 ./ row_norm, 0, numel(row_norm), ...
             numel(row_norm)) * problem.Aeq;
         problem.beq = problem.beq(:) ./ row_norm;
+        row_units(size(problem.Aineq,1)+(1:size(problem.Aeq,1))) = row_norm;
     end
     problem.lb = problem.lb(:) ./ units;
     problem.ub = problem.ub(:) ./ units;
@@ -2272,6 +2610,9 @@ for i = 1:numel(original_callbacks)
 end
 callbacks{end + 1} = @capture_bound;
 if isfield(problem, 'cost_solver') && strcmp(problem.cost_solver, 'gurobi')
+    problem.gurobi_checkpoint.units = units;
+    problem.gurobi_checkpoint.objective_offset_usd = objective_offset;
+    problem.gurobi_checkpoint.row_units = row_units;
     [x, fval, exitflag, output] = run_gurobi_cost_milp(problem, stop_bound, K);
     best_dualbound = output.bestbound;
 else
@@ -2367,10 +2708,45 @@ if isfinite(stop_bound)
     % MATLAB接口不提供MIP回调；以官方目标界停止参数对应旧回调条件。
     params.BestBdStop = stop_bound + max(1e-4, 1e-9 * abs(stop_bound));
 end
+checkpoint_file = '';
+solution_prefix = '';
+if problem.gurobi_checkpoint.enabled
+    % 原生候选实时落盘；不是分支树或下界检查点，不据此宣称无损续树。
+    % 官方说明：https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#solfiles
+    model.varnames = cellstr(compose('x_%d', (1:n).'));
+    solution_prefix = erase(params.LogFile, '.log');
+    params.SolFiles = solution_prefix;
+    checkpoint_file = [solution_prefix, '_model.mat'];
+    metadata = problem.gurobi_checkpoint;
+    metadata.K = K;
+    metadata = rmfield(metadata, {'enabled','progress_file'});
+    save(checkpoint_file, 'model', 'params', 'metadata', '-v7.3');
+    progress_file = problem.gurobi_checkpoint.progress_file;
+    if ~isempty(progress_file)
+        try
+            fid = fopen(progress_file, 'a', 'n', 'UTF-8');
+            if fid < 0, error('O1:progress_open_failed', '无法打开会话记录。'); end
+            close_progress = onCleanup(@() fclose(fid));
+            fprintf(fid, ['\n- 长认证启动检查点：K=%g，策略=%g，方法=%g，', ...
+                '时限=%.1f秒，模型及换算快照=`%s`，原生候选前缀=`%s`；', ...
+                '尚未得到本阶段最终证书，原有效上下界保留。\n'], ...
+                K, params.MIPFocus, params.Method, params.TimeLimit, checkpoint_file, solution_prefix);
+            clear close_progress
+        catch exception
+            warning('O1:progress_write_failed', '快照已保存，但会话记录失败：%s', exception.message);
+        end
+    end
+end
 fprintf(['[O1] K=%g使用Gurobi，策略=%g，时限=%.1f s，', ...
     '绝对gap目标=%g USD，日志=%s\n'], ...
     K, params.MIPFocus, params.TimeLimit, params.MIPGapAbs, params.LogFile);
-result = gurobi(model, params);
+partition_output = struct();
+if isfield(problem,'gurobi_partition')
+    [result,partition_output] = run_partition_certificate(model,params, ...
+        problem.gurobi_partition,problem.gurobi_checkpoint,problem.partition_progress,K);
+else
+    result = gurobi(model, params);
+end
 x = [];
 fval = NaN;
 bound = -Inf;
@@ -2398,10 +2774,398 @@ output = struct('message', ['Gurobi状态：', result.status], ...
     'bestbound', bound, 'absolutegap', NaN, ...
     'numnodes', record_field(result, 'nodecount', NaN), ...
     'gurobi_log_file', params.LogFile, ...
+    'gurobi_checkpoint_file', checkpoint_file, ...
+    'gurobi_solution_prefix', solution_prefix, ...
     'runtime', record_field(result, 'runtime', NaN));
+partition_fields = fieldnames(partition_output);
+for field_index=1:numel(partition_fields)
+    output.(partition_fields{field_index})=partition_output.(partition_fields{field_index});
+end
 if isfinite(fval) && isfinite(bound)
     output.absolutegap = max(0, fval - bound);
 end
+end
+
+function [result,extra] = run_partition_certificate(base,params,task,metadata,on_progress,K)
+% 下界辅助问题与原全年可行上界分开；只改变求解路径，不修改研究模型。
+started=tic; cfg=task.config; offset=metadata.objective_offset_usd;
+units=metadata.units(:); ix=task.indices; T=numel(ix.O1_HB_change);
+key_fields={'A','obj','rhs','sense','lb','ub','vtype'};
+state=struct('schema',1,'file',[tempname,'_O1_partition.mat'],'signature',task.signature, ...
+    'K',K,'base',base,'units',units,'row_units',metadata.row_units(:), ...
+    'lower_usd',task.known_lower_usd,'upper_usd',task.known_upper_usd, ...
+    'original_x',base.start(:).*units,'has_original_witness',false, ...
+    'root_pi',[],'root_lower',NaN,'layers',{{}},'refined',false, ...
+    'partition_hours',cfg.gurobi_partition_hours(:), ...
+    'upper_finished',false,'outer_finished',false,'elapsed_s',0,'stage',"初始化",'reused',false, ...
+    'affine_bounds',zeros(0,2));
+if ~isempty(task.prior_state_file) && isfile(task.prior_state_file)
+    cached=load(task.prior_state_file,'state'); candidate=cached.state;
+    matches=candidate.schema==1 && candidate.K==K && isequaln(candidate.signature,task.signature) && ...
+        isequaln(candidate.units,units) && isequaln(candidate.row_units,metadata.row_units(:)) && ...
+        isequaln(record_field(candidate,'partition_hours',[]),cfg.gurobi_partition_hours(:));
+    for j=1:numel(key_fields)
+        name=key_fields{j}; matches=matches && isequaln(candidate.base.(name),base.(name));
+    end
+    if matches
+        state=candidate; state.reused=true;
+        state.lower_usd=max(state.lower_usd,task.known_lower_usd);
+        if task.known_upper_usd<state.upper_usd
+            state.original_x=base.start(:).*units; state.upper_usd=task.known_upper_usd;
+        end
+        fprintf('[O1] K=%g复用整数分区证书，不重算已完成块。\n',K);
+    else
+        fprintf('[O1] K=%g分区状态的矩阵/单位/完整签名改变，重新建立辅助证书。\n',K);
+    end
+end
+[ok,violation,integer_error]=audit_partition_witness(base,state.original_x./units,task,metadata);
+if ~ok, error('O1:invalid_partition_seed','分区认证种子未通过原矩阵/整数性复核。'); end
+state.has_original_witness=true; state.witness_violation=violation; state.witness_integer_error=integer_error;
+state.upper_usd=base.obj(:).'* (state.original_x./units)+offset;
+if ~task.affine_globally_valid, state.affine_bounds=zeros(0,2); end
+last_progress=-Inf; checkpoint(true);
+% 原生0表示自动，并非单线程；辅助分区自动模式最多使用4线程。
+partition_threads=params.Threads;
+if partition_threads==0, partition_threads=4; end
+gp=struct('Method',2,'Threads',min(4,partition_threads), ...
+    'OutputFlag',0,'TimeLimit',120,'FeasibilityTol',1e-8,'OptimalityTol',1e-8);
+oracle=base;
+if task.implied_starts
+    oracle.vtype([ix.SU_AEL(:);ix.SD_AEL(:)])='I';
+end
+if isempty(state.root_pi) && ~done() && left()>5
+    lp=oracle; lp.vtype(:)='C'; lp=rmfield(lp,'start'); gp.TimeLimit=min(120,left());
+    r=gurobi(lp,gp);
+    if ~strcmp(r.status,'OPTIMAL'), error('O1:partition_root_lp','分区价格LP未求至最优，不生成伪证书。'); end
+    state.root_pi=r.pi; state.root_lower=r.objval;
+    state.lower_usd=max(state.lower_usd,r.objval+offset-.05); checkpoint(true);
+end
+base_steps=max(1,round(cfg.gurobi_partition_hours(1)/task.dt));
+for level=1:numel(cfg.gurobi_partition_hours)
+    if done() || left()<=65, break; end
+    steps=base_steps*round(cfg.gurobi_partition_hours(level)/cfg.gurobi_partition_hours(1));
+    if level>numel(state.layers)
+        groups=partition_variable_groups(ix,T,steps,numel(base.obj));
+        previous=struct(); if level>1, previous=state.layers{level-1}; end
+        layer=build_partition_layer(oracle,groups,state.root_pi,state.root_lower,previous,gp);
+        state.layers{level}=layer; checkpoint(true);
+    end
+    layer=state.layers{level};
+    for k=find(~layer.completed(:)).'
+        if done() || left()<=65, break; end
+        part=layer.parts{k}; part.start=(state.original_x(layer.columns{k})./units(layer.columns{k}));
+        mp=gp; mp.TimeLimit=min(cfg.gurobi_partition_time_s(level),left()-60);
+        mp.MIPGap=0; mp.MIPGapAbs=5; mp.MIPFocus=3; mp.IntFeasTol=1e-6;
+        r=gurobi(part,mp);
+        layer=merge_partition_oracle(layer,k,r);
+        state.layers{level}=layer;
+        update_layer_bound(layer); state.stage="整数分区"+level+"："+k+"/"+numel(layer.bounds);
+        checkpoint(mod(k,8)==0 || all(layer.completed));
+    end
+    if ~all(layer.completed), break; end
+end
+if ~done() && ~state.refined && ~isempty(state.layers) && all(state.layers{end}.completed)
+    layer=state.layers{end}; gaps=zeros(numel(layer.bounds),1);
+    for k=1:numel(gaps)
+        gaps(k)=max(0,layer.upper(k)-layer.bounds(k));
+    end
+    [~,order]=sort(gaps,'descend'); jobs=order(1:min(cfg.gurobi_partition_refine_blocks,numel(order)));
+    for k=jobs(:).'
+        if left()<=65 || done(), break; end
+        if layer.refined(k) || gaps(k)<=5.1, continue; end
+        part=layer.parts{k};
+        part.start=state.original_x(layer.columns{k})./units(layer.columns{k});
+        mp=gp; mp.TimeLimit=min(cfg.gurobi_partition_refine_time_s,left()-60);
+        mp.MIPGap=0; mp.MIPGapAbs=5; mp.MIPFocus=3; mp.IntFeasTol=1e-6;
+        state.stage="大界差分区精修："+k; checkpoint(true);
+        r=gurobi(part,mp); layer=merge_partition_oracle(layer,k,r); layer.refined(k)=true;
+        state.layers{end}=layer; update_layer_bound(layer); checkpoint(true);
+    end
+    state.refined=all(layer.refined(jobs) | gaps(jobs)<=5.1); checkpoint(true);
+end
+if ~done() && ~state.upper_finished && cfg.gurobi_partition_upper_time_s>0 && left()>65
+    restricted=base; restricted.start=state.original_x./units;
+    fixed=[ix.n_ael(:);ix.I_AEL_up(:)]; values=round(restricted.start(fixed));
+    restricted.lb(fixed)=values; restricted.ub(fixed)=values;
+    sp=params; sp.TimeLimit=min(cfg.gurobi_partition_upper_time_s,left()-60);
+    sp.MIPFocus=1; sp.MIPGap=0; sp.MIPGapAbs=1000;
+    sp=stage_parameters(sp,"固定AEL上界"); state.stage="固定AEL整数轨迹的原全年HB精修"; checkpoint(true);
+    sp=rmfield(sp,'BestBdStop');
+    sp.BestObjStop=state.lower_usd-offset+target_gap()-.1;
+    r=gurobi(restricted,sp); accept_candidate(r); state.upper_finished=true; checkpoint(true);
+end
+if ~done() && ~state.outer_finished && cfg.gurobi_partition_outer_time_s>0 && ...
+        ~isempty(state.layers) && left()>65
+    % 外松弛仅提供下界；所有分区割都来自原整数可行域的有效证书。
+    outer=base; outer.start=state.original_x./units; outer.vtype(ix.n_ael(:))='C';
+    layer=state.layers{end};
+    for k=1:numel(layer.bounds)
+        row=sparse(1,layer.columns{k},-layer.parts{k}.obj(:),1,numel(base.obj));
+        scale=max(1,max(abs(nonzeros(row)))); row=row/scale; rhs=(-layer.bounds(k)+.05)/scale;
+        if row*outer.start>rhs+1e-6, error('O1:partition_cut_witness','整数割排除了原可行见证。'); end
+        outer.A(end+1,:)=row; outer.rhs(end+1,1)=rhs; outer.sense(end+1,1)='<';
+    end
+    outer.branchpriority=zeros(numel(base.obj),1); outer.branchpriority(ix.O1_HB_change(:))=10;
+    sp=params; sp.TimeLimit=min(cfg.gurobi_partition_outer_time_s,left()-60);
+    sp.MIPFocus=2; sp.Cuts=0; sp.MIPGap=0; sp.MIPGapAbs=100;
+    sp=stage_parameters(sp,"台数外松弛下界"); state.stage="台数外松弛：只取有效下界"; checkpoint(true);
+    r=gurobi(outer,sp); accept_lower(r); accept_candidate(r); state.outer_finished=true; checkpoint(true);
+end
+native=struct();
+if ~done() && left()>1
+    original=base; original.start=state.original_x./units;
+    sp=params; sp.TimeLimit=max(1,left()-60); sp=stage_parameters(sp,"原完整MILP");
+    sp.BestBdStop=state.upper_usd-offset-target_gap()+.1;
+    state.stage="原完整MILP连续认证"; checkpoint(true);
+    native=gurobi(original,sp); accept_lower(native); accept_candidate(native); checkpoint(true);
+end
+state.stage="本轮结束"; checkpoint(true);
+status='TIME_LIMIT'; if done(), status='USER_OBJ_LIMIT'; end
+result=struct('x',state.original_x./units,'objval',state.upper_usd-offset, ...
+    'objboundc',state.lower_usd-offset,'status',status, ...
+    'nodecount',record_field(native,'nodecount',0),'runtime',toc(started));
+extra=struct('partition_state_file',state.file,'partition_lower_usd',state.lower_usd, ...
+    'partition_affine_bounds',state.affine_bounds, ...
+    'partition_original_witness_valid',state.has_original_witness,'partition_state_reused',state.reused, ...
+    'partition_native_status',record_field(native,'status','未启动或无返回'), ...
+    'partition_implied_start_integers',task.implied_starts);
+
+    function value=left(), value=params.TimeLimit-toc(started); end
+    function value=target_gap(), value=cfg.frontier_certification_tolerance_usd_t*cfg.nh3_target_t; end
+    function value=done(), value=state.upper_usd-state.lower_usd<=target_gap(); end
+    function checkpoint(force)
+        state.elapsed_s=toc(started);
+        if state.lower_usd>state.upper_usd+.1, error('O1:partition_bound','分区下界超过原可行上界。'); end
+        state.lower_usd=min(state.lower_usd,state.upper_usd);
+        temporary=[state.file,'.tmp.mat']; save(temporary,'state','-v7.3'); movefile(temporary,state.file,'f');
+        if force || state.elapsed_s-last_progress>=120
+            on_progress(state); last_progress=toc(started);
+            fprintf('[O1] K=%g，%s：[%.3f, %.3f] USD，不确定性=%.6g USD/t，检查点=%s。\n', ...
+                K,state.stage,state.lower_usd,state.upper_usd, ...
+                (state.upper_usd-state.lower_usd)/cfg.nh3_target_t,state.file);
+        end
+    end
+    function update_layer_bound(layer)
+        value=layer.constant+sum(layer.bounds)+offset;
+        state.lower_usd=max(state.lower_usd,value);
+        % 计数行跨块时，各块域不含K；仅耦合常数随K线性变化，整条线均为严格下界。
+        where=find(layer.coupling_rows==task.update_row,1);
+        if ~isempty(where) && task.affine_globally_valid
+            slope=layer.coupling_pi(where)*task.update_coefficient/metadata.row_units(task.update_row);
+            state.affine_bounds(end+1,:)=[value-slope*K,slope];
+            [~,keep]=max(state.affine_bounds(:,1));
+            if max(state.affine_bounds(:,2))-min(state.affine_bounds(:,2))<1e-10
+                state.affine_bounds=state.affine_bounds(keep,:);
+            end
+        end
+    end
+    function accept_lower(r)
+        bound=record_field(r,'objboundc',-Inf);
+        if isfinite(bound) && bound+offset<=state.upper_usd+.1
+            state.lower_usd=max(state.lower_usd,bound+offset-.05);
+        end
+    end
+    function accept_candidate(r)
+        if ~isfield(r,'x') || left()<=1, return; end
+        [x,cost,v,iv]=recover_partition_candidate(base,r.x,task,metadata,min(60,max(1,left())));
+        if ~isempty(x) && cost<state.upper_usd
+            state.original_x=x; state.upper_usd=cost; state.has_original_witness=true;
+            state.witness_violation=v; state.witness_integer_error=iv;
+        end
+    end
+    function sp=stage_parameters(sp,label)
+        sp.LogFile=[tempname,'_O1_',char(label),'.log']; sp.SolFiles=erase(sp.LogFile,'.log');
+        sp.BestBdStop=state.upper_usd-offset-target_gap()+.1;
+        fprintf('[O1] K=%g%s，时限=%.1f s，日志=%s。\n',K,label,sp.TimeLimit,sp.LogFile);
+    end
+end
+
+function groups=partition_variable_groups(indices,T,steps,n)
+% 分组只用于辅助求解；按实际时段数适配平年、闰年和短测试时域。
+groups=zeros(n,1); B=ceil(T/steps); names=fieldnames(indices);
+for j=1:numel(names)
+    ids=indices.(names{j})(:);
+    if numel(ids)==T || numel(ids)==T+1
+        groups(ids)=min(ceil((1:numel(ids)).'/steps),B);
+    else
+        groups(ids)=B+1;
+    end
+end
+if any(groups==0), error('O1:partition_missing_variable','分区映射遗漏了原变量。'); end
+end
+
+function layer=build_partition_layer(model,groups,root_pi,root_lower,previous,params)
+% 最小化Ax<=b的pi<=0；f-Ac'*pi与pi'*bc构成有效拉格朗日下界。
+m=size(model.A,1); [ri,ci]=find(model.A); B=max(groups);
+lo=accumarray(ri,groups(ci),[m,1],@min,Inf); hi=accumarray(ri,groups(ci),[m,1],@max,0);
+coupling=lo~=hi; cr=find(coupling); pi=root_pi(cr);
+pi(model.sense(cr)=='<')=min(0,pi(model.sense(cr)=='<'));
+pi(model.sense(cr)=='>')=max(0,pi(model.sense(cr)=='>'));
+fc=model.obj(:)-model.A(cr,:).'*pi; constant=pi.'*model.rhs(cr);
+parts=cell(B,1); columns=cell(B,1); lp_bounds=zeros(B,1); upper=zeros(B,1);
+for k=1:B
+    ids=find(groups==k); rows=find(~coupling & lo==k); columns{k}=ids;
+    part=struct('A',model.A(rows,ids),'obj',fc(ids),'rhs',model.rhs(rows), ...
+        'sense',model.sense(rows),'lb',model.lb(ids),'ub',model.ub(ids), ...
+        'vtype',model.vtype(ids),'modelsense','min');
+    lp=part; lp.vtype(:)='C'; r=gurobi(lp,params);
+    if ~strcmp(r.status,'OPTIMAL'), error('O1:partition_local_lp','分区LP未求至最优，拒绝分解证书。'); end
+    lp_bounds(k)=r.objval; upper(k)=part.obj(:).'*model.start(ids); parts{k}=part;
+end
+identity=constant+sum(lp_bounds)-root_lower;
+if abs(identity)>max(.1,1e-8*abs(root_lower))
+    error('O1:partition_lp_identity','分区LP之和未复现原全年LP，拒绝下界。');
+end
+bounds=lp_bounds-.05;
+if ~isempty(fieldnames(previous))
+    if any(coupling & ~ismember((1:m).',previous.coupling_rows))
+        error('O1:partition_not_nested','分区合并不得新增跨块行。');
+    end
+    old_to_new=zeros(max(previous.groups),1);
+    for old=1:numel(old_to_new)
+        g=unique(groups(previous.groups==old));
+        if numel(g)~=1, error('O1:partition_not_nested','分区必须逐层合并而非交错。'); end
+        old_to_new(old)=g;
+    end
+    for k=1:B
+        inner=ismember((1:m).',previous.coupling_rows) & ~coupling & lo==k;
+        [~,positions]=ismember(find(inner),previous.coupling_rows);
+        floor=sum(previous.bounds(old_to_new==k))+previous.coupling_pi(positions).'*model.rhs(inner);
+        bounds(k)=max(bounds(k),floor);
+    end
+end
+if any(bounds>upper+.1), error('O1:partition_projection','分区下界超过原可行投影，拒绝证书。'); end
+% 已有底线保存在记录层，不向MILP叠加拖慢割生成的稠密目标底线行。
+layer=struct('groups',groups,'coupling_rows',cr,'coupling_pi',pi,'constant',constant, ...
+    'parts',{parts},'columns',{columns},'lp_bounds',lp_bounds,'bounds',bounds, ...
+    'upper',upper,'completed',false(B,1),'refined',false(B,1), ...
+    'raw_results',{cell(B,1)},'lp_identity_usd',identity);
+end
+
+function layer=merge_partition_oracle(layer,k,result)
+if strcmp(result.status,'INFEASIBLE') || strcmp(result.status,'UNBOUNDED')
+    error('O1:partition_oracle_invalid','原可行投影存在，但分区报告%s；拒绝该结果。',result.status);
+end
+bound=record_field(result,'objboundc',-Inf);
+if isfinite(bound), layer.bounds(k)=max(layer.bounds(k),bound-.05); end
+if isfield(result,'objval'), layer.upper(k)=min(layer.upper(k),result.objval); end
+if layer.bounds(k)>layer.upper(k)+.1
+    error('O1:partition_oracle_bound','分区下界超过局部已知上界，拒绝该结果。');
+end
+layer.completed(k)=true; layer.raw_results{k}=result;
+end
+
+function [ok,violation,integer_error]=audit_partition_witness(base,x,task,metadata)
+% 转回原矩阵行单位及原变量单位，检查原全部整数，不只检查辅助模型整数。
+res=base.A*x(:)-base.rhs(:); eq=base.sense=='='; scales=metadata.row_units(:);
+violation=max([0;res(~eq).*scales(~eq);abs(res(eq)).*scales(eq); ...
+    (base.lb(:)-x(:)).*metadata.units(:);(x(:)-base.ub(:)).*metadata.units(:)]);
+original=x(:).*metadata.units(:); ints=task.original_intcon(:);
+integer_error=max([0;abs(original(ints)-round(original(ints)))]);
+ok=violation<=1e-5 && integer_error<=1e-6;
+end
+
+function [original,cost,violation,integer_error]=recover_partition_candidate(base,x,task,metadata,max_time)
+% 外松弛向量只作启发式；恢复原台数、方向和更新数后才允许改进原可行上界。
+original=[]; cost=Inf; violation=Inf; integer_error=Inf; started=tic; ix=task.indices;
+for mode=1:3
+    if toc(started)>=max_time, break; end
+    candidate=x(:); N=ix.n_ael(:); n=candidate(N);
+    if mode==1, n=round(n); elseif mode==2, n=ceil(n-1e-7); else, n=floor(n+1e-7); end
+    candidate(N)=n; candidate(ix.I_AEL_up(:))=double([n(1);diff(n)]>0);
+    fixed=setdiff(task.original_intcon(:),task.relaxed_grid(:));
+    lp=base; lp.vtype(:)='C'; lp=rmfield(lp,'start');
+    lp.lb(fixed)=round(candidate(fixed)); lp.ub(fixed)=round(candidate(fixed));
+    par=struct('Method',2,'Threads',4,'OutputFlag',0,'TimeLimit',max(1,max_time-toc(started)), ...
+        'FeasibilityTol',1e-8,'OptimalityTol',1e-8);
+    r=gurobi(lp,par); if ~strcmp(r.status,'OPTIMAL'), continue; end
+    v=r.x(:);
+    if ~isempty(task.relaxed_grid)
+        % 单位可能不同，先在原kWh/kW坐标取消同小时购售，再恢复方向。
+        p=ix.p_purchase(:); s=ix.p_sell(:); raw=v.*metadata.units(:);
+        shared=min(raw(p),raw(s)); raw(p)=raw(p)-shared; raw(s)=raw(s)-shared;
+        raw(ix.u_purchase(:))=double(raw(p)>1e-8); v=raw./metadata.units(:);
+    end
+    [ok,vio,iv]=audit_partition_witness(base,v,task,metadata);
+    c=base.obj(:).'*v+metadata.objective_offset_usd;
+    if ok && c<cost
+        original=v.*metadata.units(:); cost=c; violation=vio; integer_error=iv;
+    end
+    if max(abs(x(N)-round(x(N))))<=1e-6, break; end
+end
+end
+
+function valid = ael_start_counts_are_integral(problem, indices)
+% 只有整数台数递推及互斥方向均被矩阵逐项证明，才声明启停量的隐含整数性。
+valid=false;
+if ~all(isfield(indices,{'n_ael','SU_AEL','SD_AEL','I_AEL_up'})), return; end
+N=indices.n_ael(:); su=indices.SU_AEL(:); sd=indices.SD_AEL(:); I=indices.I_AEL_up(:); T=numel(N);
+if any([numel(su),numel(sd),numel(I)]~=T) || ~all(ismember([N;I],problem.intcon)) || ...
+        any(problem.lb([su;sd])<0) || any(problem.lb(I)~=0) || any(problem.ub(I)~=1), return; end
+[rows,cols,d]=find(problem.Aeq(:,sd));
+if numel(rows)~=T || ~isequal(cols,(1:T).') || numel(unique(rows))~=T || any(d<=0), return; end
+r=(1:T).'; expected=sparse([r;r;r;r(2:end)], ...
+    [N;su;sd;N(1:end-1)],[d;-d;d;-d(2:end)],T,numel(problem.lb));
+if nnz(problem.Aeq(rows,:)-expected)~=0, return; end
+rhs=problem.beq(rows)./d;
+if abs(rhs(1)-round(rhs(1)))>1e-12 || any(rhs(2:end)~=0), return; end
+A=problem.Aineq; count=full(sum(spones(A),2));
+[ar,ac,av]=find(min(A(:,I),0));
+keep=count(ar)==2 & A(sub2ind(size(A),ar,su(ac)))>0 & problem.bineq(ar)==0;
+ar=ar(keep); ac=ac(keep); av=av(keep);
+if numel(ar)~=T || ~isequal(ac,r) || any(av>=0), return; end
+[br,bc,bv]=find(max(A(:,I),0));
+keep=count(br)==2 & A(sub2ind(size(A),br,sd(bc)))>0 & problem.bineq(br)==bv;
+br=br(keep); bc=bc(keep);
+if numel(br)~=T || ~isequal(bc,r), return; end
+% I=0推出SU=0，I=1推出SD=0；递推差为整数，因此SU/SD均为整数。
+valid=true;
+end
+
+function persist_partition_progress(ctx,record,prior,indices,state)
+% 状态先原子落盘，再更新既有K缓存；中断后不重算已完成的整数块。
+names=fieldnames(prior);
+for j=1:numel(names)
+    if ~isfield(record,names{j}), record.(names{j})=prior.(names{j}); end
+end
+record.objective_lower=max(record.objective_lower,state.lower_usd);
+if state.has_original_witness
+    solution=vector_to_solution(state.original_x,indices);
+    cost=evaluate(ctx.system_cost_usd,solution);
+    if abs(cost-state.upper_usd)>.1
+        error('O1:partition_cost_mismatch','分区检查点的原目标复算不一致，拒绝保存证书。');
+    end
+    if cost<=record.objective_upper
+        record.solution=solution; record.objective_upper=cost;
+        record.count_upper=round(sum(solution.O1_HB_change));
+        record.upper_bound_has_full_solution=true;
+    end
+end
+if record.objective_lower>record.objective_upper+.1
+    error('O1:partition_invalid_bound','分区下界超过已验证上界，拒绝保存证书。');
+end
+record.objective_lower=min(record.objective_lower,record.objective_upper);
+record.system_cost_lower=record.objective_lower; record.system_cost_upper=record.objective_upper;
+record.absolute_gap=record.objective_upper-record.objective_lower;
+record.relative_gap=record.absolute_gap/max(1,abs(record.objective_upper));
+record.is_certified=record.absolute_gap/ctx.config.nh3_target_t<=ctx.config.frontier_certification_tolerance_usd_t;
+record.is_proven=false; record.is_infeasible=false;
+record.status="incumbent_with_bound";
+if record.is_certified, record.status="certified_tolerance"; end
+record.frontier_phase="partition_certification";
+record.solve_backend="gurobi_partition_certificate"; record.elapsed_s=state.elapsed_s;
+record.output=struct('partition_state_file',state.file,'partition_stage',state.stage, ...
+    'partition_lower_usd',state.lower_usd,'partition_original_witness_valid',state.has_original_witness);
+prior_lines=zeros(0,2);
+if record_field(prior,'partition_affine_bounds_version',0)==1
+    prior_lines=record_field(prior,'partition_affine_bounds',zeros(0,2));
+end
+record.partition_affine_bounds=unique([prior_lines;state.affine_bounds],'rows');
+record.partition_affine_bounds_version=1;
+record.cost_components=ctx.services.evaluate_cost_components(record.solution,ctx);
+record.operation_metrics=ctx.services.evaluate_operation_metrics(record.solution,ctx);
+entry=struct('mode',"frontier_cost",'cost_cap',Inf,'K',state.K,'record',record,'source',"partition_checkpoint");
+ctx.services.fixed_point_store(ctx.point_cache_file,ctx.cost_signature,"append","frontier_cost",Inf,entry);
 end
 
 function vector = solution_to_vector(indices, solution, vector_length)
@@ -2429,6 +3193,78 @@ for i = 1:numel(names)
     name = names{i};
     index = indices.(name);
     solution.(name) = reshape(vector(index(:)), size(index));
+end
+end
+
+function economic = economic_boundaries_from_frontier(frontier, reference, feasibility, ctx)
+% 直接由固定K成本界认证经济次数，不调用或等待最小可行次数搜索。
+% 预算沿用reference.upper；另列相对真实参考最优值的保守次数上界。
+economic = struct([]);
+Q = ctx.config.nh3_target_t;
+uncertainty = (reference.objective_upper - reference.objective_lower) / Q;
+for allowance = ctx.config.cost_allowance_usd_t(:).'
+    cap = reference.objective_upper + allowance * Q;
+    strict_cap = reference.objective_lower + allowance * Q;
+    tolerance = max(1e-6, 1e-10 * abs(cap));
+    rejected = frontier.is_infeasible | frontier.cost_lower_usd > cap + tolerance;
+    accepted = frontier.has_incumbent & isfinite(frontier.cost_upper_usd) & ...
+        frontier.cost_upper_usd <= cap + tolerance;
+    strictly_accepted = accepted & frontier.cost_upper_usd <= strict_cap + tolerance;
+    lower = feasibility.K_lower;
+    if any(rejected)
+        lower = max(lower, max(frontier.K(rejected)) + 1);
+    end
+    upper = reference.count_upper;
+    strict_upper = Inf;
+    if reference.objective_upper <= strict_cap + tolerance
+        strict_upper = reference.count_upper;
+    end
+    if any(accepted)
+        upper = min(upper, min(frontier.K(accepted)));
+    end
+    if any(strictly_accepted)
+        strict_upper = min(strict_upper, min(frontier.K(strictly_accepted)));
+    end
+    if ctx.config.use_cache
+        % 复用旧成本帽的计数证书；这里只读取，不执行O1Feasibility。
+        signatures = {ctx.cost_signature, ctx.signature};
+        caps = [cap, cap - ctx.objective_shift_usd];
+        for j = 1:numel(signatures)
+            cached = ctx.services.fixed_point_store(ctx.point_cache_file, ...
+                signatures{j}, "load", "economic", caps(j), struct());
+            for n = 1:numel(cached)
+                r = cached(n).record;
+                if string(r.objective_kind) == "count" && isfinite(r.count_lower)
+                    lower = max(lower, ceil(r.count_lower));
+                end
+                if r.is_infeasible && cached(n).K <= ctx.T
+                    lower = max(lower, cached(n).K + 1);
+                end
+                cost = r.system_cost_upper + (cap - caps(j));
+                if r.has_incumbent && isfinite(cost) && cost <= cap + tolerance
+                    upper = min(upper, r.count_upper);
+                    if cost <= strict_cap + tolerance
+                        strict_upper = min(strict_upper, r.count_upper);
+                    end
+                end
+            end
+        end
+    end
+    if lower > upper
+        error('O1:inconsistent_economic_bounds', '经济预算下的次数证书矛盾。');
+    end
+    row = struct('allowance_usd_t', allowance, 'cost_cap_usd', cap, ...
+        'reference_lower_usd', reference.objective_lower, ...
+        'reference_upper_usd', reference.objective_upper, ...
+        'reference_uncertainty_usd_t', uncertainty, ...
+        'certified_allowance_usd_t', allowance + uncertainty, ...
+        'K_lower', lower, 'K_upper', upper, 'is_proven', lower == upper, ...
+        'K_upper_strict', strict_upper, 'strict_cost_cap_usd', strict_cap, ...
+        'is_strictly_certified', isfinite(strict_upper) && strict_upper == lower, ...
+        'method', "fixed_K_cost_bounds", ...
+        'minimum_updates', struct('count_lower', lower, 'count_upper', upper, ...
+            'is_proven', lower == upper), 'search', table());
+    economic = [economic; row]; %#ok<AGROW>
 end
 end
 

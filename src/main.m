@@ -42,20 +42,24 @@ o1_config.nh3_target_t = 80000;
 o1_config.cost_allowance_usd_t = [0, 1, 5, 10];
 o1_config.frontier_k = [];
 o1_config.frontier_all_k = true;
+o1_config.defer_feasibility_search = true;
+o1_config.certify_all_frontier_k = true;
 o1_config.frontier_max_time_s = 30;
 o1_config.frontier_max_attempts = 1;
 o1_config.frontier_solution_interval = 25;
 o1_config.frontier_run_budget_s = 1800;
 o1_config.frontier_points_per_run = 200;
-% 先用少量锚点识别前沿结构，再只认证关键K，避免逐点消耗求解预算。
+% 锚点先提供成本界；目标区间内每个整数K都按0.5 USD/t验收。
 o1_config.frontier_anchor_count = 12;
 o1_config.frontier_key_k = 111;
 o1_config.frontier_auto_key_count = 2;
 o1_config.frontier_certification_tolerance_usd_t = 0.5;
 o1_config.frontier_certification_max_time_s = 3600;
 o1_config.frontier_certification_max_attempts = 4;
-o1_config.frontier_certification_points_per_run = 3;
-o1_config.frontier_certification_run_budget_s = 1800;
+% 单次main连续遍历次数下界至参考解K；每轮每K最多尝试4次。
+% 单K仍保留3600秒时限，超时轮转到其他K；未达标点按缓存续算。
+o1_config.frontier_certification_points_per_run = Inf;
+o1_config.frontier_certification_run_budget_s = Inf;
 % 先尝试缓存HB模式的上界改进；失败只表示受限模式失败，不抬高全局下界。
 o1_config.frontier_polish_enabled = true;
 o1_config.frontier_polish_only = false;
@@ -93,6 +97,15 @@ o1_config.gurobi_matlab_directory = '';
 o1_config.gurobi_mip_focus = -1;
 o1_config.gurobi_method = -1;
 o1_config.gurobi_threads = 0;
+% 下一轮将块长增至672小时以保留更多跨时段耦合；原模型完整MILP仍负责最终认证。
+o1_config.gurobi_partition_enabled = true;
+o1_config.gurobi_partition_hours = [672];
+o1_config.gurobi_partition_time_s = [180];
+o1_config.gurobi_partition_refine_blocks = 0;
+o1_config.gurobi_partition_refine_time_s = 180;
+o1_config.gurobi_partition_max_attempts = 3;
+o1_config.gurobi_partition_upper_time_s = 300;
+o1_config.gurobi_partition_outer_time_s = 0;
 o1_config.compute_frontier_during_search = true;
 o1_config.max_time_s = 1200;
 o1_config.count_max_time_s = 900;
@@ -122,15 +135,19 @@ fprintf('[main] baseline relative gap=%.4f; O1 cost gap=%.4f; ', ...
     params.solver.relative_gap, o1_config.cost_relative_gap);
 fprintf('O1 count-continuation budget=%d; epsilon=%.2f%%\n', ...
     o1_config.max_k_search_points, 100 * o1_config.change_epsilon);
-fprintf(['[main] 全K前沿通过锚点界值包络生成，关键K另行认证；', ...
+fprintf(['[main] 目标区间为次数下界至参考经济解K，每个整数K均验收；', ...
     '锚点单次上限=%g s，尝试上限=%d。\n'], o1_config.frontier_max_time_s, ...
     o1_config.frontier_max_attempts);
 fprintf('[main] 固定K经济后端=%s；原约束、参数和目标函数保持不变。\n', ...
     o1_config.frontier_solver);
-fprintf(['[main] autonomous O1 enabled: feasibility budget=%g s, ', ...
-    'frontier budget=%g s, frontier points/run=%d.\n'], ...
-    o1_config.run_budget_s, o1_config.frontier_run_budget_s, ...
-    o1_config.frontier_points_per_run);
+fprintf('[main] K认证分区下界=%d；分区时长=%s h；本轮单点时限=%g s。\n', ...
+    o1_config.gurobi_partition_enabled, mat2str(o1_config.gurobi_partition_hours), ...
+    o1_config.frontier_certification_max_time_s);
+fprintf(['[main] Kfeas搜索暂缓；整区间连续经济认证，', ...
+    '单K时限=%g s，每轮每K最多%d次，目标<=%.3g USD/t。\n'], ...
+    o1_config.frontier_certification_max_time_s, ...
+    o1_config.frontier_certification_max_attempts, ...
+    o1_config.frontier_certification_tolerance_usd_t);
 if o1_config.frontier_polish_enabled
     fprintf(['[main] 关键K定向上界精修已启用：单次上限=%g s，', ...
         '仅精修=%d。\n'], o1_config.frontier_polish_max_time_s, ...
