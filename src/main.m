@@ -46,6 +46,9 @@ o1_config.defer_feasibility_search = true;
 o1_config.economic_cap_time_s = 600;
 o1_config.economic_fixed_time_s = 600;
 o1_config.economic_retry_time_s = 1800;
+% LP修复计入阶段总时限；宽松帽停滞后让出一轮，再以短预算试探。
+o1_config.economic_lp_time_s = 30;
+o1_config.economic_stalled_cap_time_s = 120;
 o1_config.economic_max_attempts = 4;
 o1_config.economic_points_per_round = 4;
 o1_config.economic_max_solves_per_run = 64;

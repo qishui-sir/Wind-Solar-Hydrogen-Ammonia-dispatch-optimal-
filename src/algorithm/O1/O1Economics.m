@@ -40,11 +40,20 @@ end
 
 for round_index = 1:cfg.economic_max_attempts
     if economic.is_proven || ~can_run(), break; end
+    extra_probes = 0;
     % 两个成本帽先各短算，后续与少量二分认证交替，不等待模型完全最优。
     for cap_index = 1:2
         if economic.is_proven || ~can_run(), break; end
         if cap_index == 1
             kind = "loose_count"; cap = economic.cost_cap_usd;
+            schedule = state.loose_schedule;
+            if schedule.cap_usd == cap && schedule.skip_once
+                state.loose_schedule.skip_once = false;
+                extra_probes = 1;
+                save_state();
+                fprintf('[O1] 宽松帽此前推进缓慢：本轮让出预算给严格帽及固定K认证。\n');
+                continue
+            end
         else
             kind = "strict_count"; cap = economic.strict_cost_cap_usd;
         end
@@ -56,16 +65,42 @@ for round_index = 1:cfg.economic_max_attempts
         prior = find_cap(state, kind, cap);
         task.attempt = prior.attempts+1;
         task.time_limit = next_time(cfg.economic_cap_time_s, task.attempt);
+        if kind == "loose_count" && state.loose_schedule.cap_usd == cap && ...
+                state.loose_schedule.stalled
+            task.time_limit = min(task.time_limit,cfg.economic_stalled_cap_time_s);
+            extra_probes = 1;
+            if cfg.gurobi_mip_focus < 0
+                foci = [0,2,3]; task.focus = foci(1+mod(task.attempt-2,3));
+            end
+            fprintf('[O1] 宽松帽短试探：预算=%.1f s，自动轮换策略。\n',task.time_limit);
+        end
+        before = economic;
         begin_task(kind, task.K, task.time_limit);
         record = solve_task(base, task, ctx);
+        state = store_witnesses(state, record);
         state = store_cap(state, prior, record, kind, cap);
         finish_task();
+        if kind == "loose_count"
+            lower_gain = economic.K_lower-before.K_lower;
+            upper_gain = before.K_upper-economic.K_upper;
+            if isnan(upper_gain), upper_gain = 0; end
+            required_gain = 1;
+            if isfinite(before.K_upper)
+                required_gain = max(1,ceil(0.05*(before.K_upper-before.K_lower)));
+            end
+            stalled = lower_gain < required_gain && upper_gain < required_gain;
+            state.loose_schedule = struct('cap_usd',cap,'stalled',stalled, ...
+                'skip_once',stalled,'last_lower_gain',lower_gain,'last_upper_gain',upper_gain);
+            save_state();
+            fprintf('[O1] 宽松帽本轮证据推进：下界+%g，上界减少%g，停滞=%d。\n', ...
+                lower_gain,upper_gain,stalled);
+        end
         fprintf(['[O1] %s：状态=%s，模型计数下界=%g，已验证候选计数=%g，', ...
             '候选成本=%.6g USD；Keco=[%g,%g]。\n'], ...
             kind,record.solver_status,record.count_lower,record.count_upper, ...
             record.cost_upper_usd,economic.K_lower,economic.K_upper);
     end
-    for probe_index = 1:cfg.economic_points_per_round
+    for probe_index = 1:cfg.economic_points_per_round+extra_probes
         if economic.is_proven || ~can_run(), break; end
         K = select_K(economic, state.points, fixed_attempts, round_index);
         if isempty(K), break; end
@@ -81,6 +116,7 @@ for round_index = 1:cfg.economic_max_attempts
             cfg.economic_delta_usd_t*cfg.nh3_target_t,task.attempt);
         begin_task("fixed_cost", K, task.time_limit);
         record = solve_task(base, task, ctx);
+        state = store_witnesses(state, record);
         state.points = merge_point(state.points, record, K, "fixed_K_global_cost");
         finish_task();
         point = find_point(state.points, K);
@@ -194,13 +230,17 @@ end
 
 function state = load_state(file,ctx)
 state = struct('points',repmat(empty_point(0),0,1), ...
-    'caps',repmat(empty_cap("",Inf),0,1),'reference',struct());
+    'caps',repmat(empty_cap("",Inf),0,1),'reference',struct(), ...
+    'loose_schedule',struct('cap_usd',NaN,'stalled',false,'skip_once',false, ...
+    'last_lower_gain',0,'last_upper_gain',0));
 if ~ctx.config.use_cache || ~isfile(file), return; end
 loaded = load(file);
 if isfield(loaded,'schema_version') && loaded.schema_version == 1 && ...
         isequaln(loaded.signature,ctx.cost_signature) && ...
         loaded.delta_usd_t == ctx.config.economic_delta_usd_t
+    schedule = state.loose_schedule;
     state = loaded.state;
+    if ~isfield(state,'loose_schedule'), state.loose_schedule = schedule; end
     fprintf('[O1] 已读取经济阈值缓存；旧状态将按当前门槛重新认证。\n');
 end
 end
@@ -397,7 +437,7 @@ if new.has_incumbent && (new.cost_upper_usd < prior.cost_upper_usd || ...
 end
 prior.attempts = max(prior.attempts,new.attempts);
 prior.elapsed_s = prior.elapsed_s+new.elapsed_s;
-prior.solver_status = new.solver_status;
+if strlength(new.solver_status) > 0, prior.solver_status = new.solver_status; end
 prior.source = source;
 index = find([points.K] == K,1);
 if isempty(index), points(end+1,1) = prior; else, points(index) = prior; end
@@ -529,11 +569,15 @@ else
     p.f = base.cost_f;
     offset = base.offset;
 end
-p.x0 = task.start;
+% 两次LP都占用本阶段预算；为返回候选的成本抛光预留时间。
+lp_budget = min(ctx.config.economic_lp_time_s,task.time_limit/10);
+[p.x0,start_candidate] = prepare_start(p,task.start,base,lp_budget,task.cap,ctx);
+solver_task = task;
+solver_task.time_limit = max(0.01,task.time_limit-toc(started)-lp_budget);
 if strcmp(ctx.config.economics_solver,'gurobi')
-    result = gurobi_solve(p,base.units,task,offset,ctx);
+    result = gurobi_solve(p,base.units,solver_task,offset,ctx);
 else
-    result = matlab_solve(p,task,offset,ctx);
+    result = matlab_solve(p,solver_task,offset,ctx);
 end
 record = empty_point(task.K);
 record.count_upper = Inf;
@@ -541,6 +585,7 @@ record.attempts = task.attempt;
 record.solver_status = result.status;
 record.is_infeasible = result.status == "INFEASIBLE";
 record.count_lower = 0;
+record.witnesses = repmat(empty_point(task.K),0,1);
 if isfinite(result.bound)
     if is_count
         record.count_lower = max(0,ceil(result.bound-1e-7));
@@ -548,27 +593,44 @@ if isfinite(result.bound)
         record.cost_lower_usd = result.bound+offset;
     end
 end
-if ~isempty(result.x)
-    candidate = result.x;
+for candidate_cell = {start_candidate,result.x}
+    candidate = candidate_cell{1};
+    if isempty(candidate), continue; end
     candidate(p.intcon) = round(candidate(p.intcon));
-    if matrix_violation(p,candidate) > ctx.model.options.ConstraintTolerance || ...
-            (is_count && base.cost_f.'*candidate+base.offset > task.cap)
-        repair_time = min(30,task.time_limit-toc(started));
-        if repair_time > 0
-            candidate = repair_candidate(p,candidate,base.cost_f,repair_time,ctx);
-        else
-            candidate = [];
+    % 计数目标不控制连续变量成本；即使满足宽松帽，也要尝试成本抛光。
+    if ~isequal(candidate,start_candidate)
+        repair_time = min(ctx.config.economic_lp_time_s,task.time_limit-toc(started));
+        if repair_time > 0 && (is_count || ...
+                matrix_violation(p,candidate) > ctx.model.options.ConstraintTolerance)
+            polished = polish_candidate(p,candidate,base,repair_time,task.cap,ctx);
+            if ~isempty(polished) && (matrix_violation(p,candidate) > ...
+                    ctx.model.options.ConstraintTolerance || ...
+                    base.cost_f.'*polished <= base.cost_f.'*candidate)
+                fprintf('[O1] 候选LP成本抛光：%.3f -> %.3f USD。\n', ...
+                    base.cost_f.'*candidate+base.offset,base.cost_f.'*polished+base.offset);
+                candidate = polished;
+            end
         end
     end
-    if ~isempty(candidate)
+    if matrix_violation(p,candidate) <= ctx.model.options.ConstraintTolerance
         solution = vector_solution(candidate,base.indices);
         [x,solution,cost,count,residual] = validate_solution(solution,base,ctx,task.K);
         if ~isempty(x) && (~is_count || cost <= task.cap)
-            record.has_incumbent = true;
-            record.solution = solution;
-            record.cost_upper_usd = cost;
-            record.count_upper = count;
-            record.matrix_violation = residual;
+            witness = empty_point(count);
+            witness.has_incumbent = true;
+            witness.solution = solution;
+            witness.cost_upper_usd = cost;
+            witness.count_upper = count;
+            witness.matrix_violation = residual;
+            record.witnesses(end+1,1) = witness;
+            if ~record.has_incumbent || (is_count && count < record.count_upper) || ...
+                    ((~is_count || count == record.count_upper) && cost < record.cost_upper_usd)
+                record.has_incumbent = true;
+                record.solution = solution;
+                record.cost_upper_usd = cost;
+                record.count_upper = count;
+                record.matrix_violation = residual;
+            end
         end
     end
 end
@@ -578,33 +640,37 @@ if record.is_infeasible && record.has_incumbent
 end
 end
 
+function state = store_witnesses(state,record)
+% 每个已核验调度独立保留，避免更小但不严格合格的宽松候选覆盖合格见证。
+for i = 1:numel(record.witnesses)
+    point = record.witnesses(i);
+    prior = find_point(state.points,point.K);
+    source = prior.source;
+    if strlength(source) == 0, source = "validated_primal_witness"; end
+    state.points = merge_point(state.points,point,point.K,source);
+end
+end
+
 function result = gurobi_solve(p,units,task,offset,ctx)
+model = scaled_model(p,units);
 n = numel(p.lb);
-D = spdiags(units,0,n,n);
-A = [p.Aineq;p.Aeq]*D;
-row_scale = max(1,full(max(abs(A),[],2)));
-model = struct('A',spdiags(1./row_scale,0,size(A,1),size(A,1))*A, ...
-    'rhs',[p.bineq(:);p.beq(:)]./row_scale, ...
-    'sense',[repmat('<',size(p.Aineq,1),1);repmat('=',size(p.Aeq,1),1)], ...
-    'obj',p.f(:).*units,'lb',p.lb(:)./units,'ub',p.ub(:)./units, ...
-    'modelsense','min','vtype',repmat('C',n,1));
 model.vtype(p.intcon) = 'I';
 if ~isempty(p.x0), model.start = p.x0(:)./units; end
 focus = ctx.config.gurobi_mip_focus;
 if focus < 0
-    if task.kind == "loose_count"
+    if task.focus >= 0
+        focus = task.focus;
+    elseif task.kind == "loose_count"
         focus = 3;
     elseif task.kind == "strict_count"
         focus = 1;
-    elseif task.focus >= 0
-        focus = task.focus;
     else
         foci = [1,3,0,2]; focus = foci(1+mod(task.attempt-1,numel(foci)));
     end
 end
 parameters = struct('TimeLimit',task.time_limit,'MIPGap',0,'MIPGapAbs',0, ...
     'MIPFocus',focus,'Method',ctx.config.gurobi_method,'Threads',ctx.config.gurobi_threads, ...
-    'FeasibilityTol',1e-9,'IntFeasTol',1e-9,'DualReductions',0, ...
+    'FeasibilityTol',solver_tolerance(ctx),'IntFeasTol',solver_tolerance(ctx),'DualReductions',0, ...
     'DisplayInterval',60,'OutputFlag',1,'LogToConsole',double(~strcmp(ctx.config.display,'off')), ...
     'LogFile',[tempname,'_O1_',char(task.kind),'.log']);
 if task.kind == "fixed_cost"
@@ -612,7 +678,7 @@ if task.kind == "fixed_cost"
     if isfinite(task.fail), parameters.BestBdStop = task.fail-offset+money_margin(task.fail); end
 elseif task.kind == "loose_count"
     parameters.MIPGapAbs = 0.49;
-    if isfinite(task.K), parameters.BestBdStop = task.K-1+1e-6; end
+    parameters.BestBdStop = count_bound_target(task)-1+1e-6;
 elseif task.kind == "strict_count"
     parameters.MIPGapAbs = 0.49;
     parameters.BestObjStop = task.K_lower+1e-6;
@@ -664,7 +730,7 @@ result = struct('x',x,'bound',bound,'status',status);
                 stop = stop || values.fval+offset <= task.sat-money_margin(task.sat);
             end
         elseif task.kind == "loose_count"
-            stop = ceil(bound-1e-7) >= task.K;
+            stop = ceil(bound-1e-7) >= count_bound_target(task);
         elseif task.kind == "strict_count" && isfield(values,'fval') && ...
                 isscalar(values.fval) && isfinite(values.fval)
             stop = values.fval <= task.K_lower+1e-7;
@@ -672,18 +738,91 @@ result = struct('x',x,'bound',bound,'status',status);
     end
 end
 
-function x = repair_candidate(p,x,cost_f,seconds,ctx)
-integer_indices = p.intcon;
-p.lb(integer_indices) = round(x(integer_indices));
-p.ub(integer_indices) = p.lb(integer_indices);
-options = optimoptions('linprog','Display','off','MaxTime',seconds, ...
-    'ConstraintTolerance',min(1e-8,ctx.model.options.ConstraintTolerance));
-[candidate,~,flag] = linprog(cost_f,p.Aineq,p.bineq,p.Aeq,p.beq,p.lb,p.ub,options);
+function target = count_bound_target(task)
+% 宽松帽只需取得本轮有效下界进展，避免以旧合格上界作为唯一停止门槛。
+step = max(1,ceil(0.05*(task.K-task.K_lower)));
+target = min(task.K,task.K_lower+step);
+end
+
+function [start,candidate] = prepare_start(p,start,base,seconds,cap,ctx)
+candidate = [];
+if isempty(start), return; end
+integers = p.intcon(isfinite(start(p.intcon)));
+start(integers) = round(start(integers));
+if numel(integers) == numel(p.intcon)
+    candidate = polish_candidate(p,start,base,seconds,cap,ctx);
+    if ~isempty(candidate)
+        start = candidate;
+        fprintf('[O1] 热启动LP修复通过：缩放矩阵残差<=%.1g，成本=%.3f USD。\n', ...
+            solver_tolerance(ctx),base.cost_f.'*candidate+base.offset);
+        return
+    end
+end
+% 无法构造完整可行起点时只传递范围合法的整数提示，释放连续变量。
+hint = NaN(size(start));
+integers = integers(start(integers) >= p.lb(integers) & start(integers) <= p.ub(integers));
+hint(integers) = start(integers);
+start = hint;
+if isempty(integers), start = []; end
+fprintf('[O1] 热启动改为部分整数提示：%d/%d个整数；无可行证书。\n', ...
+    numel(integers),numel(p.intcon));
+end
+
+function x = polish_candidate(p,x,base,seconds,cap,ctx)
+% 固定所有整数后求最小原成本；此LP的最优值只可用作可行上界。
+p.lb(p.intcon) = round(x(p.intcon));
+p.ub(p.intcon) = p.lb(p.intcon);
+p.f = base.cost_f;
+if isfinite(cap)
+    % 仅给可行见证留出数值余量；证明下界的MILP成本帽保持原值。
+    p.Aineq = [p.Aineq;base.cost_f.'];
+    p.bineq = [p.bineq(:);cap-base.offset-money_margin(cap)];
+end
+model = scaled_model(p,base.units);
+tolerance = solver_tolerance(ctx);
+if strcmp(ctx.config.economics_solver,'gurobi')
+    parameters = struct('TimeLimit',max(0.01,seconds),'OutputFlag',0, ...
+        'FeasibilityTol',tolerance,'OptimalityTol',tolerance, ...
+        'Threads',ctx.config.gurobi_threads,'DualReductions',0);
+    raw = gurobi(model,parameters);
+    candidate = value(raw,'x',[]);
+else
+    options = optimoptions('linprog','Display','off','MaxTime',max(0.01,seconds), ...
+        'ConstraintTolerance',tolerance);
+    candidate = linprog(model.obj,model.A(model.sense=='<',:),model.rhs(model.sense=='<'), ...
+        model.A(model.sense=='=',:),model.rhs(model.sense=='='),model.lb,model.ub,options);
+end
 x = [];
-if flag > 0 && ~isempty(candidate) && ...
+if isempty(candidate) || any(~isfinite(candidate)), return; end
+scaled = candidate(:);
+candidate = scaled.*base.units;
+candidate(p.intcon) = round(candidate(p.intcon));
+scaled = candidate./base.units;
+if scaled_violation(model,scaled) <= tolerance && ...
         matrix_violation(p,candidate) <= ctx.model.options.ConstraintTolerance
     x = candidate;
 end
+end
+
+function model = scaled_model(p,units)
+n = numel(p.lb);
+A = [p.Aineq;p.Aeq]*spdiags(units,0,n,n);
+row_scale = max(1,full(max(abs(A),[],2)));
+model = struct('A',spdiags(1./row_scale,0,size(A,1),size(A,1))*A, ...
+    'rhs',[p.bineq(:);p.beq(:)]./row_scale, ...
+    'sense',[repmat('<',size(p.Aineq,1),1);repmat('=',size(p.Aeq,1),1)], ...
+    'obj',p.f(:).*units,'lb',p.lb(:)./units,'ub',p.ub(:)./units, ...
+    'modelsense','min','vtype',repmat('C',n,1));
+end
+
+function residual = scaled_violation(model,x)
+rows = model.A*x-model.rhs;
+residual = max([0;rows(model.sense=='<');abs(rows(model.sense=='=')); ...
+    model.lb-x;x-model.ub]);
+end
+
+function tolerance = solver_tolerance(ctx)
+tolerance = min(1e-9,ctx.model.options.ConstraintTolerance);
 end
 
 function [x,solution,cost,count,residual] = validate_solution(solution,base,ctx,K)
