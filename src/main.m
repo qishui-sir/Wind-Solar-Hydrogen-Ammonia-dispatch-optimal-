@@ -42,7 +42,7 @@ o1_config.nh3_target_t = 80000;
 % delta是相对真实参考最优成本的经济损失限额，不是固定K求解误差。
 o1_config.economic_delta_usd_t = 0.5;
 o1_config.defer_feasibility_search = true;
-% 完整时间分解、level稳定化、有效割回填与联合窗口修复，再做严格整数认证。
+% 完整分解与可行解搜索交替推进；最后用相邻整数点严格认证。
 o1_config.economic_cap_time_s = 600;
 o1_config.economic_fixed_time_s = 600;
 o1_config.economic_retry_time_s = 1800;
@@ -53,24 +53,27 @@ o1_config.economic_stalled_cap_time_s = 120;
 o1_config.economic_grid_simplify = true;
 o1_config.economic_proof_mode = 'full';
 o1_config.economic_structural_search = true;
-o1_config.economic_block_lengths_h = [96,192,384];
+o1_config.economic_block_lengths_h = [96,192,384,768]; % 先至384 h，证据停滞后少量试验768 h。
 o1_config.economic_block_budget_s = 3600;
 o1_config.economic_block_round_time_s = 900;
 o1_config.economic_block_lp_time_s = 120;
 o1_config.economic_block_time_s = 10;
 o1_config.economic_block_max_time_s = 60;
 o1_config.economic_block_batch = 8; % 定价检查点间隔；每份分解证书必须覆盖全部块。
-o1_config.economic_block_max_cuts = 2048;
+o1_config.economic_block_max_cuts = 8192; % 保留有效割及部分扫描的固定行前缀。
 o1_config.economic_decomposition_oracle_tolerance = 1;
 o1_config.economic_decomposition_tolerance = 0.2;
-o1_config.economic_decomposition_stall_sweeps = 2;
+o1_config.economic_decomposition_stall_sweeps = 6;
+o1_config.economic_decomposition_min_dual_sweeps = 8;
 o1_config.economic_local_time_s = 90;
 o1_config.economic_local_passes = 3;
 o1_config.economic_final_interval = 20;
 o1_config.economic_certification_time_s = 1800;
-o1_config.economic_max_attempts = 4;
+o1_config.economic_certification_reserve_s = 1800;
+o1_config.economic_certification_retry_gain = 1; % 连续下界提升至少1次才触发同模型重试。
+o1_config.economic_max_attempts = 8;
 o1_config.economic_points_per_round = 1;
-o1_config.economic_max_solves_per_run = 2048;
+o1_config.economic_max_solves_per_run = 4096;
 o1_config.economic_run_budget_s = 7200;
 % 参考误差阻碍认证时按需续算，门槛始终保持delta=0.5。
 o1_config.economic_reference_time_s = 600;
@@ -108,6 +111,15 @@ if isfield(O1_results,'threshold_state') && isfield(O1_results.threshold_state,'
     decomposition_report=O1_results.threshold_state.decomposition;
     fprintf('[main] 分解下界=%.6f；DW受限主问题上界=%.6f（仅用于分解收敛）；状态=%s。\n', ...
         decomposition_report.best_lower,decomposition_report.master_upper,decomposition_report.stop_reason);
+    if isfield(decomposition_report,'master_report')
+        master_report=decomposition_report.master_report;
+        fprintf('[main] 主问题算法=%g，原始残差=%.3g，数值检查=%s。\n', ...
+            master_report.algorithm,master_report.original_residual,master_report.reason);
+    end
+end
+if isfield(O1_results,'threshold_state')
+    fprintf('[main] 当前严格经济余量=%.3f USD；余量与求解误差分别记录。\n', ...
+        O1_results.threshold_state.structural_report.strict_slack_usd);
 end
 if isnan(Keco)
     fprintf('[main] Keco尚未严格认证；已保存证据及分解进度，下次运行main续算。\n');
