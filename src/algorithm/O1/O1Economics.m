@@ -1,6 +1,17 @@
 function outputs = O1Economics(ctx, feasibility, reference)
-%O1ECONOMICS 经济阈值识别；所有边界仅由全局下界或已验证可行解更新。
-% 成本帽计数问题不调用Kfea；固定K问题只需跨过经济门槛，无统一成本gap要求。
+%O1ECONOMICS 经济阈值识别：证书驱动的决定性搜索。
+% 经济阈值定义（A = economic_delta_usd_t * nh3_target_t）：
+%   sat  = reference.objective_lower + A   (<= C* + A，充分经济帽)
+%   fail = reference.objective_upper + A   (>= C* + A，必要经济帽)
+%   Keco = min{K : 存在可行调度 count <= K 且 cost <= C* + A}
+% 区间 [K_lower, K_upper] 只允许被两类证书推进：
+%   (U) 已验证见证 count<=K 且 cost<=sat        => K_upper <= K
+%   (L) min cost(count<=K) 的有效全局下界 > fail => K_lower >= K+1
+% 因此唯一能合并区间的是“决定性定K最小成本MILP”。本函数按以下优先级使用预算：
+%   1) 相邻整数点 K_upper-1 的决定性求解（排除即证明，接受即改善上界）
+%   2) 参考带收紧（把 (sat,fail] 不可判定窗口压到预算允许的最小值）
+%   3) 宽松帽全局最小计数（全局计数下界）/ 严格帽最小计数（上界见证）
+%   4) 局部与事件启发式（只允许改善上界，且有独立预算上限）
 cfg = ctx.config;
 started = tic;
 base = ctx.cost_solver;
@@ -15,30 +26,22 @@ base.physical_problem = p;
 base.cut_policy = 2;
 base.cut_margin = value(cfg,'economic_cut_margin',1e-5);
 base.cut_relative_margin = 1e-9;
-fprintf('[O1] 购售电整数等价简化=%d；下界模型=%s。\n', ...
-    base.grid_exact,string(value(cfg,'economic_proof_mode','full')));
+fprintf('[O1] 购售电整数等价简化=%d；下界模型=%s；决定性搜索版本=%g。\n', ...
+    base.grid_exact,string(value(cfg,'economic_proof_mode','full')), ...
+    value(cfg,'economic_search_version',2));
 cache_file = fullfile(cfg.cache_directory, 'O1_economic_threshold_cache.mat');
 state = load_state(cache_file, ctx);
+state = prepare_search_state(state, cfg);
 state.new_solves = 0;
+state.primal_spent_s = 0;
+state.pattern_seed_K = NaN;   % 每轮运行对当前 K_upper 重新尝试一次松弛模式生成
+state.decisive_spent_s = 0;   % 决定性求解的本轮预算计数（避免挤光降序预算）
+state.loose_done_this_run = false;
 state.reference_refinements_this_run = 0;
-state.active_task = "";
+state.reference_stalled_this_run = false;
 state.stop_reason = "incomplete_economic_threshold";
 if ~isfield(state,'block_cuts'), state.block_cuts = empty_cuts(); end
-state.block_elapsed_s = 0;
-if ~isfield(state,'cert_schedule'), state.cert_schedule=empty_cert_schedule(); end
-if ~isfield(state,'primal_schedule')
-    state.primal_schedule=struct('step',1,'stalls',0, ...
-        'polished_K',Inf,'polished_cost',Inf);
-end
-if value(state.primal_schedule,'version',0)~=2
-    state.primal_schedule.version=2;
-    state.primal_schedule.step=cfg.economic_local_target_step;
-    state.primal_schedule.stalls=0;
-    if isfield(state.primal_schedule,'window_level')
-        state.primal_schedule=rmfield(state.primal_schedule,'window_level');
-    end
-end
-if ~isfield(state,'event_schedule'), state.event_schedule=struct(); end
+state.block_elapsed_s = value(state,'block_elapsed_s',0);
 previous_audit=value(state,'cut_audit',struct());
 [base,state.cut_audit] = audit_block_cuts(base,state.block_cuts,state,reference,ctx);
 base = apply_block_cuts(base,state.block_cuts);
@@ -47,186 +50,83 @@ if ~isempty(base.cut_disabled) && (value(previous_audit,'policy',0)~=base.cut_po
     % A conflicting numerical cut cannot support an inherited rejection.
     state = invalidate_cut_dependent_bounds(state);
 end
-if value(state,'proof_model_version',0) ~= 1
-    state.loose_schedule.stalled = false;
-    state.loose_schedule.skip_once = false;
-    state.proof_model_version = 1;
-end
 reference = merge_reference(reference, state.reference, ctx, base);
 state = import_cost_cache(state, ctx, base);
 state = register_reference_point(state, reference, ctx, base);
 [state, economic] = certify(state, reference, feasibility, ctx);
 initial_width = economic.K_upper-economic.K_lower;
-initial_sweeps=decomposition_completed(value(state,'decomposition',struct()));
-wide_certifications=0;
 state.structural_report = struct('initial_width',initial_width,'current_width',initial_width, ...
     'initial_K_lower',economic.K_lower,'initial_K_upper',economic.K_upper, ...
     'lower_gain',0,'upper_gain',0,'width_reduction_fraction',0, ...
-    'half_width_target_met',false,'acceptance_target_met',false,'block_elapsed_s',0);
-fprintf('[O1] 阈值识别：delta=%.6g USD/t，Keco严格区间=[%g,%g]；不遍历成本前沿。\n', ...
-    cfg.economic_delta_usd_t, economic.K_lower, economic.K_upper);
+    'half_width_target_met',economic.is_proven,'acceptance_target_met',economic.is_proven, ...
+    'block_elapsed_s',state.block_elapsed_s,'complete_sweeps',0,'new_complete_sweeps',0, ...
+    'decomposition_progress_met',economic.is_proven, ...
+    'strict_slack_usd',economic.strict_cost_cap_usd-economic.satisfied_evidence.cost_upper_usd, ...
+    'economic_band_usd',economic.cost_cap_usd-economic.strict_cost_cap_usd, ...
+    'allowance_usd',cfg.economic_delta_usd_t*cfg.nh3_target_t, ...
+    'decisive_K',NaN,'decisive_status',"",'unresolved_reason',"",'search_version',2);
+fprintf('[O1] 阈值识别：delta=%.6g USD/t，Keco严格区间=[%g,%g]；参考带=%.3f USD。\n', ...
+    cfg.economic_delta_usd_t, economic.K_lower, economic.K_upper, ...
+    economic.cost_cap_usd-economic.strict_cost_cap_usd);
+print_threshold_state();
+print_structure_diagnostic();
 save_state();
-fixed_attempts = zeros(ctx.T+1,1);
-pending_cert_schedule=state.cert_schedule;
-
-% 参考区间过宽时，先确保严格门槛拥有可用的经济可行见证。
-while ~economic.is_proven && can_run() && ...
-        (~isfinite(reference.objective_lower) || ...
-        reference.objective_upper-reference.objective_lower > ...
-        cfg.economic_delta_usd_t*cfg.nh3_target_t) && ...
-        state.reference_refinements_this_run < cfg.economic_reference_max_refinements
-    previous_gap = reference.objective_upper-reference.objective_lower;
-    refine_reference();
-    if reference.objective_upper-reference.objective_lower >= previous_gap-1e-6
-        break
-    end
-end
 
 for round_index = 1:cfg.economic_max_attempts
     if economic.is_proven || ~can_run(), break; end
-    if value(cfg,'economic_structural_search',false)
-        reserve=min(value(cfg,'economic_certification_reserve_s',1800), ...
-            0.25*cfg.economic_run_budget_s);
-        if cfg.economic_run_budget_s-toc(started)<=reserve, break; end
-        % Construct cheaper-count witnesses before spending time on their lower proof.
-        primal_search(round_index,reserve);
-        if economic.is_proven || ~can_run(), break; end
-        block_time = min([cfg.economic_block_round_time_s, ...
-            cfg.economic_block_budget_s-state.block_elapsed_s, ...
-            cfg.economic_run_budget_s-toc(started)-reserve]);
-        if block_time > 0 && isfinite(economic.cost_cap_usd) && ...
-                decomposition_can_run(value(state,'decomposition',struct()),economic,cfg)
-            begin_task("complete_decomposition",economic.K_upper,block_time);
-            block_ctx = ctx;
-            block_ctx.config.economic_decomposition_solve_limit = ...
-                cfg.economic_max_solves_per_run-state.new_solves;
-            [base,state,record] = strengthen_blocks(base,state,economic,block_ctx,block_time, ...
-                round_index,@save_block_checkpoint);
-            prior = find_cap(state,"loose_count",economic.cost_cap_usd);
-            record.attempts = prior.attempts+1;
-            state = store_witnesses(state,record);
-            state = store_cap(state,prior,record,"loose_count",economic.cost_cap_usd);
-            finish_task(max(1,record.solve_calls));
-        elseif block_time>0 && isfield(state,'decomposition') && ...
-                ~decomposition_can_run(state.decomposition,economic,cfg)
-            fprintf('[O1] 分解任务已停放：%s；等待认证界、成本帽或定价预算变化。\n',state.decomposition.stop_reason);
-        end
-        if economic.is_proven || ~can_run(), break; end
-        branch_time=min(cfg.economic_branch_time_s,max(0,cfg.economic_run_budget_s-toc(started)-reserve));
-        if branch_time>0 && branch_can_run(value(state,'branch',struct()), ...
-                value(state,'decomposition',struct()),economic,cfg,base)
-            begin_task("branch_pricing",economic.K_upper,branch_time);
-            branch_ctx=ctx; branch_ctx.config.economic_decomposition_solve_limit= ...
-                cfg.economic_max_solves_per_run-state.new_solves;
-            [state.branch,record]=branch_pricing(base,state,economic,branch_ctx,branch_time,@save_branch_checkpoint);
-            prior=find_cap(state,"loose_count",state.branch.bound_cap_usd);
-            state=store_cap(state,prior,record,"loose_count",state.branch.bound_cap_usd);
-            finish_task(record.solve_calls);
-        end
-        if economic.K_upper-economic.K_lower <= cfg.economic_final_interval, break; end
-        completed=decomposition_completed(value(state,'decomposition',struct()))-initial_sweeps;
-        if wide_certifications==0 && (economic.K_lower>state.structural_report.initial_K_lower || completed>=2) && ...
-                cfg.economic_run_budget_s-toc(started)>reserve+cfg.economic_certification_time_s
-            concentrated_certification(true);
-        end
+    if band_is_blocking() && ...
+            state.reference_refinements_this_run < cfg.economic_reference_max_refinements && can_run()
+        % 参考带过宽时两个经济帽都无法判定（甚至严格帽不可行），必须先收紧。
+        refine_reference();
         continue
     end
-    extra_probes = 0;
-    % 两个成本帽先各短算，后续与少量二分认证交替，不等待模型完全最优。
-    for cap_index = 1:2
+    if ~isfinite(economic.K_upper)
+        % 尚无满足严格经济帽的见证：先求严格帽下的最小计数见证。
+        strict_cap_solve(round_index);
         if economic.is_proven || ~can_run(), break; end
-        if cap_index == 1
-            kind = "loose_count"; cap = economic.cost_cap_usd;
-            schedule = state.loose_schedule;
-            if strcmp(value(cfg,'economic_proof_mode','full'),'full') && ...
-                    schedule.cap_usd == cap && schedule.skip_once
-                state.loose_schedule.skip_once = false;
-                extra_probes = 1;
-                save_state();
-                fprintf('[O1] 宽松帽此前推进缓慢：本轮让出预算给严格帽及固定K认证。\n');
-                continue
-            end
-        else
-            kind = "strict_count"; cap = economic.strict_cost_cap_usd;
-        end
-        if ~isfinite(cap), continue; end
-        task = make_task(kind, economic.K_upper, cap, round_index);
-        task.K_lower = economic.K_lower;
-        if ~isfinite(task.K), task.K = ctx.T; end
-        task.start = best_start(state, reference, task.K, base);
-        prior = find_cap(state, kind, cap);
-        task.attempt = prior.attempts+1;
-        task.time_limit = next_time(cfg.economic_cap_time_s, task.attempt);
-        if strcmp(value(cfg,'economic_proof_mode','full'),'full') && ...
-                kind == "loose_count" && state.loose_schedule.cap_usd == cap && ...
-                state.loose_schedule.stalled
-            task.time_limit = min(task.time_limit,cfg.economic_stalled_cap_time_s);
-            extra_probes = 1;
-            if cfg.gurobi_mip_focus < 0
-                foci = [0,2,3]; task.focus = foci(1+mod(task.attempt-2,3));
-            end
-            fprintf('[O1] 宽松帽短试探：预算=%.1f s，自动轮换策略。\n',task.time_limit);
-        end
-        before = economic;
-        begin_task(kind, task.K, task.time_limit);
-        record = solve_task(base, task, ctx);
-        state = log_proof(state,record,task);
-        state = store_witnesses(state, record);
-        state = store_cap(state, prior, record, kind, cap);
-        finish_task();
-        if kind == "loose_count"
-            lower_gain = economic.K_lower-before.K_lower;
-            upper_gain = before.K_upper-economic.K_upper;
-            if isnan(upper_gain), upper_gain = 0; end
-            required_gain = 1;
-            if isfinite(before.K_upper)
-                required_gain = max(1,ceil(0.05*(before.K_upper-before.K_lower)));
-            end
-            stalled = lower_gain < required_gain && upper_gain < required_gain;
-            state.loose_schedule = struct('cap_usd',cap,'stalled',stalled, ...
-                'skip_once',stalled,'last_lower_gain',lower_gain,'last_upper_gain',upper_gain);
-            save_state();
-            fprintf('[O1] 宽松帽本轮证据推进：下界+%g，上界减少%g，停滞=%d。\n', ...
-                lower_gain,upper_gain,stalled);
-        end
-        fprintf(['[O1] %s：状态=%s，模型计数下界=%g，已验证候选计数=%g，', ...
-            '候选成本=%.6g USD；Keco=[%g,%g]。\n'], ...
-            kind,record.solver_status,record.count_lower,record.count_upper, ...
-            record.cost_upper_usd,economic.K_lower,economic.K_upper);
+        slice = min(value(cfg,'economic_primal_slice_s',300), remaining()/4);
+        if slice > 1, primal_pass(round_index, slice); end
+        continue
     end
-    for probe_index = 1:cfg.economic_points_per_round+extra_probes
+    if state.primal_spent_s == 0 && value(cfg,'economic_primal_first_s',0) > 1 && ...
+            can_run() && ~has_adjacent_donor()
+        % 先用短时上界启发式生成“近似删除”候选：它往往只差几十美元就能满足
+        % 严格经济帽，却是决定性最小成本MILP最好的热启动材料（决定性求解本身
+        % 从旧解出发时，可行解质量远达不到判定线）。
+        slice = min([value(cfg,'economic_primal_first_s',900), remaining()/3]);
+        if slice > 1, primal_pass(round_index, slice); end
         if economic.is_proven || ~can_run(), break; end
-        K = select_K(economic, state.points, fixed_attempts, round_index);
+    end
+    narrow = (economic.K_upper-economic.K_lower) <= value(cfg,'economic_final_interval',20);
+    slot = mod(round_index-1,4);
+    decisive_budget = value(cfg,'economic_decisive_budget_s',3600);
+    decisive_left = decisive_budget-value(state,'decisive_spent_s',0);
+    if narrow
+        % 只有相邻整数点的决定性求解能让区间变成 0/1，优先消耗预算。
+        K = decisive_target();
         if isempty(K), break; end
-        fixed_attempts(K+1) = fixed_attempts(K+1)+1;
-        prior = find_point(state.points, K);
-        task = make_task("fixed_cost", K, Inf, round_index);
-        task.start = best_start(state, reference, K, base);
-        task.attempt = prior.attempts+1;
-        task.time_limit = next_time(cfg.economic_fixed_time_s, task.attempt);
-        task.sat = economic.strict_cost_cap_usd;
-        task.fail = economic.cost_cap_usd;
-        task.focus = evidence_focus(prior,task.sat,task.fail, ...
-            cfg.economic_delta_usd_t*cfg.nh3_target_t,task.attempt);
-        begin_task("fixed_cost", K, task.time_limit);
-        record = solve_task(base, task, ctx);
-        state = log_proof(state,record,task);
-        state = store_witnesses(state, record);
-        state.points = merge_point(state.points, record, K, "fixed_K_global_cost");
-        finish_task();
-        point = find_point(state.points, K);
-        fprintf('[O1] K=%g：%s，成本界=[%.6g,%.6g] USD；Keco=[%g,%g]。\n', ...
-            K, point.status, point.cost_lower_usd, point.cost_upper_usd, ...
-            economic.K_lower,economic.K_upper);
+        decisive_solve(K, round_index);
+    elseif slot == 0
+        % 计数下界只在"当前下界偏弱"时重建一次（例如割池被数值审计隔离后下界回落）；
+        % 若缓存的 loose 帽已经把下界立在 400 以上，就不必每轮再花 1800 s 重算同一个值。
+        if ~value(state,'loose_done_this_run',false) && economic.K_lower < 400
+            loose_cap_solve(round_index);
+            state.loose_done_this_run = true;
+        else
+            primal_slice(round_index);
+        end
+    elseif slot == 1 && decisive_left > 60
+        % 决定性求解按"每轮预算"限流：实测单次 730–1800 s，多次尝试会把降序搜索的预算挤光，
+        % 而过去两轮真正的下降全部来自降序（平台重拟合/窗口放开 z）。
+        K = decisive_target();
+        if isempty(K), break; end
+        before = toc(started);
+        decisive_solve(K, round_index);
+        state.decisive_spent_s = value(state,'decisive_spent_s',0)+max(0,toc(started)-before);
+    else
+        % 上界下降是当前唯一还能推进区间的手段：把预算集中给降序搜索。
+        primal_slice(round_index);
     end
-    if ~economic.is_proven && can_run() && ...
-            state.reference_refinements_this_run < cfg.economic_reference_max_refinements && ...
-            reference_is_limiting(state, reference, economic, cfg)
-        refine_reference();
-    end
-end
-if value(cfg,'economic_structural_search',false) && ~economic.is_proven && can_run()
-    concentrated_certification(false);
 end
 if economic.is_proven
     state.stop_reason = "complete_economic_threshold";
@@ -234,10 +134,10 @@ elseif toc(started) >= cfg.economic_run_budget_s
     state.stop_reason = "incomplete_economic_time_budget";
 elseif state.new_solves >= cfg.economic_max_solves_per_run
     state.stop_reason = "incomplete_economic_solve_budget";
-elseif reference_is_limiting(state, reference, economic, cfg)
-    state.stop_reason = "incomplete_economic_reference_resolution";
-elseif isfield(state,'decomposition') && isfield(state.decomposition,'park')
-    state.stop_reason = "incomplete_economic_stalled_evidence";
+elseif state.unresolved_reason ~= ""
+    state.stop_reason = state.unresolved_reason;
+elseif ~can_run()
+    state.stop_reason = "incomplete_economic_time_budget";
 end
 state.elapsed_s = toc(started);
 save_state();
@@ -254,23 +154,38 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
             toc(started) < cfg.economic_run_budget_s;
     end
 
+    function seconds = remaining()
+        seconds = max(0,cfg.economic_run_budget_s-toc(started));
+    end
+
     function seconds = next_time(first_time, attempt)
         seconds = first_time;
         if attempt > 1, seconds = cfg.economic_retry_time_s; end
-        seconds = max(0.01,min(seconds,cfg.economic_run_budget_s-toc(started)));
+        seconds = max(0.01,min(seconds,remaining()));
+    end
+
+    function seconds = decisive_time(attempt)
+        % 同一整数点的重复决定性求解按指数加时；预算不够时退化为剩余时间。
+        % 上限另受 economic_secondary_time_cap_s 约束：降序搜索才是当前推进区间的主力。
+        seconds = min(cfg.economic_retry_time_s, ...
+            cfg.economic_fixed_time_s*2^max(0,attempt-1));
+        seconds = min(seconds,value(cfg,'economic_secondary_time_cap_s',1800));
+        seconds = max(0.01,min(seconds,remaining()));
     end
 
     function task = make_task(kind,K,cap,round_number)
         task = struct('kind',kind,'K',K,'K_lower',0,'cap',cap, ...
             'sat',NaN,'fail',NaN,'round',round_number,'attempt',1, ...
-            'time_limit',cfg.economic_fixed_time_s,'start',[],'focus',-1);
+            'time_limit',cfg.economic_fixed_time_s,'start',[],'focus',-1, ...
+            'scale',1,'relax',{{}},'gap_usd',NaN);
     end
 
     function begin_task(kind,K,seconds)
         state.active_task = kind;
         save_state();
-        fprintf('[O1] %s：K上限=%g，时限=%.1f s；当前Keco=[%g,%g]。\n', ...
-            kind,K,seconds,economic.K_lower,economic.K_upper);
+        fprintf('[O1] %s：K上限=%g，时限=%.1f s；当前Keco=[%g,%g]，参考带=%.3f USD。\n', ...
+            kind,K,seconds,economic.K_lower,economic.K_upper, ...
+            economic.cost_cap_usd-economic.strict_cost_cap_usd);
     end
 
     function finish_task(calls)
@@ -279,6 +194,423 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
         state.active_task = "";
         [state,economic] = certify(state,reference,feasibility,ctx);
         save_state();
+    end
+
+    function print_threshold_state()
+        band = economic.cost_cap_usd-economic.strict_cost_cap_usd;
+        allowance = cfg.economic_delta_usd_t*cfg.nh3_target_t;
+        fprintf(['[O1] 阈值：sat=%.3f USD fail=%.3f USD；参考带=%.3f USD(%.3f%% of A)，' ...
+            '不可判定窗口宽度=%.3f USD；Keco=[%g,%g]，证书=%d。\n'], ...
+            economic.strict_cost_cap_usd,economic.cost_cap_usd,band, ...
+            100*band/max(eps,allowance),band,economic.K_lower,economic.K_upper,economic.is_proven);
+        if isfinite(economic.K_upper) && ~economic.is_proven
+            fprintf(['[O1] 待判定整数点 K=%g..%g：需要 cost<=sat 的有效见证' ...
+                '（降上界）或 min cost>fail 的有效下界（升下界）。\n'], ...
+                economic.K_lower,economic.K_upper-1);
+        end
+    end
+
+    function print_structure_diagnostic()
+        % 结构性诊断：说明计数帽在LP/MILP中的可见尺度（为什么下界会被LP支配）。
+        if ~isfield(ctx.model.context,'structure'), return; end
+        s = ctx.model.context.structure;
+        eps_change = cfg.change_epsilon;
+        ramp = ctx.HB_ramp;
+        solution = ctx.services.add_change_indicators(reference.solution,ctx);
+        load = solution.HB_load(:);
+        tv_load = sum(abs([load(2:end);load(1)]-load));
+        tv_set = NaN;
+        if isfield(solution,'O1_HB_setpoint')
+            setpoint = solution.O1_HB_setpoint(:);
+            tv_set = sum(abs([setpoint(2:end);setpoint(1)]-setpoint));
+        end
+        buffer_h = s.storage_work_kg/max(eps,s.h2_kg_per_load_unit_h*0.8);
+        fprintf(['[O1] 结构诊断：AEL=%.2f kgH2/kWh，HB=%.1f kgH2/(负荷单位·h)，' ...
+            '储氢缓冲≈%.2f h(80%%负荷)，每次变化可覆盖负荷%.3f。\n'], ...
+            s.h2_kg_per_ael_kwh,s.h2_kg_per_load_unit_h,buffer_h,ramp+eps_change);
+        fprintf(['[O1] 参考解负荷总变差=%.2f（设定值总变差=%.2f）；' ...
+            'K=%g 时计数帽允许的总变差≤%.1f，Kref=%g 时≤%.1f。\n'], ...
+            tv_load,tv_set,economic.K_upper, ...
+            (ramp+eps_change)*economic.K_upper+eps_change*ctx.T, ...
+            reference.count_upper, ...
+            (ramp+eps_change)*reference.count_upper+eps_change*ctx.T);
+    end
+
+    function yes = has_adjacent_donor()
+        % 相邻整数点 K_upper-1 是否已有可作热启动的候选（计数<=K 且成本<=必要帽）。
+        % 若有，就没必要再花预算跑上界启发式，直接进入决定性求解。
+        yes = false;
+        if ~isfinite(economic.K_upper), return; end
+        K = floor(economic.K_upper)-1;
+        for i = 1:numel(state.points)
+            p = state.points(i);
+            if p.has_incumbent && p.count_upper <= K && ...
+                    p.cost_upper_usd <= economic.cost_cap_usd
+                yes = true;
+                return
+            end
+        end
+    end
+
+    function yes = band_is_blocking()
+        % 参考带收紧对判定是“纯收益”：sat 抬高使见证更容易合格，fail 下移使排除
+        % 更容易成立。因此只要带宽大于目标且本轮尚未停滞，就先收紧一次。
+        band = economic.cost_cap_usd-economic.strict_cost_cap_usd;
+        target = band_target_usd();
+        yes = isfinite(band) && band > target && ...
+            ~value(state,'reference_stalled_this_run',false);
+    end
+
+    function target = band_target_usd()
+        % 参考带目标：既要远小于允许成本，又不能低于求解器在该成本量级上
+        % 能分辨的绝对精度（1e-5×成本量级），否则收紧请求永远无法达成。
+        allowance = cfg.economic_delta_usd_t*cfg.nh3_target_t;
+        target = max(value(cfg,'economic_band_fraction',0.02)*allowance, ...
+            1e-5*max(1,abs(reference.objective_upper)));
+    end
+
+    function pat = relaxed_pattern_seed(slice,round_number)
+        %RELAXED_PATTERN_SEED 用"z 整数、AEL 放松"的合法松弛生成 z 模式（阶段0）。
+        % 模型与实测有效的探针一致：min cost s.t. count <= K_upper-1（BestObjStop=sat、
+        % 2048 条按序割、MIPFocus=0）。松弛解可能含分数台数，因此只取其 z 模式，
+        % 后续必须经"固定z + AEL整数"求解并原矩阵核验才能成为见证。
+        pat = [];
+        if ~isfinite(economic.K_upper) || slice <= 1 || ~can_run(), return; end
+        task = make_task("fixed_cost",economic.K_upper-1,Inf,round_number);
+        task.z_only = true;                        % 只保留 z 整数（合法松弛）
+        task.sat = economic.strict_cost_cap_usd;   % 找到 <=sat 即停；不用 fail，避免停在近失解
+        task.fail = NaN;
+        task.start = solution_vector(base.indices,economic.satisfied_evidence.solution, ...
+            numel(base.cost_f));
+        task.attempt = find_point(state.points,economic.K_upper-1).attempts+1;
+        task.time_limit = max(1,slice);
+        task.focus = 0;
+        task.gap_usd = 0.49;
+        begin_task("relaxed_pattern",economic.K_upper-1,task.time_limit);
+        record = solve_task(base,task,ctx);
+        state = log_proof(state,record,task);
+        state = store_witnesses(state,record);   % 仅当松弛解恰好整数可行时才会成为见证
+        finish_task(0);
+        if isfield(record,'z_pattern') && ~isempty(record.z_pattern)
+            pat = double(record.z_pattern(:));
+        end
+    end
+
+    function K = decisive_target()
+        % 只攻相邻整数点 K_upper-1：一次排除即证明、一次接受即降上界。
+        % （中点二分的前提是"下界能随定K求解上升"，但实测该对偶界被 z 积分间隙锁死，
+        %  中点求解只会浪费 900–1800 s 而不会改变任何一侧，故不再使用。）
+        K = [];
+        if ~isfinite(economic.K_upper), return; end
+        hi = floor(economic.K_upper)-1;
+        if hi < max(0,ceil(economic.K_lower)), return; end
+        K = hi;
+    end
+
+    function relax = decisive_relaxations(attempt)
+        % 整数松弛只会放大可行域：其下界仍是 Keco 的合法下界，但候选解必须
+        % 重新通过原模型整数核验（validate_solution 已按原整数集检查）。
+        % 先给完整模型足够的加时预算；只有完整模型连续无进展时才逐级放松。
+        relax = {};
+        if ~value(cfg,'economic_decide_relaxations',true), return; end
+        if attempt >= 6
+            relax = {'I_AEL_up','n_ael'};
+        elseif attempt >= 4
+            relax = {'I_AEL_up'};
+        end
+    end
+
+    function decisive_solve(K,round_number)
+        prior = find_point(state.points,K);
+        task = make_task("fixed_cost",K,Inf,round_number);
+        task.start = best_start(state,reference,K,base);
+        task.attempt = prior.attempts+1;
+        task.time_limit = decisive_time(task.attempt);
+        task.sat = economic.strict_cost_cap_usd;
+        task.fail = economic.cost_cap_usd;
+        task.focus = evidence_focus(prior,task.sat,task.fail, ...
+            cfg.economic_delta_usd_t*cfg.nh3_target_t,task.attempt);
+        task.relax = decisive_relaxations(task.attempt);
+        if value(cfg,'economic_decide_scale',true)
+            task.scale = max(1,cfg.economic_delta_usd_t*cfg.nh3_target_t);
+        end
+        task.gap_usd = value(cfg,'economic_decide_gap_usd',NaN);
+        before_lower = economic.K_lower; before_upper = economic.K_upper;
+        begin_task("fixed_cost",K,task.time_limit);
+        record = solve_task(base,task,ctx);
+        state = log_proof(state,record,task);
+        state = store_witnesses(state,record);
+        state.points = merge_point(state.points,record,K,"fixed_K_global_cost");
+        finish_task();
+        point = find_point(state.points,K);
+        moved = economic.K_lower > before_lower || economic.K_upper < before_upper;
+        state.decisive_unresolved = ~moved;
+        state.decisive_K = K;
+        state.decisive_status = point.solver_status;
+        if point.cost_upper_usd <= task.sat
+            fprintf(['[O1] 决定性K=%g：接受见证 count=%g，cost=%.3f<=sat=%.3f USD' ...
+                ' => Keco<=%g。\n'],K,point.count_upper,point.cost_upper_usd,task.sat, ...
+                economic.K_upper);
+        elseif point.cost_lower_usd > task.fail
+            fprintf(['[O1] 决定性K=%g：排除证书 下界=%.3f>fail=%.3f USD' ...
+                ' => Keco>=%g。\n'],K,point.cost_lower_usd,task.fail,economic.K_lower);
+        else
+            fprintf(['[O1] 决定性K=%g 未能判定：成本界=[%.3f,%.3f] USD 落在' ...
+                '(sat,fail]=(%.3f,%.3f]；整数=%d，尝试%d，时限%.1f s，状态=%s。\n'], ...
+                K,point.cost_lower_usd,point.cost_upper_usd,task.sat,task.fail, ...
+                record.integer_count,task.attempt,task.time_limit,record.solver_status);
+        end
+        print_threshold_state();
+    end
+
+    function loose_cap_solve(round_number)
+        % 宽松帽最小计数：给出 Keco 的全局计数下界（对任意 cost<=fail 的调度）。
+        cap = economic.cost_cap_usd;
+        if ~isfinite(cap), return; end
+        prior = find_cap(state,"loose_count",cap);
+        task = make_task("loose_count",economic.K_upper,cap,round_number);
+        task.K_lower = economic.K_lower;
+        if ~isfinite(task.K), task.K = ctx.T; end
+        task.start = best_start(state,reference,task.K,base);
+        task.attempt = prior.attempts+1;
+        task.time_limit = min(next_time(cfg.economic_cap_time_s,task.attempt), ...
+            value(cfg,'economic_secondary_time_cap_s',1800));
+        task.focus = 3;
+        task.gap_usd = 0.49;
+        begin_task("loose_count",task.K,task.time_limit);
+        record = solve_task(base,task,ctx);
+        state = log_proof(state,record,task);
+        state = store_witnesses(state,record);
+        state = store_cap(state,prior,record,"loose_count",cap);
+        finish_task();
+        fprintf('[O1] 全局最小计数：模型下界=%g，已验证计数=%g；Keco=[%g,%g]。\n', ...
+            record.count_lower,record.count_upper,economic.K_lower,economic.K_upper);
+    end
+
+    function strict_cap_solve(round_number)
+        % 严格帽最小计数：任何候选都直接改善上界；若计数<=K_lower 则立即证明。
+        cap = economic.strict_cost_cap_usd;
+        if ~isfinite(cap), return; end
+        prior = find_cap(state,"strict_count",cap);
+        task = make_task("strict_count",economic.K_upper,cap,round_number);
+        task.K_lower = max(0,economic.K_lower);
+        if ~isfinite(task.K), task.K = ctx.T; end
+        task.start = best_start(state,reference,task.K,base);
+        task.attempt = prior.attempts+1;
+        task.time_limit = min(next_time(cfg.economic_fixed_time_s,task.attempt), ...
+            value(cfg,'economic_secondary_time_cap_s',1800));
+        task.focus = 1;
+        task.gap_usd = 0.49;
+        begin_task("strict_count",task.K,task.time_limit);
+        record = solve_task(base,task,ctx);
+        state = log_proof(state,record,task);
+        state = store_witnesses(state,record);
+        state = store_cap(state,prior,record,"strict_count",cap);
+        finish_task();
+        fprintf('[O1] 严格帽最小计数：模型下界=%g，已验证计数=%g；Keco=[%g,%g]。\n', ...
+            record.count_lower,record.count_upper,economic.K_lower,economic.K_upper);
+    end
+
+    function primal_slice(round_number)
+        if state.primal_spent_s >= value(cfg,'economic_primal_budget_s',0), return; end
+        slice = min([value(cfg,'economic_primal_slice_s',300), ...
+            value(cfg,'economic_primal_budget_s',0)-state.primal_spent_s, remaining()/3]);
+        if slice > 1, primal_pass(round_number, slice); end
+    end
+
+    function primal_pass(round_number,slice)
+        % 上界启发式时间片：只允许改善上界，绝不产生下界证书。
+        if slice <= 0 || ~can_run(), return; end
+        t0 = tic;
+        % 平台重拟合优先：它把“变化时刻”固定为候选模式后放开AEL台数，
+        % 实测比仅固定整数的LP删除便宜一个量级（每步约100-400 USD）。
+        plateau_refit(round_number,max(1,0.9*slice));
+        remaining_slice = slice-toc(t0);
+        if remaining_slice > 1 && can_run() && ~economic.is_proven
+            primal_search(round_number,max(0,remaining()-remaining_slice));
+        end
+        state.primal_spent_s = value(state,'primal_spent_s',0)+toc(t0);
+        save_state();
+    end
+
+    function plateau_refit(round_number,slice)
+        %PLATEAU_REFIT 平台重拟合（上界侧，贪心连续下降）。
+        % 每一步：从当前最好的严格合格见证出发，抽样删除单个变化时刻并用“固定全部
+        % 整数”的LP修复筛出最便宜候选；再把 z 固定成该模式、放开 AEL 台数/启停方向
+        % 做最小成本 MILP（BestObjStop=sat）。核验通过的解登记为新见证并继续下降。
+        if ~economic.satisfied_evidence.has_solution || ~can_run(), return; end
+        if slice<=1 || ~strcmp(ctx.config.economics_solver,'gurobi'), return; end
+        deadline = toc(started)+slice;
+        z_idx = base.indices.O1_HB_change(:);
+        fixed = base.physical_problem.intcon;
+        lp_limit = value(cfg,'economic_plateau_lp_time_s',10);
+        steps = 0;
+        while toc(started)<deadline && can_run() && ~economic.is_proven
+            headroom = economic.strict_cost_cap_usd-economic.satisfied_evidence.cost_upper_usd;
+            if headroom<=0, break; end
+            x_start = solution_vector(base.indices, ...
+                economic.satisfied_evidence.solution,numel(base.cost_f));
+            if isempty(x_start), break; end
+            events = find(round(x_start(z_idx))>0.5);
+            if isempty(events), break; end
+            scan_limit = min(numel(events),value(cfg,'economic_plateau_scan',16));
+            % 便宜的删除对应“设定值跳变幅度最小”的变化时刻（event_candidates 已按幅度升序），
+            % 因此优先扫描它们，而不是均匀抽样。
+            ranked = event_candidates(x_start,base,ctx.T,[]);
+            if isempty(ranked), ranked = events; end
+            order = ranked(1:min(numel(ranked),scan_limit));
+            % 阶段0：先用"z 整数、AEL 放松"的松弛模型生成优质 z 模式（实测优于贪心删除 3,000+ USD）。
+            % 同一 K_upper 只做一次（避免每步都花 900 s）；换到新的 K_upper 后会再次尝试。
+            if value(cfg,'economic_plateau_pattern_s',0) > 1 && can_run() && toc(started) < deadline && ...
+                    value(state,'pattern_seed_K',NaN) ~= economic.K_upper
+                state.pattern_seed_K = economic.K_upper;
+                pat = relaxed_pattern_seed(min(value(cfg,'economic_plateau_pattern_s',900), ...
+                    max(1,deadline-toc(started))),round_number);
+                if ~isempty(pat) && sum(pat) < economic.K_upper
+                    fprintf(['[O1] 松弛模式生成：count=%g（上界%g），改用该模式做' ...
+                        '固定z+AEL整数复核。\n'],sum(pat),economic.K_upper);
+                    x_cand = x_start;
+                    x_cand(z_idx) = pat;
+                    task0 = make_task("plateau_refit",sum(pat),Inf,round_number);
+                    task0.start = x_cand;
+                    task0.freeze_z = pat;
+                    task0.sat = economic.strict_cost_cap_usd;
+                    task0.fail = NaN;
+                    task0.focus = 0;   % 实测该模型上 MIPFocus=0 才能找到 incumbent
+                    task0.time_limit = min([value(cfg,'economic_plateau_time_s',300), ...
+                        max(1,deadline-toc(started))]);
+                    task0.attempt = find_point(state.points,sum(pat)).attempts+1;
+                    before_upper = economic.K_upper;
+                    begin_task("plateau_pattern",sum(pat),task0.time_limit);
+                    record0 = solve_task(base,task0,ctx);
+                    state = log_proof(state,record0,task0);
+                    state = store_witnesses(state,record0);
+                    state.points = merge_point(state.points,record0,sum(pat),"relaxed_pattern_refit");
+                    finish_task();
+                    steps = steps+1;
+                    if record0.has_incumbent && record0.cost_upper_usd<=economic.strict_cost_cap_usd
+                        fprintf(['[O1] 松弛模式复核接受 count=%g，cost=%.3f<=sat => Keco<=%g' ...
+                            '（此前%g，第%d步）。\n'],record0.count_upper,record0.cost_upper_usd, ...
+                            economic.K_upper,before_upper,steps);
+                        continue
+                    end
+                    fprintf(['[O1] 松弛模式复核未达 sat（成本%.3f > sat %.3f），' ...
+                        '回到删除扫描。\n'],record0.cost_upper_usd,economic.strict_cost_cap_usd);
+                end
+            end
+            fprintf(['[O1] 平台重拟合：K=%g，抽样删除%d/%d个变化时刻，严格余量%.3f USD。\n'], ...
+                economic.K_upper,numel(order),numel(events),headroom);
+            [p,~] = annual_cut_pool(base,x_start,value(cfg,'economic_annual_cut_limit',256));
+            best = struct('has',false,'x',[],'cost',Inf,'hour',NaN);
+            cand_list = {};
+            for hour = order(:).'
+                if toc(started)>=deadline || ~can_run(), break; end
+                q = p;
+                lb = q.lb; ub = q.ub;
+                lb(fixed) = round(x_start(fixed)); ub(fixed) = lb(fixed);
+                if base.grid_exact
+                    u_idx = base.indices.u_purchase(:);
+                    lb(u_idx) = 0; ub(u_idx) = 1;   % 净额抵消已验证：方向交给后处理
+                end
+                lb(z_idx(hour)) = 0; ub(z_idx(hour)) = 0;
+                q.lb = lb; q.ub = ub; q.intcon = [];
+                q.bineq(base.update_row) = (numel(events)-1)*base.update_coefficient;
+                q.f = base.cost_f;
+                model_g = scaled_model(q,base.units);
+                model_g.vtype = repmat('C',numel(model_g.obj),1);
+                x = continuous_solve(model_g,min([lp_limit,deadline-toc(started)]),ctx,struct());
+                if isempty(x), continue; end
+                x = normalize_grid(x.*base.units,base);
+                x(fixed) = round(x(fixed));
+                if matrix_violation(base.physical_problem,x)>ctx.model.options.ConstraintTolerance
+                    continue
+                end
+                cost = base.cost_f.'*x+base.offset;
+                cand_list{end+1} = struct('hour',hour,'x',x,'cost',cost); %#ok<AGROW>
+                if ~best.has || cost<best.cost
+                    best = struct('has',true,'x',x,'cost',cost,'hour',hour);
+                end
+            end
+            if ~isempty(cand_list)
+                [~,corder] = sort(cellfun(@(c) c.cost,cand_list));
+                cand_list = cand_list(corder);
+            end
+            if ~best.has
+                fprintf('[O1] 平台重拟合：无可行删除候选，停止下降。\n');
+                break
+            end
+            count = sum(round(best.x(z_idx)));
+            fprintf(['[O1] 平台重拟合：最便宜删除 hour=%g，候选计数=%g，成本%.3f USD' ...
+                '（比sat高%.3f）。\n'],best.hour,count,best.cost,best.cost-economic.strict_cost_cap_usd);
+            task = make_task("plateau_refit",count,Inf,round_number);
+            task.start = best.x;
+            task.freeze_z = round(best.x(z_idx));
+            task.sat = economic.strict_cost_cap_usd;
+            task.fail = NaN;
+            task.focus = 1;
+            task.time_limit = min([value(cfg,'economic_plateau_time_s',300), ...
+                max(1,deadline-toc(started))]);
+            task.attempt = find_point(state.points,count).attempts+1;
+            before_upper = economic.K_upper;
+            begin_task(task.kind,count,task.time_limit);
+            record = solve_task(base,task,ctx);
+            state = log_proof(state,record,task);
+            state = store_witnesses(state,record);
+            state.points = merge_point(state.points,record,count,"plateau_refit_annual_cost");
+            finish_task();
+            steps = steps+1;
+            accepted = record.has_incumbent && record.cost_upper_usd<=economic.strict_cost_cap_usd;
+            if accepted
+                fprintf(['[O1] 平台重拟合接受 count=%g，cost=%.3f<=sat => Keco<=%g' ...
+                    '（此前%g，第%d步）。\n'],record.count_upper,record.cost_upper_usd, ...
+                    economic.K_upper,before_upper,steps);
+                continue
+            end
+            % 固定整段 z 未达 sat 时，改为在删除点附近开窗放开 z（允许重新安排变化时刻），
+            % AEL 仍全部放开；这比"只删除"强，比全模型决定性求解快。
+            % 实测单窗口常常刚差一点，因此按"筛选成本从低到高"多试几个窗口（窗口逐次加宽）。
+            fprintf(['[O1] 平台重拟合固定z未达sat（成本%.3f > sat%.3f），' ...
+                '改为窗口内放开z重试。\n'],record.cost_upper_usd,economic.strict_cost_cap_usd);
+            wbase = round(value(cfg,'economic_plateau_window_h',24));
+            n_win = max(1,round(value(cfg,'economic_plateau_window_candidates',3)));
+            accept2 = false; record2 = record;
+            for wi = 1:min(n_win,numel(cand_list))
+                if ~can_run() || toc(started) >= deadline, break; end
+                wh = cand_list{wi}.hour;
+                span = max(1,wh-wbase*wi):min(ctx.T,wh+wbase*wi);
+                task2 = task;
+                task2.free_z_span = [span(1),span(end)];
+                task2.time_limit = min([value(cfg,'economic_plateau_time_s',300), ...
+                    max(1,deadline-toc(started))]);
+                task2.attempt = find_point(state.points,count).attempts+1;
+                begin_task("plateau_window",count,task2.time_limit);
+                record2 = solve_task(base,task2,ctx);
+                state = log_proof(state,record2,task2);
+                state = store_witnesses(state,record2);
+                state.points = merge_point(state.points,record2,count,"plateau_window_free_z");
+                finish_task();
+                steps = steps+1;
+                if record2.has_incumbent && record2.cost_upper_usd<=economic.strict_cost_cap_usd
+                    accept2 = true;
+                    break
+                end
+                fprintf(['[O1] 窗口%d(hour=%g,±%g h)未达sat：成本%.3f（差%.3f）。\n'], ...
+                    wi,wh,wbase*wi,record2.cost_upper_usd, ...
+                    record2.cost_upper_usd-economic.strict_cost_cap_usd);
+            end
+            if accept2
+                fprintf(['[O1] 窗口放开z接受 count=%g，cost=%.3f<=sat => Keco<=%g' ...
+                    '（此前%g，第%d步）。\n'],record2.count_upper,record2.cost_upper_usd, ...
+                    economic.K_upper,before_upper,steps);
+                continue
+            end
+            fprintf('[O1] 窗口放开z仍未达 sat（成本%.3f），停止下降。\n',record2.cost_upper_usd);
+            break
+        end
+        if steps>0
+            fprintf('[O1] 平台重拟合本轮完成%d步，Keco=[%g,%g]。\n',steps, ...
+                economic.K_lower,economic.K_upper);
+        end
     end
 
     function primal_search(round_number,reserve)
@@ -299,8 +631,6 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
                 state.primal_schedule.polished_time_s=seconds;
             end
         end
-        % Alternate small AEL cost repair with relocation of HB events.
-        % The whole annual continuous dispatch and cyclic boundary stay free.
         for local_index=1:cfg.economic_local_passes
             available=cfg.economic_run_budget_s-toc(started)-reserve;
             if economic.is_proven || ~can_run() || available<=0, break; end
@@ -312,10 +642,9 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
             end
             task=make_task(kind,K,economic.strict_cost_cap_usd,round_number);
             task.K_lower=economic.K_lower;
-            step=state.primal_schedule.step;
-            if step<2, step=cfg.economic_local_target_step; end
-            step=min(cfg.economic_local_max_step,max(2,step));
-            task.target=max(economic.K_lower,K-step);
+            % 局部搜索的目标固定为"当前上界 −1"：实测目标取 K−2 时它永远达不到
+            % （日志里"成本改善0.000 USD"恒成立），只有降到相邻整数点它才可能给出一次可接受下降。
+            task.target=max(economic.K_lower,K-1);
             task.sat=economic.satisfied_evidence.cost_upper_usd- ...
                 max([1,0.01*cfg.economic_delta_usd_t*cfg.nh3_target_t, ...
                 cfg.economic_local_headroom_usd-headroom]);
@@ -341,25 +670,25 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
             end
             improved=economic.K_upper<before_upper;
             if kind=="local_count"
-                if improved
-                    state.primal_schedule.step=min(cfg.economic_local_max_step,step+1);
-                else
-                    state.primal_schedule.step=max(2,step-1);
-                end
+                % 目标恒为 K−1，不再做"步长升级/回退"（升级只会让目标更不可达）。
+                state.primal_schedule.step=1;
             end
-            fprintf('[O1] %s：开放%d个变化时刻、%d个AEL时段，目标K<=%g；Keco=[%g,%g]，成本改善%.3f USD，严格余量%.3f USD。\n', ...
-                kind,numel(task.event_hours),numel(task.ael_hours),task.target,economic.K_lower,economic.K_upper, ...
+            fprintf(['[O1] %s：开放%d个变化时刻、%d个AEL时段，目标K<=%g；' ...
+                'Keco=[%g,%g]，成本改善%.3f USD，严格余量%.3f USD。\n'], ...
+                kind,numel(task.event_hours),numel(task.ael_hours),task.target, ...
+                economic.K_lower,economic.K_upper, ...
                 before_cost-economic.satisfied_evidence.cost_upper_usd, ...
                 economic.strict_cost_cap_usd-economic.satisfied_evidence.cost_upper_usd);
         end
         available=cfg.economic_run_budget_s-toc(started)-reserve;
         seconds=min(cfg.economic_event_time_s,max(0,available));
-        if seconds>0 && can_run() && ~economic.is_proven
+        if seconds>0 && can_run()
             task=make_task("event_repair",economic.K_upper,economic.strict_cost_cap_usd,round_number);
             begin_task(task.kind,task.K,seconds);
             [record,state.event_schedule]=event_repair(base,economic,ctx,seconds,state.event_schedule,@save_event_witness);
             state=log_proof(state,record,task); state=store_witnesses(state,record); finish_task(0);
-            fprintf('[O1] 变化事件恢复：LP调用%d，接受%d次，待重试%d个事件，Keco=[%g,%g]，严格余量%.3f USD。\n', ...
+            fprintf(['[O1] 变化事件恢复：LP调用%d，接受%d次，待重试%d个事件，' ...
+                'Keco=[%g,%g]，严格余量%.3f USD。\n'], ...
                 record.lp_calls,record.accepted_events,numel(value(state.event_schedule,'retry_hours',[])), ...
                 economic.K_lower,economic.K_upper, ...
                 economic.strict_cost_cap_usd-economic.satisfied_evidence.cost_upper_usd);
@@ -368,7 +697,6 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
             state.primal_schedule.stalls=0;
         else
             state.primal_schedule.stalls=state.primal_schedule.stalls+1;
-            % Rotate the event pool after a failed pass; do not widen thousands of hours.
         end
         save_state();
     end
@@ -379,146 +707,73 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
         save_state(); % Keep each accepted event even if the next LP is interrupted.
     end
 
-    function concentrated_certification(pilot)
-        % Wide intervals get one annual count proof per run; repeated short
-        % roots and midpoint solves otherwise consume the pricing budget.
-        wide=economic.K_upper-economic.K_lower>cfg.economic_final_interval;
-        if wide && wide_certifications>0, return; end
-        if wide && ~economic.is_proven && can_run()
-            certificate_kind="loose_count";
-            cap = economic.cost_cap_usd;
-            task = make_task(certificate_kind,economic.K_upper,cap,1);
-            if ~isfinite(task.K), task.K = ctx.T; end
-            task.K_lower = economic.K_lower;
-            task.concentrated = ~pilot;
-            task.start = best_start(state,reference,task.K,base);
-            task.time_limit = min(cfg.economic_certification_time_s, ...
-                max(0.01,cfg.economic_run_budget_s-toc(started)));
-            prior = find_cap(state,certificate_kind,cap); task.attempt = prior.attempts+1;
-            if claim_certification(task)
-                begin_task(certificate_kind,task.K,task.time_limit);
-                record = solve_task(base,task,ctx);
-                state = log_proof(state,record,task);
-                state = store_witnesses(state,record);
-                state = store_cap(state,prior,record,certificate_kind,cap);
-                state.cert_schedule=pending_cert_schedule;
-                finish_task();
-                wide_certifications=wide_certifications+1;
-            end
-        end
-        if economic.K_upper-economic.K_lower>cfg.economic_final_interval, return; end
-        % Only adjacent integer proofs can finish threshold certification.
-        probes=cfg.economic_max_attempts; if pilot, probes=1; end
-        for probe = 1:probes
-            if economic.is_proven || ~can_run() || ~isfinite(economic.K_upper), break; end
-            K = economic.K_upper-1;
-            prior = find_point(state.points,K);
-            task = make_task("fixed_cost",K,Inf,1);
-            task.start = best_start(state,reference,K,base);
-            task.sat = economic.strict_cost_cap_usd; task.fail = economic.cost_cap_usd;
-            task.attempt = prior.attempts+1;
-            task.time_limit = next_time(cfg.economic_certification_time_s,1);
-            if pilot, task.time_limit=min(task.time_limit,cfg.economic_stalled_cap_time_s); end
-            task.focus = evidence_focus(prior,task.sat,task.fail, ...
-                cfg.economic_delta_usd_t*cfg.nh3_target_t,task.attempt);
-            if ~claim_certification(task), break; end
-            begin_task(task.kind,K,task.time_limit);
-            before_lower = economic.K_lower; before_upper = economic.K_upper;
-            record = solve_task(base,task,ctx);
-            state = log_proof(state,record,task);
-            state = store_witnesses(state,record);
-            state.points = merge_point(state.points,record,K,"fixed_K_global_cost");
-            state.cert_schedule=pending_cert_schedule;
-            finish_task();
-            if ~economic.is_proven && can_run() && ...
-                    state.reference_refinements_this_run < cfg.economic_reference_max_refinements && ...
-                    reference_is_limiting(state,reference,economic,cfg)
-                refine_reference();
-            end
-            if before_lower == economic.K_lower && before_upper == economic.K_upper, break; end
-        end
-    end
-
-    function allowed=claim_certification(task)
-        % Persist a restart gate only after the solve returns; interruption is retryable.
-        [allowed,pending_cert_schedule]=certification_gate(state.cert_schedule,task,economic, ...
-            value(state,'decomposition',struct()),cfg);
-        if ~allowed
-            fprintf('[O1] 暂缓重复%s K=%g：认证界、有效松弛下界和预算未发生足够变化。\n',task.kind,task.K);
-        end
-    end
-
     function refine_reference()
+        % 决策不可判定时先收紧参考带：带越窄，两个经济帽越接近 C*+A。
         task = make_task("reference_cost",ctx.T,Inf,1);
-        task.time_limit = next_time(cfg.economic_reference_time_s,1);
-        task.start = solution_vector(base.indices,reference.solution,numel(base.cost_f));
         task.attempt = state.reference_refinements_this_run+1;
+        task.time_limit = next_time(cfg.economic_reference_time_s,task.attempt);
+        task.start = solution_vector(base.indices,reference.solution,numel(base.cost_f));
         gap = reference.objective_upper-reference.objective_lower;
-        task.absolute_gap = cfg.economic_reference_tolerance_usd_t*cfg.nh3_target_t;
-        if isfinite(gap), task.absolute_gap = min(task.absolute_gap,max(1e-6,gap/5)); end
+        task.absolute_gap = max(1,min(gap/4,band_target_usd()));
+        if ~isfinite(task.absolute_gap) || task.absolute_gap <= 0
+            task.absolute_gap = max(1,gap/4);
+        end
         begin_task("reference_refinement",ctx.T,task.time_limit);
+        band_before = reference.objective_upper-reference.objective_lower;
         record = solve_task(base,task,ctx);
         candidate = reference;
-        candidate.objective_lower = record.cost_lower_usd;
-        candidate.objective_upper = record.cost_upper_usd;
-        candidate.has_incumbent = record.has_incumbent;
-        candidate.solution = record.solution;
+        candidate.objective_lower = max(reference.objective_lower,record.cost_lower_usd);
+        if record.has_incumbent && record.cost_upper_usd <= reference.objective_upper
+            candidate.objective_upper = record.cost_upper_usd;
+            candidate.has_incumbent = true;
+            candidate.solution = record.solution;
+        end
         reference = merge_reference(reference,candidate,ctx,base);
         state.reference_refinements_this_run = state.reference_refinements_this_run+1;
+        band_after = reference.objective_upper-reference.objective_lower;
+        % 参考带由参考MILP的可达对偶界决定；收窄不足10%视为停滞，不再占用决定性预算。
+        state.reference_stalled_this_run = ~(band_after < 0.9*band_before);
         state = register_reference_point(state,reference,ctx,base);
         ctx.services.save_reference(reference,ctx);
         finish_task();
-        fprintf('[O1] 参考成本收紧为[%.3f,%.3f] USD；Kref=%g。\n', ...
-            reference.objective_lower,reference.objective_upper,reference.count_upper);
-    end
-
-    function save_block_checkpoint(block_state)
-        state.block_cuts = block_state.block_cuts;
-        state.decomposition = block_state.decomposition;
-        d = state.decomposition;
-        if isfinite(d.best_lower)
-            evidence = empty_point(economic.K_upper);
-            evidence.count_lower = max(0,ceil(d.best_lower-1e-5));
-            prior = find_cap(state,"loose_count",d.bound_cap_usd);
-            state = store_cap(state,prior,evidence,"loose_count",d.bound_cap_usd);
-            [state,economic] = certify(state,reference,feasibility,ctx);
-        end
-        save_state();
-    end
-
-    function save_branch_checkpoint(proof)
-        state.branch=proof;
-        record=empty_point(economic.K_upper); record.count_lower=proof.global_lower;
-        prior=find_cap(state,"loose_count",proof.bound_cap_usd);
-        state=store_cap(state,prior,record,"loose_count",proof.bound_cap_usd);
-        [state,economic]=certify(state,reference,feasibility,ctx); save_state();
+        fprintf(['[O1] 参考成本收紧为[%.3f,%.3f] USD，带宽%.3f -> %.3f USD' ...
+            '（停滞=%d）；Kref=%g。\n'], ...
+            reference.objective_lower,reference.objective_upper,band_before,band_after, ...
+            state.reference_stalled_this_run,reference.count_upper);
     end
 
     function save_state()
         state.elapsed_s=toc(started);
-        state.structural_report.current_width = economic.K_upper-economic.K_lower;
-        state.structural_report.lower_gain = economic.K_lower-state.structural_report.initial_K_lower;
-        state.structural_report.upper_gain = state.structural_report.initial_K_upper-economic.K_upper;
-        if isnan(state.structural_report.upper_gain), state.structural_report.upper_gain = 0; end
+        report = state.structural_report;
+        report.current_width = economic.K_upper-economic.K_lower;
+        report.lower_gain = economic.K_lower-report.initial_K_lower;
+        report.upper_gain = report.initial_K_upper-economic.K_upper;
+        if isnan(report.upper_gain), report.upper_gain = 0; end
         if isfinite(initial_width) && initial_width > 0
-            state.structural_report.width_reduction_fraction = ...
-                1-state.structural_report.current_width/initial_width;
+            report.width_reduction_fraction = 1-report.current_width/initial_width;
         end
-        state.structural_report.half_width_target_met = economic.is_proven || ...
-            isfinite(initial_width) && state.structural_report.current_width <= initial_width/2;
-        state.structural_report.acceptance_target_met = economic.is_proven || ...
-            state.structural_report.width_reduction_fraction>=0.2;
-        state.structural_report.strict_slack_usd = ...
-            economic.strict_cost_cap_usd-economic.satisfied_evidence.cost_upper_usd;
-        state.structural_report.block_elapsed_s = state.block_elapsed_s;
-        state.structural_report.complete_sweeps=decomposition_completed(value(state,'decomposition',struct()));
-        state.structural_report.new_complete_sweeps=state.structural_report.complete_sweeps-initial_sweeps;
-        certificate=value(value(state,'decomposition',struct()),'certificate',struct());
-        state.structural_report.decomposition_progress_met=economic.is_proven || ...
-            value(certificate,'lower',-Inf)>state.structural_report.initial_K_lower+1e-5;
+        report.half_width_target_met = economic.is_proven || ...
+            isfinite(initial_width) && report.current_width <= initial_width/2;
+        report.acceptance_target_met = economic.is_proven || ...
+            report.width_reduction_fraction>=0.2;
+        report.strict_slack_usd = economic.strict_cost_cap_usd- ...
+            economic.satisfied_evidence.cost_upper_usd;
+        report.economic_band_usd = economic.cost_cap_usd-economic.strict_cost_cap_usd;
+        report.allowance_usd = cfg.economic_delta_usd_t*cfg.nh3_target_t;
+        report.decisive_K = value(state,'decisive_K',NaN);
+        report.decisive_status = string(value(state,'decisive_status',""));
+        if ~economic.is_proven && isfinite(economic.K_upper)
+            report.unresolved_reason = "decisive_MILP_undecided_for_K_" + ...
+                string(economic.K_upper-1);
+        else
+            report.unresolved_reason = "";
+        end
+        state.structural_report = report;
+        state.unresolved_reason = report.unresolved_reason;
         state.reference = reference;
         state.Keco_lower = economic.K_lower;
         state.Keco_upper = economic.K_upper;
+        state.search_version = value(cfg,'economic_search_version',2);
         if ~cfg.use_cache, return; end
         payload = struct('signature',ctx.cost_signature, ...
             'delta_usd_t',cfg.economic_delta_usd_t,'schema_version',1,'state',state);
@@ -532,12 +787,13 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
             return
         end
         close_file = onCleanup(@() fclose(fid));
-        fprintf(fid,'\n- O1经济阈值检查点：Kref=%g，Keco=[%g,%g]，认证=%d，阶段=%s，状态=%s。\n', ...
+        fprintf(fid,'\n- O1经济阈值检查点：Kref=%g，Keco=[%g,%g]，认证=%d，带宽=%.3f USD，阶段=%s，状态=%s。\n', ...
             reference.count_upper,economic.K_lower,economic.K_upper,economic.is_proven, ...
-            state.active_task,state.stop_reason);
+            economic.cost_cap_usd-economic.strict_cost_cap_usd,state.active_task,state.stop_reason);
         clear close_file
     end
 end
+
 
 function state = load_state(file,ctx)
 state = struct('points',repmat(empty_point(0),0,1), ...
@@ -552,8 +808,51 @@ if isfield(loaded,'schema_version') && loaded.schema_version == 1 && ...
     schedule = state.loose_schedule;
     state = loaded.state;
     if ~isfield(state,'loose_schedule'), state.loose_schedule = schedule; end
-    fprintf('[O1] 已读取经济阈值缓存；旧状态将按当前门槛重新认证。\n');
+    fprintf('[O1] 已读取经济阈值缓存；旧状态按当前门槛重新认证。\n');
 end
+end
+
+function state = prepare_search_state(state,cfg)
+%PREPARE_SEARCH_STATE 证书驱动搜索只继承“可复用证据”，重置工作状态。
+% 可复用证据：成本点(points)、成本帽(caps)、参考解、派生割及割审计。
+% 必须重置：分解/分支中间状态、认证排程、启发式进度——旧搜索的“5%进度”门槛
+% 正是区间无法合并的直接原因之一。
+version = value(cfg,'economic_search_version',2);
+if value(state,'search_version',0) == version, return; end
+state.search_version = version;
+state.decomposition = struct();
+state.branch = struct();
+state.cert_schedule = empty_cert_schedule();
+state.event_schedule = struct();
+state.primal_schedule = struct('version',3,'step',cfg.economic_local_target_step, ...
+    'stalls',0,'polished_K',Inf,'polished_cost',Inf,'exchange_cursor',0);
+state.loose_schedule = struct('cap_usd',NaN,'stalled',false,'skip_once',false, ...
+    'last_lower_gain',0,'last_upper_gain',0);
+state.primal_spent_s = 0;
+state.active_task = "";
+state.stop_reason = "incomplete_economic_threshold";
+state.decisive_unresolved = false;
+state.decisive_K = NaN;
+state.decisive_status = "";
+state.unresolved_reason = "";
+state.new_solves = 0;
+state.block_elapsed_s = 0;
+% 历史正确性清理：固定 z 的“平台重拟合”是限制模型，其 cost_lower/不可行性不能作为
+% F(K) 的排除证据（v2 期间可能已写入缓存），这里一律清零后重新由合法模型认证。
+cleared = 0;
+for i = 1:numel(state.points)
+    if contains(string(state.points(i).source),"plateau_refit")
+        state.points(i).cost_lower_usd = -Inf;
+        state.points(i).is_infeasible = false;
+        cleared = cleared+1;
+    end
+end
+if cleared > 0
+    fprintf(['[O1] 证据清理：%d 个固定z(平台重拟合)成本点的下界被重置为无效' ...
+        '（限制模型的下界不能用于排除）。\n'],cleared);
+end
+fprintf(['[O1] 搜索状态迁移到决定性搜索v%g：保留%d个成本点、%d个成本帽与参考解，' ...
+    '重置分解/分支/启发式工作状态。\n'],version,numel(state.points),numel(state.caps));
 end
 
 function point = empty_point(K)
@@ -818,7 +1117,9 @@ upper_distance = max(0,point.cost_upper_usd-sat);
 lower_distance = max(0,fail-point.cost_lower_usd);
 near = max(1,allowance/4);
 if upper_distance <= near && upper_distance <= lower_distance
-    focus = 1; % A类：优先改善可行上界。
+    % A类：优先找 <=sat 的可行解。实测本模型上 MIPFocus=0 才能给出 incumbent
+    % （MIPFocus=1 在 900–1641 s 内连一个解都找不到），因此这里固定用 0。
+    focus = 0;
 elseif lower_distance <= near
     focus = 3; % B类：优先改善全局下界。
 else
@@ -935,6 +1236,9 @@ schedule.source_cap=economic.strict_cost_cap_usd;
 integers=original.intcon;
 if base.grid_exact, integers=setdiff(integers,base.indices.u_purchase(:)); end
 z=base.indices.O1_HB_change(:); basis=struct(); near=[]; near_cost=[];
+% 循环外先初始化：若首批候选为空（events_exhausted）会在循环内 break，
+% 那里的 near_best 尚未定义，循环后再引用就会报"无法识别"。
+near_best=[]; near_best_point=empty_point(count);
 while toc(started)<seconds && count>economic.K_lower
     p=original; p.f=base.cost_f;
     p.bineq(base.update_row)=count*base.update_coefficient;
@@ -947,6 +1251,7 @@ while toc(started)<seconds && count>economic.K_lower
     order=event_attempt_order(order,schedule,value(ctx.config,'economic_event_candidates',24));
     if isempty(order), schedule.status="events_exhausted"; break; end
     best=[]; best_point=empty_point(count); tested=[]; pending=[];
+    near_best=[]; near_best_point=empty_point(count);
     for hour=order(:).'
         remaining=seconds-toc(started); if remaining<=0, break; end
         trial=model; trial.lb(z(hour))=0; trial.ub(z(hour))=0;
@@ -977,6 +1282,14 @@ while toc(started)<seconds && count>economic.K_lower
             best_point.count_upper=trial_count; best_point.cost_upper_usd=trial_cost;
             best_point.matrix_violation=residual; best_point.solver_status=status;
             best_point.source="event_deletion_annual_LP_witness";
+        elseif isempty(near_best) || trial_cost<near_best_point.cost_upper_usd
+            % 近似删除（成本略高于严格帽）：作为后续决定性求解的热启动材料保留，
+            % 不登记为见证（certify 只按 cost_upper<=sat 接受）。
+            near_best=valid; near_best_point=empty_point(trial_count);
+            near_best_point.has_incumbent=true; near_best_point.solution=solution;
+            near_best_point.count_upper=trial_count; near_best_point.cost_upper_usd=trial_cost;
+            near_best_point.matrix_violation=residual;
+            near_best_point.solver_status="near_miss_start_donor";
         end
     end
     schedule.tested_hours=union(value(schedule,'tested_hours',[]),tested);
@@ -990,6 +1303,10 @@ while toc(started)<seconds && count>economic.K_lower
     if ~isempty(checkpoint), checkpoint(best_point); end
     fprintf('[O1] 事件LP接受K=%g：成本%.3f USD，严格余量%.3f USD。\n', ...
         count,cost,economic.strict_cost_cap_usd-cost);
+end
+if ~isempty(near_best)
+    % 保留为热启动材料；放在最前，保证 record.witnesses(end) 仍是已接受见证。
+    record.witnesses=[near_best_point; record.witnesses];
 end
 if ~isempty(record.witnesses)
     point=record.witnesses(end); record.has_incumbent=true; record.solution=point.solution;
@@ -1087,23 +1404,59 @@ p = base.problem;
 is_local = task.kind == "local_count" || task.kind == "local_cost";
 if is_local, p=value(base,'physical_problem',p); end
 if ~is_local && isfield(base,'cut_all')
-    [p,used]=annual_cut_pool(base,task.start,value(ctx.config,'economic_annual_cut_limit',256));
+    % 计数目标（min count）对割更敏感：实测用全部有效割时下界404.92，而只用256条只有361。
+    % 决定性成本求解同样受益：实测"2048 条按序割 + MIPFocus=0"能在 K=491 上找到
+    % cost=sat-3675 的（松弛）解，而"256 条 + MIPFocus=1"在 900–1641 s 内一个 <=sat 的解都找不到。
+    cut_limit = value(ctx.config,'economic_annual_cut_limit',256);
+    if task.kind=="loose_count" || task.kind=="strict_count" || task.kind=="fixed_cost" || ...
+            task.kind=="plateau_refit"
+        cut_limit = value(ctx.config,'economic_count_cut_limit',cut_limit);
+    end
+    [p,used]=annual_cut_pool(base,task.start,cut_limit);
     fprintf('[O1] 全年认证割池：使用%d/%d条数值安全割。\n',used,numel(base.cut_all));
 end
 p.bineq(base.update_row) = task.K*base.update_coefficient;
+% 平台重拟合：把 z（设定值更新模式）固定为候选模式，放开 AEL 台数/方向重新优化成本。
+% 计数因此被固定在候选值上；得到的任何可行解都是原模型的合法调度（仍按原整数集核验）。
+% 注意（正确性）：固定 z 是对可行域的**限制**，因此该模型的对偶界不是 F(K) 的合法下界，
+% 绝不能参与 certify 的排除；本任务只贡献可行解（见证）。
+is_restricted = isfield(task,'freeze_z') && ~isempty(task.freeze_z);
+if is_restricted
+    zz = base.indices.O1_HB_change(:);
+    span = value(task,'free_z_span',[]);
+    T = numel(zz);
+    fixed_mask = true(T,1);
+    if ~isempty(span)
+        % 窗口内放开 z：允许在窗口内重新安排"变化时刻"（而非仅删除），仍受计数帽约束。
+        lo = max(1,round(span(1))); hi = min(T,round(span(2)));
+        if hi >= lo, fixed_mask(lo:hi) = false; end
+    end
+    p.lb(zz(fixed_mask)) = task.freeze_z(fixed_mask);
+    p.ub(zz(fixed_mask)) = p.lb(zz(fixed_mask));
+    p.intcon = setdiff(p.intcon,zz(fixed_mask));
+    if ~any(fixed_mask)
+        is_restricted = false;   % 完全放开 z：这是原模型的合法部分模型，界仍合法
+    end
+end
 is_count = task.kind == "loose_count" || task.kind == "strict_count" || task.kind=="local_count";
+cost_scale = 1;
 if is_count
     p.f = base.count_f;
     p.Aineq = [p.Aineq;base.cost_f.';-base.count_f.'];
     p.bineq = [p.bineq(:);task.cap-base.offset;-task.K_lower];
     offset = 0;
 else
-    p.f = base.cost_f;
+    % 决定性成本求解把目标仿射压缩到“允许成本”量级：最优解不变，但阈值与
+    % MIP间隔都落在O(1)尺度，避免3e7美元量级上的数值噪声吃掉几百美元的判定余量。
+    cost_scale = max(1,value(task,'scale',1));
+    p.f = base.cost_f/cost_scale;
     offset = base.offset;
     if task.kind=="local_cost"
-        p.Aineq=[p.Aineq;base.cost_f.']; p.bineq=[p.bineq(:);task.cap-base.offset];
+        p.Aineq=[p.Aineq;base.cost_f.'/cost_scale];
+        p.bineq=[p.bineq(:);(task.cap-base.offset)/cost_scale];
     end
 end
+task.scale = cost_scale;
 if is_local
     if isempty(task.start) || any(~isfinite(task.start))
         error('O1:invalid_local_start','局部压缩需要完整的原模型可行调度。');
@@ -1163,6 +1516,16 @@ if is_local
     record.global_bound = -Inf;
     record.is_infeasible = false; % 局部限制的不可行性不提供任何全年拒绝证据。
 end
+if is_restricted
+    % 固定 z 的模型是对可行域的限制：其界与不可行性都不能作为 F(K) 的排除证据。
+    record.global_bound = -Inf;
+    record.cost_lower_usd = -Inf;
+    record.is_infeasible = false;
+end
+if value(task,'z_only',false) && ~isempty(result.x)
+    % 记录松弛解生成的 z 模式（供后续"固定z + AEL整数"复核使用）。
+    record.z_pattern = round(result.x(base.indices.O1_HB_change(:)));
+end
 for candidate_cell = {start_candidate,result.x}
     candidate = candidate_cell{1};
     if isempty(candidate), continue; end
@@ -1202,6 +1565,17 @@ for candidate_cell = {start_candidate,result.x}
                 record.count_upper = count;
                 record.matrix_violation = residual;
             end
+        elseif ~isempty(x)
+            % 近似候选（成本略高于本轮成本帽）：只作为后续决定性求解的热启动材料。
+            % 它不参与任何界：certify 只按 cost_upper<=sat 接受见证、按对偶界排除。
+            donor = empty_point(count);
+            donor.has_incumbent = true;
+            donor.solution = solution;
+            donor.cost_upper_usd = cost;
+            donor.count_upper = count;
+            donor.matrix_violation = residual;
+            donor.solver_status = "near_miss_start_donor";
+            record.witnesses(end+1,1) = donor;
         end
     end
 end
@@ -1216,6 +1590,21 @@ kind = "original_economic";
 if base.grid_exact
     p.intcon = setdiff(p.intcon,base.indices.u_purchase(:));
     kind = "grid_equivalent";
+end
+if value(task,'z_only',false)
+    % z 整数、其余（AEL 台数/方向）放松：这是**合法松弛**（可行域更大）。
+    % 用途只是生成优质 z 模式；其候选解仍必须按原整数集核验才能成为见证，
+    % 且它不参与 certify 的排除（排除只认 loose_count 帽）。
+    p.intcon = base.indices.O1_HB_change(:);
+    kind = kind+"_z_only_relaxation";
+end
+% 有效松弛：放松某些整数组只会放大可行域，其MILP下界仍是Keco的合法下界
+% （候选解仍按原整数集重新核验，不可能被登记为见证）。
+for name = value(task,'relax',{})
+    if isfield(base.indices,name{1})
+        p.intcon = setdiff(p.intcon,base.indices.(name{1})(:));
+        kind = kind+"_relax_"+string(name{1});
+    end
 end
 if task.kind == "loose_count" && ...
         strcmp(value(ctx.config,'economic_proof_mode','full'),'hb_only')
@@ -1536,12 +1925,11 @@ p=base.physical_problem; p.bineq(base.update_row)=ctx.T*base.update_coefficient;
 seeds=solution_vector(base.indices,reference.solution,numel(p.lb));
 points=value(state,'points',[]);
 if ~isempty(points)
-    [~,order]=sort([points.cost_upper_usd]);
-    sat=reference.objective_lower+ctx.config.economic_delta_usd_t*ctx.config.nh3_target_t;
-    accepted=find([points.has_incumbent] & [points.cost_upper_usd]<=sat);
-    [~,rank]=sort([points(accepted).K]); accepted=accepted(rank(1:min(2,numel(rank))));
-    selected=unique([accepted,order(1:min(4,numel(order)))],'stable');
-    for j=selected
+    % 种子必须覆盖**全部**已知可行解：只审计 5–6 个种子会让"只对这些解成立"的割漏网。
+    % 实测（dsh_test/probes/probe_check489.m）：割 #872（384h 块割）被一个合法 489 见证违反
+    % 1.527e-5 而裕度只有 1e-5，导致含该割的模型把合法解排除、据此算出的"下界"不成立。
+    usable=find([points.has_incumbent]);
+    for j=usable
         x=solution_vector(base.indices,points(j).solution,numel(p.lb));
         if ~isempty(x), seeds(:,end+1)=x; end %#ok<AGROW>
     end
@@ -2512,7 +2900,9 @@ model = scaled_model(p,units);
 n = numel(p.lb);
 model.vtype(p.intcon) = 'I';
 if ~isempty(p.x0)
-    if all(isfinite(p.x0)) && scaled_violation(model,p.x0(:)./units)<=solver_tolerance(ctx) && ...
+    % 与prepare_start一致：热启动按求解器可行性容差判定，而不是证书容差1e-9。
+    if all(isfinite(p.x0)) && ...
+            scaled_violation(model,p.x0(:)./units)<=ctx.model.options.ConstraintTolerance && ...
             matrix_violation(p,p.x0)<=ctx.model.options.ConstraintTolerance && ...
             max([0;abs(p.x0(p.intcon)-round(p.x0(p.intcon)))])<=1e-6
         model.start=p.x0(:)./units;
@@ -2540,11 +2930,16 @@ parameters = struct('TimeLimit',task.time_limit,'MIPGap',0,'MIPGapAbs',0, ...
     'DisplayInterval',60,'OutputFlag',1,'LogToConsole',double(~strcmp(ctx.config.display,'off')), ...
     'LogFile',[tempname,'_O1_',char(task.kind),'.log']);
 parameters.StartTimeLimit=min(value(ctx.config,'economic_start_time_s',3),task.time_limit/10);
-if task.kind == "fixed_cost"
-    if isfinite(task.sat), parameters.BestObjStop = task.sat-offset-money_margin(task.sat); end
-    if isfinite(task.fail), parameters.BestBdStop = task.fail-offset+money_margin(task.fail); end
+cost_scale = max(1,value(task,'scale',1));
+gap_usd = value(task,'gap_usd',NaN);
+if isfinite(gap_usd) && gap_usd > 0, parameters.MIPGapAbs = gap_usd/cost_scale; end
+if task.kind == "fixed_cost" || task.kind == "plateau_refit"
+    % 判定停止：找到 <=sat 的可行解即接受；对偶界越过 fail 即排除。
+    if isfinite(task.sat), parameters.BestObjStop = (task.sat-offset-money_margin(task.sat))/cost_scale; end
+    if isfinite(task.fail), parameters.BestBdStop = (task.fail-offset+money_margin(task.fail))/cost_scale; end
 elseif task.kind == "loose_count"
     parameters.MIPGapAbs = 0.49;
+    % 不再使用“5%进度”停止：计数下界必须是模型最优（整数）证书。
     parameters.BestBdStop = count_bound_target(task)-1+1e-6;
 elseif task.kind == "strict_count"
     parameters.MIPGapAbs = 0.49;
@@ -2553,7 +2948,7 @@ elseif task.kind == "local_count"
     parameters.MIPGapAbs = 0.49;
     parameters.BestObjStop = task.target-offset+1e-6;
 elseif task.kind == "local_cost"
-    if isfinite(task.sat), parameters.BestObjStop=task.sat-offset-money_margin(task.sat); end
+    if isfinite(task.sat), parameters.BestObjStop=(task.sat-offset-money_margin(task.sat))/cost_scale; end
 elseif task.kind == "reference_cost"
     parameters.MIPGapAbs = task.absolute_gap;
 end
@@ -2561,8 +2956,9 @@ if task.kind == "block_bound"
     parameters.OutputFlag=0; parameters.LogToConsole=0;
     parameters=rmfield(parameters,'LogFile');
 else
-    fprintf('[O1] Gurobi %s：策略=%g，时限=%.1f s，日志=%s\n', ...
-        task.kind,focus,task.time_limit,parameters.LogFile);
+    fprintf('[O1] Gurobi %s：策略=%g，时限=%.1f s，整数松弛=%s，目标缩放=%.1g，日志=%s\n', ...
+        task.kind,focus,task.time_limit,strjoin(string(value(task,'relax',{})),'+'), ...
+        cost_scale,parameters.LogFile);
 end
 raw = gurobi(model,parameters);
 result = struct('x',[],'bound',-Inf,'status',string(raw.status));
@@ -2576,6 +2972,7 @@ elseif isfield(raw,'objbound') && isfinite(raw.objbound)
 elseif strcmp(raw.status,'OPTIMAL') && isfield(raw,'objval') && isfinite(raw.objval)
     result.bound = raw.objval;
 end
+if isfinite(result.bound), result.bound = result.bound*cost_scale; end
 end
 
 function result = matlab_solve(p,task,offset,ctx)
@@ -2585,6 +2982,10 @@ if task.kind == "loose_count" || task.kind == "strict_count" || task.kind == "lo
     gap = 0.49;
 end
 if task.kind == "reference_cost", gap = task.absolute_gap; end
+cost_scale = max(1,value(task,'scale',1));
+if isfinite(value(task,'gap_usd',NaN)) && value(task,'gap_usd',NaN) > 0
+    gap = value(task,'gap_usd',NaN)/cost_scale;
+end
 p.solver = 'intlinprog';
 p.options = optimoptions(ctx.model.options,'Display',ctx.config.display, ...
     'MaxTime',task.time_limit,'RelativeGapTolerance',0, ...
@@ -2599,6 +3000,7 @@ if isfield(output,'bestbound') && isscalar(output.bestbound) && isfinite(output.
 end
 status = "TIME_LIMIT";
 if flag == -2, status = "INFEASIBLE"; elseif flag > 0, status = "OPTIMAL"; end
+if isfinite(bound), bound = bound*cost_scale; end
 result = struct('x',x,'bound',bound,'status',status);
 
     function stop = capture(~,values,~)
@@ -2606,22 +3008,24 @@ result = struct('x',x,'bound',bound,'status',status);
         if isfield(values,'dualbound') && isscalar(values.dualbound) && isfinite(values.dualbound)
             bound = max(bound,values.dualbound);
         end
-        if task.kind == "fixed_cost"
-            stop = bound+offset > task.fail+money_margin(task.fail);
+        if task.kind == "fixed_cost" || task.kind == "plateau_refit"
+            stop = bound*cost_scale+offset > task.fail+money_margin(task.fail);
             if isfield(values,'fval') && isscalar(values.fval) && isfinite(values.fval)
-                stop = stop || values.fval+offset <= task.sat-money_margin(task.sat);
+                stop = stop || values.fval*cost_scale+offset <= task.sat-money_margin(task.sat);
             end
         elseif task.kind == "loose_count"
-            stop = ceil(bound-1e-7) >= count_bound_target(task);
+            % 计数下界只在“整数最优”意义上发布：AbsoluteGapTolerance=0.49
+            % 已经保证证书精确，不能再设“5%进度”提前停止。
+            stop = false;
         elseif task.kind == "strict_count" && isfield(values,'fval') && ...
                 isscalar(values.fval) && isfinite(values.fval)
             stop = values.fval <= task.K_lower+1e-7;
         elseif task.kind == "local_count" && isfield(values,'fval') && ...
                 isscalar(values.fval) && isfinite(values.fval)
-            stop = values.fval+offset <= task.target+1e-7;
+            stop = values.fval*cost_scale+offset <= task.target+1e-7;
         elseif task.kind=="local_cost" && isfield(values,'fval') && ...
                 isscalar(values.fval) && isfinite(values.fval)
-            stop=values.fval+offset<=task.sat-money_margin(task.sat);
+            stop=values.fval*cost_scale+offset<=task.sat-money_margin(task.sat);
         end
     end
 end
@@ -2631,9 +3035,8 @@ if value(task,'concentrated',false)
     target = task.K;
     return
 end
-% 宽松帽只需取得本轮有效下界进展，避免以旧合格上界作为唯一停止门槛。
-step = max(1,ceil(0.05*(task.K-task.K_lower)));
-target = min(task.K,task.K_lower+step);
+% 计数下界必须来自整数最优证书；不再使用“本轮5%进展”这类非收敛门槛。
+target = task.K;
 end
 
 function [start,candidate] = prepare_start(p,start,base,seconds,cap,ctx)
@@ -2643,7 +3046,10 @@ integers = p.intcon(isfinite(start(p.intcon)));
 start(integers) = round(start(integers));
 if numel(integers) == numel(p.intcon)
     model=scaled_model(p,base.units);
-    if all(isfinite(start)) && scaled_violation(model,start./base.units)<=solver_tolerance(ctx) && ...
+    % 热启动只要求“在求解器容差内可行”；用1e-9的证书容差会把数值上完全可用的
+    % 近似候选判为不可行，导致决定性求解丢掉最好的起点。
+    if all(isfinite(start)) && ...
+            scaled_violation(model,start./base.units)<=ctx.model.options.ConstraintTolerance && ...
             matrix_violation(p,start)<=ctx.model.options.ConstraintTolerance && ...
             (~isfinite(cap) || base.cost_f.'*start+base.offset<=cap)
         candidate=start; return; % A polishing timeout must not discard a feasible witness.
