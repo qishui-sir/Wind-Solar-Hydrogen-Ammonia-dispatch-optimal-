@@ -40,11 +40,20 @@ fprintf('[main] AEL startup electricity=%d (%.2f load fraction/h), no extra char
     params.AEL.common.startup, params.AEL.common.startup_elec);
 
 o1_config = struct();
-% 中间文件统一放在project/dsh_test下管理；dsh_test已按性质分子目录：
-%   cache/ 运行状态与参考解缓存   reports/ 报告与进度   logs/ 主流程日志
-%   probes/ 探针与其实验日志      audit/ 独立证书审计   diag/ 结构与语法检查
-%   validation/ 30天端到端验证    archive/ 一次性产物
-o1_config.cache_directory = fullfile(project_dir, 'dsh_test', 'cache');
+% 运行态缓存统一放在src/cache：main读取的全部.mat都在这里。
+%   O1_economic_threshold_partition21_cache.mat  分块证书状态（Keco区间证据）
+%   O1_economic_threshold_cache.mat              旧版经济阈值状态（回退读取）
+%   O1_stage1_cache.mat                          Stage 1 参考解
+%   O1_partition21_v1/                           分块证书检查点树
+%   legacy/                                      搬迁前的旧.mat快照，不参与读取
+% 其余中间产物仍在project/dsh_test下：reports/ 报告与进度  logs/ 主流程日志
+%   probes/ 探针与其实验日志  audit/ 独立证书审计  diag/ 结构与语法检查
+%   validation/ 30天端到端验证  archive/ 一次性产物
+cache_directory = fullfile(source_dir, 'cache');
+if ~isfolder(cache_directory)
+    mkdir(cache_directory);
+end
+o1_config.cache_directory = cache_directory;
 o1_config.progress_file = fullfile(project_dir, 'dsh_test', 'reports', 'O1进度.md');
 o1_config.nh3_target_t = 80000;
 % delta是相对真实参考最优成本的经济损失限额，不是固定K求解误差。

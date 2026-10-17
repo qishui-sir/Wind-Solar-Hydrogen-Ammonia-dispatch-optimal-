@@ -1293,8 +1293,55 @@ if isfield(loaded,'schema_version') && loaded.schema_version == 1 && ...
     schedule = state.loose_schedule;
     state = loaded.state;
     if ~isfield(state,'loose_schedule'), state.loose_schedule = schedule; end
+    state = rebase_cache_paths(state, ctx.config.cache_directory);
     fprintf('[O1] 已读取经济阈值缓存；旧状态按当前门槛重新认证。\n');
 end
+end
+
+function state = rebase_cache_paths(state, cache_directory)
+%REBASE_CACHE_PATHS 把缓存中记录的绝对路径重映射到当前 cache_directory。
+% 缓存目录可整体搬迁（例如 dsh_test/cache -> src/cache）：历史状态里的
+% work_dir / root_model / records.model_file 仍是搬迁前的绝对路径。若不重映射，
+% partition21_context_matches 读不到 context.mat 会判定上下文失效，并把分块
+% 计数下界清零（实测会让408的下界退回到0）。这里只改路径前缀，不动任何证据
+% 数值，因此可重复执行（幂等）。
+if ~ischar(cache_directory) || isempty(cache_directory), return; end
+if ~isfield(state,'partition21') || isempty(fieldnames(state.partition21)), return; end
+state.partition21 = rebase_cache_node(state.partition21, ...
+    'O1_partition21_v1', cache_directory);
+end
+
+function v = rebase_cache_node(v, marker, cache_directory)
+%REBASE_CACHE_NODE 递归重写struct/cell中指向缓存目录的路径字符串。
+if isstruct(v)
+    names = fieldnames(v);
+    for i = 1:numel(v)
+        for k = 1:numel(names)
+            v(i).(names{k}) = rebase_cache_node(v(i).(names{k}), marker, cache_directory);
+        end
+    end
+elseif iscell(v)
+    for i = 1:numel(v)
+        v{i} = rebase_cache_node(v{i}, marker, cache_directory);
+    end
+elseif ischar(v)
+    v = rebase_cache_path(v, marker, cache_directory);
+elseif isstring(v)
+    for i = 1:numel(v)
+        v(i) = string(rebase_cache_path(char(v(i)), marker, cache_directory));
+    end
+end
+end
+
+function s = rebase_cache_path(s, marker, cache_directory)
+%REBASE_CACHE_PATH 把包含marker的相对尾部重新挂到cache_directory下。
+if isempty(s), return; end
+idx = strfind(s, marker);
+if isempty(idx), return; end          % 与缓存目录无关的字符串原样保留
+tail = s(idx(1):end);
+tail = strrep(tail, '/', filesep);
+tail = strrep(tail, '\', filesep);
+s = fullfile(cache_directory, tail);
 end
 
 function state = prepare_search_state(state,cfg)

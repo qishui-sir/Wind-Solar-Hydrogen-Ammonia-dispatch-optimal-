@@ -4,10 +4,13 @@ docs/
 *.asv
 
 # cache
+# 运行态 .mat 全部集中在 src/cache（main 直接读取）；src/cache/legacy/ 是搬迁前的旧快照。
 *.mat
-src/O1_fixed_k_cache.mat
-src/O1_stage1_cache.mat
+src/cache/
 
 #harness
 dsh_test/
+
+# scratch (临时脚本/日志/搬迁备份)
+.tmp_matlab/
 
