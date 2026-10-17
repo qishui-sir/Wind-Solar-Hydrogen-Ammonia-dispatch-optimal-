@@ -3,7 +3,12 @@ if ~exist('study_year', 'var') || isempty(study_year)
 end
 validateattributes(study_year, {'numeric'}, ...
     {'scalar', 'integer', 'finite', 'positive'}, mfilename, 'study_year');
-clearvars -except study_year;
+% 默认计算/恢复完整分区证书后返回；设为true可继续原来的上界和决定性搜索。
+if ~exist('continue_economic_search', 'var') || isempty(continue_economic_search)
+    continue_economic_search = false;
+end
+validateattributes(continue_economic_search, {'logical','numeric'}, {'scalar','binary'});
+clearvars -except study_year continue_economic_search;
 clc;
 
 source_dir = fileparts(mfilename('fullpath'));
@@ -52,9 +57,9 @@ o1_config.economic_adjacent_attempts = 2;
 o1_config.economic_decide_relaxations = true;
 o1_config.economic_decide_scale = true;   % 目标压缩到允许成本量级，避免数值噪声
 o1_config.economic_decide_gap_usd = 4;    % 决定性求解决策间隔(USD)
-o1_config.economic_band_fraction = 0.02;  % 参考带目标：允许成本的2%
-o1_config.economic_reference_max_refinements = 3;
-o1_config.economic_reference_time_s = 1200;
+o1_config.economic_band_fraction = 0.001; % 参考带目标：允许成本的0.1%（=40 USD），配合 gap/4 逐轮收紧，用于测试 C* 括号能夹多紧
+o1_config.economic_reference_max_refinements = 6;
+o1_config.economic_reference_time_s = 2400;
 o1_config.economic_reference_tolerance_usd_t = 0.001;
 % 决定性求解首轮/加时上限；跨轮次运行会继续加时而不是重投同样的时限。
 o1_config.economic_fixed_time_s = 900;
@@ -62,7 +67,7 @@ o1_config.economic_retry_time_s = 7200;
 o1_config.economic_certification_time_s = 7200;
 o1_config.economic_cap_time_s = 1200;
 % 计数目标（min count）的模型使用全部有效割：实测下界 256条→361、2048条→403、2192条→404.92。
-o1_config.economic_count_cut_limit = 2048;
+o1_config.economic_count_cut_limit = 0;      % 派生割池经查不可靠：放松整数的模型在含割时给出 >已知可行值的界（不合法），故关闭
 % 决定性求解每轮总预算限流（单次上限仍是 economic_secondary_time_cap_s）：
 % 实测真正的下降全部来自降序搜索，决定性求解常以 TIME_LIMIT 收场，因此只留 1800 s。
 o1_config.economic_decisive_budget_s = 1800;
@@ -96,14 +101,20 @@ o1_config.economic_stalled_cap_time_s = 120;
 o1_config.economic_points_per_round = 1;
 o1_config.economic_final_interval = 20;
 o1_config.economic_cut_margin = 1e-5;
-o1_config.economic_annual_cut_limit = 256;
+o1_config.economic_annual_cut_limit = 0;
 % 购售电净额抵消经矩阵条件检查；证明阶段保留AEL台数和启停整数。
 o1_config.economic_grid_simplify = true;
 o1_config.economic_proof_mode = 'full';
-% DW分解/分支定价不再是主路径：其下界受LP支配，且会挤掉决定性求解预算。
-o1_config.economic_structural_search = false;
+% 完整有限盒分块证书独立推进下界；旧DW/分支定价和派生割保持关闭。
+o1_config.economic_structural_search = true;
 o1_config.economic_branch_enable = false;
-o1_config.economic_block_lengths_h = [96,192,384,768];
+o1_config.economic_lower_policy_version = 4;
+o1_config.economic_block_lengths_h = [96,192];
+o1_config.economic_block_lp_time_s = 180;
+o1_config.economic_block_time_s = 3;
+o1_config.economic_block_max_time_s = 6;
+o1_config.economic_block_budget_s = 900;
+o1_config.economic_block_round_time_s = 900;
 o1_config.economic_max_attempts = 24;
 o1_config.economic_max_solves_per_run = 4096;
 % 单轮运行预算；跨轮次续算同时加时，进度全部持久化。
@@ -120,19 +131,32 @@ o1_config.change_epsilon = 0.01;
 o1_config.enable_window_cuts = false;
 o1_config.use_cache = true;
 o1_config.display = 'iter';
+if ~continue_economic_search
+    % 完整一轮包含根LP及全部局部块；结果来自实际证书和当前矩阵核验的调度。
+    o1_config.economic_max_attempts = 1;
+    o1_config.economic_run_budget_s = 1200;
+end
 fprintf('[main] 求Kref与Keco；Kfea搜索暂缓；delta=%.3g USD/t；参考带目标=%.1f USD。\n', ...
     o1_config.economic_delta_usd_t, ...
     o1_config.economic_band_fraction*o1_config.economic_delta_usd_t*o1_config.nh3_target_t);
-fprintf(['[main] 经济后端=%s；单轮预算%g s，决定性首轮%g s/加时上限%g s，' ...
-    '上界启发式预算%g s（平台重拟合优先）。\n'], ...
-    o1_config.economics_solver,o1_config.economic_run_budget_s, ...
-    o1_config.economic_fixed_time_s,o1_config.economic_retry_time_s, ...
-    o1_config.economic_primal_budget_s);
+fprintf('[main] 经济后端=%s；本次预算%g s。\n', ...
+    o1_config.economics_solver,o1_config.economic_run_budget_s);
+if continue_economic_search
+    fprintf('[main] 决定性首轮%g s/加时上限%g s；上界启发式预算%g s。\n', ...
+        o1_config.economic_fixed_time_s,o1_config.economic_retry_time_s, ...
+        o1_config.economic_primal_budget_s);
+else
+    fprintf('[main] 完成全年分区计数证书后返回，已有上界调度按当前原模型核验。\n');
+end
+fprintf('[main] 运行模式：继续区间搜索=%d；分区=%s h，局部时限=%g/%g s。\n', ...
+    continue_economic_search,mat2str(o1_config.economic_block_lengths_h), ...
+    o1_config.economic_block_time_s,o1_config.economic_block_max_time_s);
 O1_results = baseline(params, renewable_data, ...
     @(model) O1(model, o1_config));
 Kref = O1_results.Kref;
 Keco = O1_results.Keco; % 未严格证明时为NaN；区间保存在O1_results.economic。
 economic = O1_results.economic;
+Keco_interval = [economic.K_lower, economic.K_upper];
 allowance_usd = o1_config.economic_delta_usd_t * o1_config.nh3_target_t;
 band_usd = economic.cost_cap_usd - economic.strict_cost_cap_usd;
 if isfield(O1_results,'threshold_state')
@@ -145,12 +169,14 @@ if isfield(O1_results,'threshold_state')
         '参考带=%.3f USD（占A的%.3f%%）；不可判定窗口宽度=%.3f USD。\n'], ...
         economic.strict_cost_cap_usd,economic.cost_cap_usd,allowance_usd, ...
         band_usd,100*band_usd/max(eps,allowance_usd),band_usd);
-    fprintf('[main] 决定性求解：上一步K=%g，状态=%s，未判定原因=%s。\n', ...
-        convergence_report.decisive_K,char(convergence_report.decisive_status), ...
-        char(convergence_report.unresolved_reason));
-    if ~economic.is_proven
-        fprintf(['[main] 合并区间仍需一次决定性判定：K=%g 处要么给出 cost<=sat 的已验证见证' ...
-            '（Keco<=该值），要么给出 min cost>fail 的有效下界（Keco>=K+1）。\n'], ...
+    if isfinite(convergence_report.decisive_K)
+        fprintf('[main] 决定性求解：上一步K=%g，状态=%s，未判定原因=%s。\n', ...
+            convergence_report.decisive_K,char(convergence_report.decisive_status), ...
+            char(convergence_report.unresolved_reason));
+    end
+    if continue_economic_search && ~economic.is_proven
+        fprintf(['[main] 下一步可在K=%g尝试改善区间：cost<=sat 的已验证见证可降低上界，' ...
+            'min cost>fail 的有效下界可排除此次数及以下。\n'], ...
             economic.K_upper-1);
     end
 end
@@ -170,8 +196,8 @@ if isfield(O1_results,'threshold_state')
         O1_results.threshold_state.structural_report.strict_slack_usd);
 end
 if isnan(Keco)
-    fprintf(['[main] Keco尚未严格认证：Keco∈[%g,%g]，剩余不可判定窗口%.3f USD；' ...
-        '证据与加时进度已缓存，下次运行main按指数加时续算。\n'], ...
+    fprintf(['[main] Keco尚未确定唯一值：Keco∈[%g,%g]，参考成本带宽%.3f USD；' ...
+        '证据已缓存；继续搜索请先设置 continue_economic_search=true。\n'], ...
         economic.K_lower,economic.K_upper,band_usd);
 else
     fprintf('[main] 已严格认证：Kref=%g，Keco=%g，经济损失上限=%.3g USD/t。\n', ...

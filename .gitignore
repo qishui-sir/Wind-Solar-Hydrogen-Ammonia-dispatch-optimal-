@@ -4,8 +4,10 @@ docs/
 *.asv
 
 # cache
+*.mat
 src/O1_fixed_k_cache.mat
 src/O1_stage1_cache.mat
 
 #harness
 dsh_test/
+

@@ -63,7 +63,8 @@ function results = baseline(params, renewable_data, algorithm)
         storage_H2_min,'UpperBound',storage_H2_max);
     P_purchase = optimvar('p_purchase', T, 'LowerBound', 0, 'UpperBound', transformer_kw);
     P_sell = optimvar('p_sell', T, 'LowerBound', 0, 'UpperBound', transformer_kw);
-    P_curt = optimvar('p_curt', T, 'LowerBound', 0);
+    % The existing curtail row already implies this finite physical box.
+    P_curt = optimvar('p_curt', T, 'LowerBound', 0, 'UpperBound', P_total(:));
     u_purchase = optimvar('u_purchase', T, 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1);
     grid_contract_is_fixed = ~isempty(params.grid.contract_kw);
     if ~grid_contract_is_fixed

@@ -6,18 +6,25 @@ function outputs = O1Economics(ctx, feasibility, reference)
 %   Keco = min{K : 存在可行调度 count <= K 且 cost <= C* + A}
 % 区间 [K_lower, K_upper] 只允许被两类证书推进：
 %   (U) 已验证见证 count<=K 且 cost<=sat        => K_upper <= K
-%   (L) min cost(count<=K) 的有效全局下界 > fail => K_lower >= K+1
-% 因此唯一能合并区间的是“决定性定K最小成本MILP”。本函数按以下优先级使用预算：
+%   (L) 有效全局成本下界 > fail，或 fail 帽下完整计数下界，均可提高 K_lower。
+% 决定性定K成本证书与完整全局计数证书都能合并区间。本函数按以下优先级使用预算：
 %   1) 相邻整数点 K_upper-1 的决定性求解（排除即证明，接受即改善上界）
 %   2) 参考带收紧（把 (sat,fail] 不可判定窗口压到预算允许的最小值）
 %   3) 宽松帽全局最小计数（全局计数下界）/ 严格帽最小计数（上界见证）
 %   4) 局部与事件启发式（只允许改善上界，且有独立预算上限）
 cfg = ctx.config;
+partition_enabled = value(cfg,'economic_structural_search',false);
 started = tic;
 base = ctx.cost_solver;
 p = base.problem;
 base.cost_f = p.f(:);
 base.offset = evaluate(ctx.system_cost_usd, reference.solution) - p.f(:).' * p.x0(:);
+if partition_enabled
+    % Evaluate the affine constant directly so a new primal does not change its signature by cancellation.
+    zero_solution=vector_solution(zeros(numel(p.lb),1),base.indices);
+    base.offset=evaluate(ctx.system_cost_usd,zero_solution);
+    assert(isfinite(base.offset),'O1:partition21_offset','Economic affine constant must be finite.');
+end
 base.count_f = zeros(numel(p.lb), 1);
 base.count_f(base.indices.O1_HB_change(:)) = 1;
 base.units = variable_units(base, cfg.economic_scale_solver);
@@ -29,10 +36,49 @@ base.cut_relative_margin = 1e-9;
 fprintf('[O1] 购售电整数等价简化=%d；下界模型=%s；决定性搜索版本=%g。\n', ...
     base.grid_exact,string(value(cfg,'economic_proof_mode','full')), ...
     value(cfg,'economic_search_version',2));
-cache_file = fullfile(cfg.cache_directory, 'O1_economic_threshold_cache.mat');
+legacy_cache_file = fullfile(cfg.cache_directory, 'O1_economic_threshold_cache.mat');
+cache_file = legacy_cache_file;
+if partition_enabled
+    cache_file = fullfile(cfg.cache_directory, 'O1_economic_threshold_partition21_cache.mat');
+end
 state = load_state(cache_file, ctx);
+if partition_enabled && value(state,'partition21_policy_version',0)~=1
+    if cfg.use_cache && isfile(legacy_cache_file), state=load_state(legacy_cache_file,ctx); end
+    state=partition21_upper_only(state,base,ctx);
+end
+upper_primal_schedule=value(state,'primal_schedule',struct());
+upper_event_schedule=value(state,'event_schedule',struct());
 state = prepare_search_state(state, cfg);
+if partition_enabled
+    % A better validated cached primal can tighten fail before context reuse is decided.
+    reference = merge_reference(reference, state.reference, ctx, base);
+    if all(isfield(upper_primal_schedule,{'version','step','stalls','polished_K', ...
+            'polished_cost','exchange_cursor'})) && upper_primal_schedule.version==3
+        state.primal_schedule=upper_primal_schedule;
+        state.event_schedule=upper_event_schedule;
+    end
+    state.partition21_policy_version=1;
+    state.partition21_valid_certificate_id="";
+    state.block_cuts=empty_cuts(); state.decomposition=struct(); state.branch=struct();
+    % Old physical/count cache bounds have no provenance for this proof path.
+    feasibility.K_lower=0;
+    [~,~,~,partition_meta]=partition21_model(base,ctx, ...
+        reference.objective_upper+cfg.economic_delta_usd_t*cfg.nh3_target_t);
+    state.partition21_model_signature=partition_meta.model_signature;
+    if ~partition21_context_matches(value(state,'partition21',struct()),base,ctx, ...
+            reference.objective_upper+cfg.economic_delta_usd_t*cfg.nh3_target_t)
+        state.partition21=struct();
+        for cap_index=1:numel(state.caps)
+            state.caps(cap_index).count_lower=0;
+            state.caps(cap_index).is_infeasible=false;
+        end
+    else
+        state=partition21_store_bound(state,state.partition21,base,ctx,0);
+    end
+end
 state.new_solves = 0;
+state.partition21_ran_this_run=false;
+state.partition21_spent_this_run_s=0;
 state.primal_spent_s = 0;
 state.pattern_seed_K = NaN;   % 每轮运行对当前 K_upper 重新尝试一次松弛模式生成
 state.decisive_spent_s = 0;   % 决定性求解的本轮预算计数（避免挤光降序预算）
@@ -50,7 +96,9 @@ if ~isempty(base.cut_disabled) && (value(previous_audit,'policy',0)~=base.cut_po
     % A conflicting numerical cut cannot support an inherited rejection.
     state = invalidate_cut_dependent_bounds(state);
 end
-reference = merge_reference(reference, state.reference, ctx, base);
+if ~partition_enabled
+    reference = merge_reference(reference, state.reference, ctx, base);
+end
 state = import_cost_cache(state, ctx, base);
 state = register_reference_point(state, reference, ctx, base);
 [state, economic] = certify(state, reference, feasibility, ctx);
@@ -80,12 +128,59 @@ for round_index = 1:cfg.economic_max_attempts
         refine_reference();
         continue
     end
+    if partition_enabled && ~state.partition21_ran_this_run && can_run()
+        partition21_pass(round_index);
+        if economic.is_proven || ~can_run(), break; end
+        certificate=value(value(state,'partition21',struct()),'certified',struct());
+        if cfg.economic_max_attempts==1 && string(value(certificate,'status',''))=="complete" && ...
+                isfinite(economic.K_upper)
+            % One-pass main returns a certified interval; a complete scan need not prove its endpoints equal.
+            state.stop_reason="incomplete_economic_partition_ready";
+            break
+        end
+    end
     if ~isfinite(economic.K_upper)
         % 尚无满足严格经济帽的见证：先求严格帽下的最小计数见证。
         strict_cap_solve(round_index);
         if economic.is_proven || ~can_run(), break; end
         slice = min(value(cfg,'economic_primal_slice_s',300), remaining()/4);
         if slice > 1, primal_pass(round_index, slice); end
+        continue
+    end
+    % 带宽变化后**优先**用新 fail 重算下界：下界完全依赖 fail 帽，带宽一变就必须重解，
+    % 否则整轮都可能被上界启发式占满而轮不到（实测正是这样丢掉了收紧后的第一次重算）。
+    fail_now = economic.cost_cap_usd;
+    cut_now = value(cfg,'economic_count_cut_limit',0);
+    loose_cap_last = value(state,'loose_cap_usd',NaN);
+    % 新鲜度键必须同时包含 fail 与**割配置**：只比 fail 会让"关闭割池后"的旧界一直沿用
+    % （实测：切到无割模型后，缓存里 403 仍未重算）。
+    if ~partition_enabled && ~economic.is_proven && can_run() && remaining() > 120 && ...
+            (~isfinite(loose_cap_last) || abs(fail_now-loose_cap_last) > 1 || ...
+             abs(cut_now-value(state,'loose_cut_limit',-1)) > 0.5 || ...
+             value(state,'loose_policy_version',0) < 2)
+        loose_cap_solve(round_index);
+        % 关键：新鲜度键必须在求解**之后**打戳。loose_count 的可行解往往会改善
+        % reference.objective_upper ⇒ fail 随之变化；若用求解前的旧 fail 当键，下一轮立刻再次触发，
+        % 形成"下界重算 livelock"（实测：一整轮 4 h 被 5 次重算吃光，降序与接受后抛光一步没跑）。
+        state.loose_cap_usd = economic.cost_cap_usd;
+        state.loose_cut_limit = cut_now;
+        state.loose_policy_version = 2;   % 下界推导策略版本：策略一变就必须重算
+        state.loose_done_this_run = true;
+        if economic.is_proven || ~can_run(), break; end
+        continue
+    end
+    % 主动收紧参考带（放在最前）：Keco 区间宽度直接受带宽（fail−sat = obj_upper−obj_lower）支配。
+    % 注意：primal_pass 一次可能吃掉整轮预算，所以这一步必须在所有上界启发式之前执行。
+    band_now = economic.cost_cap_usd-economic.strict_cost_cap_usd;
+    if ~economic.is_proven && isfinite(band_now) && band_now > band_target_usd() && ...
+            state.reference_refinements_this_run < cfg.economic_reference_max_refinements && ...
+            can_run() && remaining() > 120
+        band_before_probe = band_now;
+        refine_reference();
+        fprintf('[O1] 参考带主动收紧：%.3f -> %.3f USD（第%d次，目标%.1f）。\n', ...
+            band_before_probe,economic.cost_cap_usd-economic.strict_cost_cap_usd, ...
+            state.reference_refinements_this_run,band_target_usd());
+        if economic.is_proven || ~can_run(), break; end
         continue
     end
     if state.primal_spent_s == 0 && value(cfg,'economic_primal_first_s',0) > 1 && ...
@@ -109,7 +204,7 @@ for round_index = 1:cfg.economic_max_attempts
     elseif slot == 0
         % 计数下界只在"当前下界偏弱"时重建一次（例如割池被数值审计隔离后下界回落）；
         % 若缓存的 loose 帽已经把下界立在 400 以上，就不必每轮再花 1800 s 重算同一个值。
-        if ~value(state,'loose_done_this_run',false) && economic.K_lower < 400
+        if ~partition_enabled && ~value(state,'loose_done_this_run',false) && economic.K_lower < 400
             loose_cap_solve(round_index);
             state.loose_done_this_run = true;
         else
@@ -130,6 +225,8 @@ for round_index = 1:cfg.economic_max_attempts
 end
 if economic.is_proven
     state.stop_reason = "complete_economic_threshold";
+elseif state.stop_reason == "incomplete_economic_partition_ready"
+    % Preserve the explicit one-pass completion reason instead of scheduling a decisive solve.
 elseif toc(started) >= cfg.economic_run_budget_s
     state.stop_reason = "incomplete_economic_time_budget";
 elseif state.new_solves >= cfg.economic_max_solves_per_run
@@ -263,10 +360,11 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
 
     function target = band_target_usd()
         % 参考带目标：既要远小于允许成本，又不能低于求解器在该成本量级上
-        % 能分辨的绝对精度（1e-5×成本量级），否则收紧请求永远无法达成。
+        % 能分辨的绝对精度。实测下限用 1e-5×成本(=317 USD) 会把 40 USD 的目标顶掉，
+        % 使"主动收紧"永远不触发；改为 1e-6×成本(≈32 USD)，让 gap/4 逐轮真正起作用。
         allowance = cfg.economic_delta_usd_t*cfg.nh3_target_t;
         target = max(value(cfg,'economic_band_fraction',0.02)*allowance, ...
-            1e-5*max(1,abs(reference.objective_upper)));
+            1e-6*max(1,abs(reference.objective_upper)));
     end
 
     function pat = relaxed_pattern_seed(slice,round_number)
@@ -363,13 +461,186 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
         print_threshold_state();
     end
 
+    function partition21_pass(round_number)
+        state.partition21_ran_this_run=true;
+        if ~strcmp(cfg.economics_solver,'gurobi')
+            fprintf('[O1] 分块证书需要Gurobi完整LP价格；保留已有证据与上界流程。\n');
+            return
+        end
+        seconds=min([cfg.economic_block_round_time_s,cfg.economic_block_budget_s,remaining()]);
+        if seconds<=6, return; end
+        pass_started=tic;
+        cleanup_partition=onCleanup(@()partition21_elapsed(pass_started)); %#ok<NASGU>
+        cap=economic.cost_cap_usd;
+        [model,hour,z,meta]=partition21_model(base,ctx,cap);
+        d=value(state,'partition21',struct());
+        if ~partition21_context_matches(d,base,ctx,cap)
+            context_signature=partition21_hash(meta.model_signature,model.rhs);
+            work_name=context_signature;
+            if ~cfg.use_cache, work_name=[ctx.run_id,'_',context_signature]; end
+            work_dir=fullfile(cfg.cache_directory,'O1_partition21_v1',work_name);
+            if ~isfolder(fullfile(work_dir,'checkpoints')), mkdir(fullfile(work_dir,'checkpoints')); end
+            d=struct('version',1,'model_signature',meta.model_signature, ...
+                'context_signature',context_signature,'cap_usd',cap,'work_dir',work_dir, ...
+                'root_attempts',0,'root_limit_s',0,'pi',[],'certified',struct(), ...
+                'status',"root_pending",'last_error',"");
+            partition21_save(fullfile(work_dir,'context.mat'), ...
+                struct('model',model,'hour',hour,'z',z,'meta',meta));
+            for cap_index=1:numel(state.caps)
+                state.caps(cap_index).count_lower=0;
+                state.caps(cap_index).is_infeasible=false;
+            end
+        else
+            frozen=load(fullfile(d.work_dir,'context.mat'),'model','hour','z','meta');
+            model=frozen.model; hour=frozen.hour; z=frozen.z; meta=frozen.meta;
+        end
+        state.partition21=d;
+        state.partition21_model_signature=meta.model_signature;
+        save_state();
+        [seed,~,seed_cost,seed_count]=validate_solution(reference.solution,base,ctx,ctx.T);
+        if isempty(seed) || seed_cost>d.cap_usd || ...
+                abs(base.cost_f.'*seed+base.offset-seed_cost)>money_margin(seed_cost)
+            d.status="retryable_no_valid_root_primal";
+            state.partition21=d; save_state(); return
+        end
+        y=seed./base.units;
+        if scaled_violation(model,y)>ctx.model.options.ConstraintTolerance
+            d.status="retryable_root_primal_residual";
+            state.partition21=d; save_state(); return
+        end
+        if isempty(d.pi)
+            raw=struct(); root_calls=0;
+            % Recover a root return saved immediately before an interrupted state commit.
+            if d.root_attempts>0
+                prefix=fullfile(d.work_dir,'checkpoints',sprintf('root_a%03d',d.root_attempts));
+                if isfile([prefix,'_model.mat']) && isfile([prefix,'_raw.mat'])
+                    try
+                        old_model=load([prefix,'_model.mat'],'model');
+                        old_raw=load([prefix,'_raw.mat'],'raw');
+                        if partition21_same_model(old_model.model,model), raw=old_raw.raw; end
+                    catch
+                        raw=struct();
+                    end
+                end
+            end
+            if ~partition21_has_price(raw,numel(model.rhs))
+                limit=min([max(cfg.economic_block_lp_time_s,2*d.root_limit_s), ...
+                    cfg.economic_retry_time_s,seconds-toc(pass_started)-5]);
+                if limit<=0 || (d.root_limit_s>0 && limit<=d.root_limit_s)
+                    d.status="retryable_root_needs_larger_budget";
+                    state.partition21=d; save_state(); return
+                end
+                attempt=d.root_attempts+1;
+                prefix=fullfile(d.work_dir,'checkpoints',sprintf('root_a%03d',attempt));
+                while isfile([prefix,'_model.mat']) || isfile([prefix,'_raw.mat'])
+                    attempt=attempt+1;
+                    prefix=fullfile(d.work_dir,'checkpoints',sprintf('root_a%03d',attempt));
+                end
+                model.pstart=y;
+                params=struct('Method',0,'LPWarmStart',2,'Threads',cfg.gurobi_threads, ...
+                    'TimeLimit',limit,'OutputFlag',1,'FeasibilityTol',1e-9,'OptimalityTol',1e-9);
+                partition21_save([prefix,'_model.mat'],struct('model',model,'params',params, ...
+                    'context_signature',d.context_signature,'seed_cost',seed_cost,'seed_count',seed_count));
+                d.root_attempts=attempt; d.root_limit_s=limit; d.root_model=[prefix,'_model.mat'];
+                d.root_raw=[prefix,'_raw.mat']; d.status="root_running";
+                state.partition21=d; begin_task("partition21_root",ctx.T,limit);
+                root_started=tic; raw=struct('status','MATLAB_ERROR'); root_error='';
+                try, raw=gurobi(model,params); catch root_exception, root_error=root_exception.message; end
+                elapsed=toc(root_started);
+                partition21_save([prefix,'_raw.mat'], ...
+                    struct('raw',raw,'elapsed',elapsed,'error',root_error));
+                root_calls=1; d.root_status=string(value(raw,'status',"missing_status"));
+            end
+            if partition21_has_price(raw,numel(model.rhs))
+                % Legalize actual full prices without any row/column unscaling.
+                d.pi=double(raw.pi(:)); sense=model.sense(:);
+                d.projected_rows=nnz(sense=='<' & d.pi>0)+nnz(sense=='>' & d.pi<0);
+                d.pi(sense=='<')=min(0,d.pi(sense=='<'));
+                d.pi(sense=='>')=max(0,d.pi(sense=='>'));
+                d.status="price_ready"; d.last_error="";
+            else
+                d.status="retryable_no_full_pi";
+                d.last_error="LP returned no finite full row price; no partition bound adopted";
+            end
+            state.partition21=d; finish_task(root_calls);
+            if isempty(d.pi), return; end
+        end
+        if isfield(d,'certified') && partition21_proof_valid(d.certified,model,d.pi, ...
+                cfg.economic_block_lengths_h) && strcmp(d.certified.status,'complete') && ...
+                d.certified.best<=seed_count+1e-5
+            state=partition21_store_bound(state,d,base,ctx,round_number);
+            finish_task(0); return
+        end
+        options=struct('levels',cfg.economic_block_lengths_h, ...
+            'times',min(cfg.economic_block_max_time_s, ...
+                cfg.economic_block_time_s*cfg.economic_block_lengths_h/min(cfg.economic_block_lengths_h)), ...
+            'threads',cfg.gurobi_threads,'budget_s',max(0,seconds-toc(pass_started)), 'start',y);
+        progress_file=fullfile(d.work_dir,'checkpoints','partition_progress.mat');
+        if isfile(progress_file)
+            try
+                progress=load(progress_file,'proof');
+                if partition21_proof_valid(progress.proof,model,d.pi,options.levels)
+                    options.resume=progress.proof;
+                end
+            catch
+                % The tested kernel can reconstruct missing progress from matching actual raw files.
+            end
+        end
+        % Reserve all possible new calls before entering the unchanged tested kernel.
+        maximum_calls=sum(ceil(ctx.T./options.levels));
+        if cfg.economic_max_solves_per_run-state.new_solves<maximum_calls
+            options.budget_s=0; % Still initializes a complete finite LP-floor certificate.
+        end
+        d.status="partition_running"; state.partition21=d; save_state();
+        try
+            proof=certified_partition_kernel(model,hour,z,d.pi,options,d.work_dir);
+        catch partition_exception
+            d.status="retryable_partition_error"; d.last_error=string(partition_exception.message);
+            % Conservatively reserve calls if an I/O/assertion failure hid the current call count.
+            state.new_solves=min(cfg.economic_max_solves_per_run,state.new_solves+maximum_calls);
+            state.partition21=d; save_state();
+            warning('O1:partition21_retry','Partition checkpoint retained: %s',partition_exception.message);
+            return
+        end
+        if ~partition21_proof_valid(proof,model,d.pi,options.levels) || proof.best>seed_count+1e-5
+            d.status="rejected_partition_certificate";
+            d.last_error="Complete coverage or annual witness consistency check failed";
+            if isfield(d.certified,'best') && d.certified.best>seed_count+1e-5
+                d.certified=struct(); state.partition21_valid_certificate_id="";
+            end
+        else
+            if ~isfield(d.certified,'best') || proof.best>=d.certified.best
+                d.certified=proof;
+            end
+            d.status=string(proof.status); d.last_error="";
+            partition21_save(fullfile(d.work_dir,'certificate.mat'), ...
+                struct('proof',d.certified,'context_signature',d.context_signature));
+        end
+        state.partition21=d;
+        state=partition21_store_bound(state,d,base,ctx,round_number);
+        finish_task(proof.calls);
+        fprintf('[O1] 分块全局计数证书：原始下界=%.9g，Keco=[%g,%g]，状态=%s。\n', ...
+            value(d.certified,'best',-Inf),economic.K_lower,economic.K_upper,d.status);
+    end
+
+    function partition21_elapsed(timer)
+        elapsed=toc(timer);
+        state.partition21_spent_this_run_s=state.partition21_spent_this_run_s+elapsed;
+        state.block_elapsed_s=state.block_elapsed_s+elapsed;
+        save_state();
+    end
+
     function loose_cap_solve(round_number)
         % 宽松帽最小计数：给出 Keco 的全局计数下界（对任意 cost<=fail 的调度）。
         cap = economic.cost_cap_usd;
         if ~isfinite(cap), return; end
         prior = find_cap(state,"loose_count",cap);
         task = make_task("loose_count",economic.K_upper,cap,round_number);
-        task.K_lower = economic.K_lower;
+        % 关键：loose_count 的模型里会加一行 Σz ≥ task.K_lower。若传入"当前缓存的下界"，
+        % 就形成自证循环——旧界（哪怕来自已被判不可靠的割池）会被新一代求解原样确认，
+        % 无论模型如何变化。实测：关掉割池后下界仍被钉在 403，而干净模型给 358。
+        % 因此这里必须从 0 重新推导。
+        task.K_lower = 0;
         if ~isfinite(task.K), task.K = ctx.T; end
         task.start = best_start(state,reference,task.K,base);
         task.attempt = prior.attempts+1;
@@ -427,7 +698,7 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
         plateau_refit(round_number,max(1,0.9*slice));
         remaining_slice = slice-toc(t0);
         if remaining_slice > 1 && can_run() && ~economic.is_proven
-            primal_search(round_number,max(0,remaining()-remaining_slice));
+            primal_search(round_number,max(0,min(remaining_slice,remaining())));
         end
         state.primal_spent_s = value(state,'primal_spent_s',0)+toc(t0);
         save_state();
@@ -459,6 +730,44 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
             ranked = event_candidates(x_start,base,ctx.T,[]);
             if isempty(ranked), ranked = events; end
             order = ranked(1:min(numel(ranked),scan_limit));
+            % 接受后"抛光"：每步 MILP 都带 BestObjStop=sat（一找到 ≤sat 就停），所以被接受的见证
+            % 只是"刚刚可行"（余量 38–400 USD），而同一固定 z 模式的真实最优可能低约 1,500 USD
+            % （实测：无截断跑满 3600 s 后可行值从 sat−41 降到 sat−1,530，对偶界 sat−2,375）。
+            % 不抛光就会用"偏高"的成本做下一步基线，把边际成本估大、导致过早停机。
+            % 因此每当上界下降就做一次不带截断的成本最小化，把更便宜的调度作为后续基线。
+            if value(state,'settled_K',Inf) ~= economic.K_upper && can_run() && toc(started) < deadline
+                settle_seconds = min([value(cfg,'economic_plateau_settle_s',600), ...
+                    max(1,deadline-toc(started))]);
+                if settle_seconds > 5
+                    settle_task = make_task("plateau_refit",economic.K_upper,Inf,round_number);
+                    settle_task.start = solution_vector(base.indices, ...
+                        economic.satisfied_evidence.solution,numel(base.cost_f));
+                    settle_task.freeze_z = round(settle_task.start(z_idx));
+                    settle_task.sat = NaN;        % 关键：不设 BestObjStop ⇒ 真做成本最小化
+                    settle_task.fail = NaN;
+                    settle_task.focus = 1;        % 多找更好的可行解
+                    settle_task.time_limit = settle_seconds;
+                    settle_task.attempt = find_point(state.points,economic.K_upper).attempts+1;
+                    begin_task("plateau_settle",economic.K_upper,settle_seconds);
+                    settle_record = solve_task(base,settle_task,ctx);
+                    state = log_proof(state,settle_record,settle_task);
+                    state = store_witnesses(state,settle_record);
+                    state.points = merge_point(state.points,settle_record,economic.K_upper, ...
+                        "plateau_settle_untruncated_cost");
+                    finish_task();
+                    state.settled_K = economic.K_upper;
+                    if settle_record.has_incumbent
+                        fprintf(['[O1] 接受后抛光：count=%g 成本 %.3f（余量 %.3f USD，' ...
+                            '用时 %.0f s）⇒ 下一步基线更低。\n'],settle_record.count_upper, ...
+                            settle_record.cost_upper_usd, ...
+                            economic.strict_cost_cap_usd-settle_record.cost_upper_usd,settle_seconds);
+                        x_start = solution_vector(base.indices, ...
+                            economic.satisfied_evidence.solution,numel(base.cost_f));
+                        events = find(round(x_start(z_idx))>0.5);
+                        if isempty(events), break; end
+                    end
+                end
+            end
             % 阶段0：先用"z 整数、AEL 放松"的松弛模型生成优质 z 模式（实测优于贪心删除 3,000+ USD）。
             % 同一 K_upper 只做一次（避免每步都花 900 s）；换到新的 K_upper 后会再次尝试。
             if value(cfg,'economic_plateau_pattern_s',0) > 1 && can_run() && toc(started) < deadline && ...
@@ -713,10 +1022,14 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
         task.attempt = state.reference_refinements_this_run+1;
         task.time_limit = next_time(cfg.economic_reference_time_s,task.attempt);
         task.start = solution_vector(base.indices,reference.solution,numel(base.cost_f));
+        % 目标仿射压缩到"允许成本"量级：40 USD 的绝对间隙在 3.2e7 美元目标上只有 1.3e-6 相对量级，
+        % 已落在求解器数值噪声内（实测参考解收紧会停在 ~200 USD 不再下降）。
+        % 压缩不改变最优解，只把绝对间隙换算到 O(1) 尺度。
+        task.scale = max(1,cfg.economic_delta_usd_t*cfg.nh3_target_t);
         gap = reference.objective_upper-reference.objective_lower;
-        task.absolute_gap = max(1,min(gap/4,band_target_usd()));
+        task.absolute_gap = max(1,min(gap/4,band_target_usd()))/task.scale;
         if ~isfinite(task.absolute_gap) || task.absolute_gap <= 0
-            task.absolute_gap = max(1,gap/4);
+            task.absolute_gap = max(1,gap/4)/task.scale;
         end
         begin_task("reference_refinement",ctx.T,task.time_limit);
         band_before = reference.objective_upper-reference.objective_lower;
@@ -777,9 +1090,7 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
         if ~cfg.use_cache, return; end
         payload = struct('signature',ctx.cost_signature, ...
             'delta_usd_t',cfg.economic_delta_usd_t,'schema_version',1,'state',state);
-        temporary = [cache_file,'.tmp.mat'];
-        save(temporary,'-struct','payload','-v7.3');
-        movefile(temporary,cache_file,'f');
+        partition21_save(cache_file,payload);
         if strlength(string(cfg.progress_file)) == 0, return; end
         fid = fopen(cfg.progress_file,'a','n','UTF-8');
         if fid < 0
@@ -794,6 +1105,180 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
     end
 end
 
+
+function state=partition21_upper_only(state,base,ctx)
+% Legacy evidence supplies validated primal points, never inherited rejection bounds.
+points=repmat(empty_point(0),0,1);
+for collection={state.points,state.caps}
+    for j=1:numel(collection{1})
+        old=collection{1}(j);
+        if ~value(old,'has_incumbent',false), continue; end
+        [x,solution,cost,count,residual]=validate_solution(value(old,'solution',struct()),base,ctx,ctx.T);
+        if isempty(x), continue; end
+        p=empty_point(count); p.has_incumbent=true; p.solution=solution;
+        p.cost_upper_usd=cost; p.count_upper=count; p.matrix_violation=residual;
+        points=merge_point(points,p,count,"partition21_validated_legacy_upper");
+    end
+end
+state.points=points; state.caps=repmat(empty_cap("",Inf),0,1);
+if ~isempty(fieldnames(state.reference)), state.reference.objective_lower=-Inf; end
+state.block_cuts=empty_cuts(); state.partition21=struct(); state.Keco_lower=0;
+fprintf('[O1] 分块策略迁移：保留%d个原矩阵核验上界，旧下界/派生割不继承。\n',numel(points));
+end
+
+function [model,hour,z,meta]=partition21_model(base,ctx,cap)
+% One actual scaled model is the single source of truth for root and local oracles.
+p=base.physical_problem; n=numel(p.lb); T=ctx.T; z=base.indices.O1_HB_change(:);
+assert(isfinite(cap)&&numel(z)==T&&numel(unique(z))==T,'O1:partition21_domain','Invalid count domain.');
+assert(all(p.lb(z)==0 & p.ub(z)==1)&&all(base.units(z)==1),'O1:partition21_z','HB z must have unit binary boxes.');
+assert(all(ismember(z,p.intcon)),'O1:partition21_integer_map','HB z must be original integer columns.');
+rr=base.update_row; coefficient=base.update_coefficient;
+assert(nnz(p.Aineq(rr,:))==T && coefficient>0 && ...
+    max(abs(full(p.Aineq(rr,z))-coefficient))<1e-12,'O1:partition21_count_row','Count row changed.');
+p.bineq(rr)=T*coefficient;
+% O1 builds these rows live; verify the derivation instead of adding a second hull.
+R=ctx.HB_ramp; e=ctx.config.change_epsilon; hh=(1:T).'; next=[hh(2:end);hh(1)];
+assert(e>=0&&e<R,'O1:partition21_ramp','Invalid ramp/tracking band.');
+load_columns=base.indices.HB_load(:);
+delta=sparse([hh;hh],[load_columns(next);load_columns],[ones(T,1);-ones(T,1)],T,n);
+change=sparse(hh,z,(R-e)*ones(T,1),T,n); hull=[delta-change;-delta-change];
+assert(size(p.Aineq,1)>=2*T && ...
+    isequal(p.Aineq(end-2*T+1:end,:),hull) && ...
+    isequal(p.bineq(end-2*T+1:end),e*ones(2*T,1)), ...
+    'O1:partition21_hull','Live HB hull does not match ramp/epsilon.');
+p.f=base.count_f; p.intcon=[]; p.x0=[];
+p.Aineq=[p.Aineq;base.cost_f.']; p.bineq=[p.bineq(:);cap-base.offset];
+cap_row=size(p.Aineq,1);
+[model,row_scale]=scaled_model(p,base.units);
+assert(all(isfinite(model.lb))&&all(isfinite(model.ub))&&all(model.lb<=model.ub)&& ...
+    all(isfinite(nonzeros(model.A)))&&all(isfinite(model.rhs))&&all(isfinite(model.obj)), ...
+    'O1:partition21_finite_box','Partition proof requires a finite physical box.');
+hour=variable_hours(base,T);
+assert(isequal(hour(z),(1:T).'),'O1:partition21_hour_map','HB z hour mapping changed.');
+if isfield(base.indices,'storage_H2')
+    assert(isequal(hour(base.indices.storage_H2(:)),(1:T+1).'), ...
+        'O1:partition21_storage_map','Storage boundary hours changed.');
+end
+rhs_without_cap=model.rhs; rhs_without_cap(cap_row)=0;
+schema='partition21_scaled_v1_87072e118e72e29558a5aa743f49e3ece7bf85d29cc1dc39897146932d6eaa9d';
+signature=partition21_hash(schema,model.A,rhs_without_cap,model.sense,model.obj, ...
+    model.lb,model.ub,hour,z,base.physical_problem.intcon(:),base.units,row_scale, ...
+    base.cost_f,base.offset,ctx.dt,R,e,ctx.config.economic_block_lengths_h);
+meta=struct('version',1,'model_signature',signature,'cap_usd',cap,'cap_row',cap_row, ...
+    'units',base.units,'row_scale',row_scale,'original_intcon',base.physical_problem.intcon(:));
+end
+
+function yes=partition21_context_matches(d,base,ctx,cap)
+yes=false;
+required={'version','model_signature','context_signature','cap_usd','work_dir','pi', ...
+    'certified','root_attempts','root_limit_s'};
+if ~all(isfield(d,required)) || d.version~=1 || ~isfinite(d.cap_usd) || d.cap_usd<cap, return; end
+try
+    [model,hour,z,meta]=partition21_model(base,ctx,d.cap_usd);
+    if ~strcmp(meta.model_signature,d.model_signature) || ...
+            ~strcmp(partition21_hash(meta.model_signature,model.rhs),d.context_signature), return; end
+    frozen=load(fullfile(d.work_dir,'context.mat'),'model','hour','z','meta');
+    if ~partition21_same_model(model,frozen.model) || ~isequal(hour,frozen.hour) || ...
+            ~isequal(z,frozen.z) || ~isequal(meta,frozen.meta), return; end
+    if ~isempty(d.pi) && (numel(d.pi)~=numel(model.rhs)||any(~isfinite(d.pi))), return; end
+    if ~isempty(fieldnames(d.certified)) && ...
+            ~partition21_proof_valid(d.certified,model,d.pi,ctx.config.economic_block_lengths_h), return; end
+    yes=true;
+catch
+    % An incomplete/corrupt/private checkpoint cannot authorize a lower bound.
+end
+end
+
+function yes=partition21_same_model(a,b)
+yes=true;
+for name={'A','rhs','sense','obj','lb','ub','vtype','modelsense'}
+    yes=yes&&isfield(a,name{1})&&isfield(b,name{1})&&isequal(a.(name{1}),b.(name{1}));
+end
+end
+
+function yes=partition21_has_price(raw,m)
+yes=isfield(raw,'pi')&&numel(raw.pi)==m&&all(isfinite(raw.pi(:)));
+end
+
+function yes=partition21_proof_valid(proof,model,pi,levels)
+yes=false;
+try
+    pi=pi(:); s=model.sense(:); pi(s=='<')=min(0,pi(s=='<')); pi(s=='>')=max(0,pi(s=='>'));
+    if ~isstruct(proof)||~isscalar(proof)||proof.version~=1||~isequal(proof.pi,pi)|| ...
+            ~iscell(proof.levels)||isempty(proof.levels)||numel(proof.levels)>numel(levels)|| ...
+            ~isfinite(proof.best), return; end
+    g=model.obj(:)-model.A'*pi;
+    full_raw=model.rhs(:)'*pi+sum(min(g.*model.lb(:),g.*model.ub(:)));
+    if abs(full_raw-proof.full_raw)>1e-6, return; end
+    best=-Inf;
+    for j=1:numel(proof.levels)
+        C=proof.levels{j}; cross=C.cross(:);
+        if C.H~=levels(j)||isempty(C.l)||any(~isfinite(C.l))|| ...
+                ~iscell(C.records)||numel(C.records)~=numel(C.l)|| ...
+                C.next<1||C.next>numel(C.l)+1||C.next~=round(C.next)|| ...
+                any(cross<1|cross>numel(pi)|cross~=round(cross))|| ...
+                numel(unique(cross))~=numel(cross), return; end
+        bp=model.rhs(cross).*pi(cross);
+        if abs(C.B-sum(bp))>1e-7||abs(C.guardB-(1e-6+1e-9*(1+sum(abs(bp)))))>1e-10|| ...
+                abs(C.certificate-(C.B-C.guardB+sum(C.l)))>1e-7, return; end
+        best=max(best,C.certificate);
+    end
+    yes=proof.best<=best+1e-8;
+catch
+end
+end
+
+function state=partition21_store_bound(state,d,base,ctx,round_number)
+if ~isfield(d,'certified')||~isfield(d.certified,'best')|| ...
+        ~partition21_context_matches(d,base,ctx,d.cap_usd), return; end
+count=max(0,ceil(d.certified.best-1e-5));
+if ~isfinite(count)||count>ctx.T, return; end
+witness=base.physical_problem.x0(:);
+if ~isempty(witness) && all(isfinite(witness)) && base.cost_f.'*witness+base.offset<=d.cap_usd && ...
+        d.certified.best>sum(witness(base.indices.O1_HB_change(:)))+1e-5, return; end
+state.partition21_valid_certificate_id=string(d.context_signature);
+prior=find_cap(state,"loose_count",d.cap_usd);
+status="partition21_global_count:"+string(d.context_signature);
+if prior.solver_status~=status, prior.count_lower=0; prior.is_infeasible=false; end
+if prior.count_lower>count, return; end
+record=empty_point(ctx.T); record.count_lower=count; record.count_upper=Inf;
+record.global_bound=d.certified.best; record.proof_model="partition21_global_count";
+record.integer_count=ctx.T; record.solver_status=status;
+state=store_cap(state,prior,record,"loose_count",d.cap_usd);
+task=struct('kind',"loose_count",'K',ctx.T,'cap',d.cap_usd,'round',round_number);
+state=log_proof(state,record,task);
+end
+
+function yes=partition21_cap_valid(state,cap)
+d=value(state,'partition21',struct()); proof=value(d,'certified',struct());
+id=string(value(d,'context_signature',""));
+yes=strlength(id)>0 && string(value(state,'partition21_valid_certificate_id',""))==id && ...
+    strcmp(value(d,'model_signature',''),value(state,'partition21_model_signature','')) && ...
+    cap.solver_status=="partition21_global_count:"+id && cap.cost_cap_usd==value(d,'cap_usd',NaN) && ...
+    isfinite(value(proof,'best',-Inf)) && cap.count_lower<=max(0,ceil(proof.best-1e-5));
+end
+
+function partition21_save(file,payload)
+temporary=[file,'.tmp.mat']; save(temporary,'-struct','payload','-v7.3'); movefile(temporary,file,'f');
+end
+
+function h=partition21_hash(varargin)
+md=java.security.MessageDigest.getInstance('SHA-256');
+for j=1:nargin
+    v=varargin{j}; md.update(unicode2native(class(v),'UTF-8'));
+    md.update(typecast(int64(size(v)),'int8'));
+    if issparse(v)
+        [ri,ci,sv]=find(v); bytes={typecast(int64(ri(:)),'int8'), ...
+            typecast(int64(ci(:)),'int8'),typecast(double(sv(:)),'int8')};
+    elseif ischar(v)
+        bytes={unicode2native(v,'UTF-8')};
+    else
+        bytes={typecast(double(v(:)),'int8')};
+    end
+    for k=1:numel(bytes), if ~isempty(bytes{k}), md.update(bytes{k}); end; end
+end
+h=lower(reshape(dec2hex(typecast(md.digest(),'uint8'),2)',1,[]));
+end
 
 function state = load_state(file,ctx)
 state = struct('points',repmat(empty_point(0),0,1), ...
@@ -818,7 +1303,23 @@ function state = prepare_search_state(state,cfg)
 % 必须重置：分解/分支中间状态、认证排程、启发式进度——旧搜索的“5%进度”门槛
 % 正是区间无法合并的直接原因之一。
 version = value(cfg,'economic_search_version',2);
-if value(state,'search_version',0) == version, return; end
+policy = value(cfg,'economic_lower_policy_version',3);
+if value(state,'search_version',0) == version && value(state,'lower_policy_version',0) == policy
+    return
+end
+if value(state,'lower_policy_version',0) ~= policy
+    % 下界推导策略改变（例如关闭不可靠割池、移除 Σz≥旧下界的自证行）时，
+    % 旧成本帽是"按旧策略算出来的证据"，必须整体作废——否则它们会继续把旧值认证成合法下界
+    % （实测：切到无割模型后仍被旧帽钉在 403，而新解给出 366）。
+    % 只清 cost caps；成本点(points)是原矩阵核验过的可行解，继续保留（上界不受影响）。
+    if ~isempty(value(state,'caps',[]))
+        fprintf('[O1] 下界策略版本 %g→%g：作废全部成本帽（下界需按新策略重算），保留%d个成本点。\n', ...
+            value(state,'lower_policy_version',0),policy,numel(value(state,'points',[])));
+    end
+    state.caps = state.caps([]);
+    state.Keco_lower = 0;
+    state.lower_policy_version = policy;
+end
 state.search_version = version;
 state.decomposition = struct();
 state.branch = struct();
@@ -885,6 +1386,9 @@ for signature = {ctx.cost_signature,ctx.signature}
         point = empty_point(K);
         point.cost_lower_usd = value(old,'objective_lower',-Inf);
         point.is_infeasible = value(old,'is_infeasible',false);
+        if value(ctx.config,'economic_structural_search',false)
+            point.cost_lower_usd=-Inf; point.is_infeasible=false;
+        end
         % 旧版frontier_cost仅在原矩阵核验通过后登记has_incumbent及上界。
         point.has_incumbent = value(old,'has_incumbent',false) && ...
             isfinite(value(old,'objective_upper',Inf));
@@ -985,7 +1489,8 @@ end
 for i = 1:numel(state.caps)
     cap = state.caps(i);
     % 只有包含真实经济可行域的宽松帽，才能提供Keco全局下界。
-    if cap.kind == "loose_count" && cap.cost_cap_usd >= fail && cap.count_lower >= lower
+    trusted_count=~value(ctx.config,'economic_structural_search',false) || partition21_cap_valid(state,cap);
+    if cap.kind == "loose_count" && trusted_count && cap.cost_cap_usd >= fail && cap.count_lower >= lower
         lower = cap.count_lower;
         rejected.source = "loose_cap_global_count_bound";
         rejected.excluded_K_max = lower-1;
@@ -1082,36 +1587,6 @@ end
 if isempty(index), state.caps(end+1,1) = prior; else, state.caps(index) = prior; end
 end
 
-function K = select_K(economic,points,attempts,round_number)
-K = [];
-if ~isfinite(economic.K_upper), return; end
-lower = economic.K_lower; upper = economic.K_upper;
-middle = floor((lower+upper)/2);
-candidates = unique([middle,lower,upper-1, ...
-    floor((lower+middle)/2),floor((middle+upper)/2)]);
-pending = [points.K];
-pending = pending(pending >= lower & pending < upper);
-candidates = unique([candidates,pending]);
-candidates = candidates(candidates >= lower & candidates < upper);
-candidates = candidates(attempts(candidates+1) < round_number);
-if isempty(candidates), return; end
-scores = zeros(numel(candidates),4);
-for i = 1:numel(candidates)
-    point = find_point(points,candidates(i));
-    distance = min(max(0,point.cost_upper_usd-economic.strict_cost_cap_usd), ...
-        max(0,economic.cost_cap_usd-point.cost_lower_usd));
-    quality = 1;
-    if isfinite(distance)
-        quality = min(4,distance/max(1,economic.cost_cap_usd-economic.reference_upper_usd));
-    end
-    reduction = min(candidates(i)-lower+1,upper-candidates(i));
-    scores(i,:) = [attempts(candidates(i)+1),(1+quality)/max(1,reduction), ...
-        abs(candidates(i)-middle),candidates(i)];
-end
-[~,order] = sortrows(scores,[1,2,3,4]);
-K = candidates(order(1));
-end
-
 function focus = evidence_focus(point,sat,fail,allowance,attempt)
 upper_distance = max(0,point.cost_upper_usd-sat);
 lower_distance = max(0,fail-point.cost_lower_usd);
@@ -1125,25 +1600,6 @@ elseif lower_distance <= near
 else
     foci = [1,3,0,2]; focus = foci(1+mod(attempt-1,numel(foci)));
 end
-end
-
-function yes = reference_is_limiting(state,reference,economic,cfg)
-gap = reference.objective_upper-reference.objective_lower;
-yes = false;
-if ~isfinite(gap), yes = true; return; end
-if gap <= 1e-6, return; end
-for i = 1:numel(state.points)
-    p = state.points(i);
-    if p.status == "unknown" && p.K >= economic.K_lower && p.K < economic.K_upper && ...
-            p.cost_upper_usd>economic.strict_cost_cap_usd && ...
-            p.cost_upper_usd <= economic.cost_cap_usd+money_margin(economic.cost_cap_usd) && ...
-            (p.cost_lower_usd >= economic.strict_cost_cap_usd-money_margin(economic.cost_cap_usd) || ...
-            p.K>=economic.K_upper-1 || economic.K_upper-economic.K_lower<=cfg.economic_final_interval)
-        yes = true; return
-    end
-end
-yes = economic.K_upper-economic.K_lower <= 2 && ...
-    gap > cfg.economic_reference_tolerance_usd_t*cfg.nh3_target_t;
 end
 
 function start = best_start(state,reference,K,base)
@@ -1172,40 +1628,6 @@ end
 function entries=empty_cert_schedule()
 entries=struct('kind',{},'K',{},'cap',{},'lower',{},'upper',{}, ...
     'sat',{},'fail',{},'DW_lower',{},'witness_cost',{},'budget',{});
-end
-
-function [allowed,entries]=certification_gate(entries,task,economic,d,cfg)
-current=struct('kind',task.kind,'K',task.K,'cap',task.cap, ...
-    'lower',economic.K_lower,'upper',economic.K_upper, ...
-    'sat',economic.strict_cost_cap_usd,'fail',economic.cost_cap_usd, ...
-    'DW_lower',value(d,'best_lower',-Inf), ...
-    'witness_cost',economic.satisfied_evidence.cost_upper_usd,'budget',task.time_limit);
-index=[];
-if ~isempty(entries)
-    same=[entries.kind]==task.kind & [entries.cap]==task.cap;
-    structural_wide=value(cfg,'economic_structural_search',false) && task.kind=="loose_count" && ...
-        economic.K_upper-economic.K_lower>cfg.economic_final_interval;
-    if ~structural_wide, same=same & [entries.K]==task.K; end
-    index=find(same,1,'last');
-end
-allowed=true;
-if ~isempty(index)
-    prior=entries(index); gain=value(cfg,'economic_certification_retry_gain',1);
-    upper_gain=1; cost_gain=max(1,0.01*(current.fail-economic.reference_upper_usd));
-    if structural_wide
-        upper_gain=max(5,ceil(0.05*(prior.upper-prior.lower)));
-        cost_gain=value(cfg,'economic_local_headroom_usd',3000);
-    end
-    allowed=current.lower>prior.lower || current.upper<=prior.upper-upper_gain || ...
-        current.sat>prior.sat+money_margin(current.sat) || ...
-        current.fail<prior.fail-money_margin(current.fail) || ...
-        (current.DW_lower>=prior.DW_lower+gain && isfinite(current.DW_lower)) || ...
-        current.witness_cost<prior.witness_cost-cost_gain || ...
-        current.budget>1.5*prior.budget;
-end
-if allowed
-    if isempty(index), entries(end+1,1)=current; else, entries(index)=current; end
-end
 end
 
 function [record,schedule]=event_repair(base,economic,ctx,seconds,schedule,checkpoint)
@@ -1684,140 +2106,6 @@ fresh=fresh(1:min(numel(fresh),value(cfg,'economic_event_exchange_new',64)));
 hours=unique([old(:);fresh(:)],'stable');
 end
 
-function fractional=decomposition_fractional(blocks,which,weights,base)
-x=zeros(numel(base.count_f),1);
-for b=1:numel(blocks), x(blocks{b}.col)=blocks{b}.points*weights(which==b); end
-ii=base.physical_problem.intcon;
-if base.grid_exact, ii=setdiff(ii,base.indices.u_purchase(:)); end
-gap=abs(x(ii)-round(x(ii))); ii=ii(gap>1e-6); gap=gap(gap>1e-6);
-[~,rank]=sort(gap,'descend'); ii=ii(rank(1:min(64,numel(rank))));
-fractional=struct('columns',ii(:),'values',x(ii));
-end
-
-function allowed=branch_can_run(proof,d,economic,cfg,base)
-allowed=false;
-if ~value(cfg,'economic_branch_enable',false) || ~isfinite(economic.K_upper), return; end
-if isfield(proof,'nodes') && ~isempty(proof.nodes) && proof.bound_cap_usd>=economic.cost_cap_usd && ...
-        branch_context_valid(proof.certificate,base)
-    allowed=true; return;
-end
-c=value(d,'certificate',struct()); f=value(d,'fractional',struct());
-allowed=value(c,'complete',false) && isfinite(value(c,'master_upper',Inf)) && ...
-    c.master_upper-c.lower<=cfg.economic_branch_relaxation_gap && ...
-    economic.K_upper-economic.K_lower>cfg.economic_branch_min_interval && ...
-    ~isempty(value(f,'columns',[])) && c.cap_usd>=economic.cost_cap_usd && branch_context_valid(c,base);
-end
-
-function valid=branch_context_valid(c,base)
-valid=value(c,'cut_policy',0)==value(base,'cut_policy',2) && ...
-    value(c,'cut_margin',Inf)==value(base,'cut_margin',1e-5) && ...
-    value(c,'cut_relative_margin',Inf)==value(base,'cut_relative_margin',1e-9) && ...
-    isequal(value(c,'cut_disabled',[]),value(base,'cut_disabled',[])) && ...
-    isequal(value(c,'units',[]),base.units) && value(c,'grid_exact',~base.grid_exact)==base.grid_exact;
-end
-
-function lower=branch_cover_lower(nodes,baseline,upper)
-% The open nodes cover every unexcluded integer schedule. Use their MINIMUM.
-if isempty(nodes), lower=upper; else, lower=min(upper,min([nodes.bound])); end
-lower=max(baseline,lower);
-end
-
-function [proof,record]=branch_pricing(base,state,economic,ctx,seconds,checkpoint)
-% Disjunctive pricing at a frozen dual; no restricted branch bound is global alone.
-started=tic; cfg=ctx.config; d=state.decomposition; proof=value(state,'branch',struct());
-record=empty_point(economic.K_upper); record.count_upper=Inf; record.solve_calls=0;
-record.count_lower=0; record.global_bound=-Inf; record.witnesses=repmat(empty_point(0),0,1);
-record.proof_model="complete_integer_branch_pricing"; record.integer_count=0;
-compatible=isfield(proof,'nodes') && proof.bound_cap_usd>=economic.cost_cap_usd && ...
-    proof.certificate.K_upper>=economic.K_upper && ...
-    branch_context_valid(proof.certificate,base) && ...
-    proof.certificate.cut_count<=numel(state.block_cuts);
-if ~compatible
-    c=d.certificate;
-    assert(c.complete && ~isempty(d.fractional.columns),'O1:invalid_branch_root','No complete branch root certificate.');
-    node=struct('id',1,'columns',[],'lower',[],'upper',[],'block_lower',c.block_lower, ...
-        'bound',max(economic.K_lower,ceil(c.lower-1e-5)),'pending',0,'status',"root");
-    proof=struct('certificate',c,'bound_cap_usd',economic.cost_cap_usd,'baseline',node.bound, ...
-        'candidates',d.fractional,'nodes',node,'next_id',2,'closed_by_bound',0, ...
-        'global_lower',node.bound,'status',"initialized");
-end
-c=proof.certificate; working=apply_block_cuts(base,state.block_cuts(1:c.cut_count));
-p=working.problem; p.f=base.count_f; p.bineq(base.update_row)=c.K_upper*base.update_coefficient;
-extra=base.cost_f.'; extra_rhs=c.cap_usd-base.offset; global_ids=-1;
-if c.count_floor>0, extra=[extra;-base.count_f.']; extra_rhs=[extra_rhs;-c.count_floor]; global_ids=[-1;-2]; end
-p.Aineq=[p.Aineq;extra]; p.bineq=[p.bineq;extra_rhs];
-mi=size(base.physical_problem.Aineq,1); me=size(base.physical_problem.Aeq,1);
-ids=[(1:mi).';mi+me+(1:c.cut_count).';global_ids;mi+(1:me).'];
-[model,scale]=scaled_model(p,base.units); model.vtype(p.intcon)='I';
-if base.grid_exact, model.vtype(base.indices.u_purchase(:))='C'; end
-seed=solution_vector(base.indices,economic.satisfied_evidence.solution,numel(p.lb));
-partition=d; partition.ranges=c.ranges;
-[blocks,link,ids,partition]=decomposition_partition(model,base,partition,seed,c.cut_count,ctx.T,ctx,scale,ids);
-assert(isequal(ids,c.link_ids) && max(abs(model.rhs(link)-c.rhs))<1e-8, ...
-    'O1:branch_context_changed','Frozen branch pricing context changed.');
-A=model.A(link,:); touched=[]; proof.status="time_budget";
-while toc(started)<seconds && record.solve_calls<value(cfg,'economic_decomposition_solve_limit',Inf)
-    closed=[proof.nodes.bound]>=economic.K_upper;
-    proof.closed_by_bound=proof.closed_by_bound+nnz(closed); proof.nodes(closed)=[];
-    if isempty(proof.nodes)
-        assert(proof.closed_by_bound>0,'O1:empty_branch_cover','Infeasible branch cover contradicts the annual witness.');
-        proof.global_lower=economic.K_upper; proof.status="certified_boundary"; checkpoint(proof); break;
-    end
-    proof.global_lower=branch_cover_lower(proof.nodes,proof.baseline,economic.K_upper);
-    pending=find([proof.nodes.pending]>0); ready=find([proof.nodes.pending]==0);
-    if ~isempty(pending)
-        calls=arrayfun(@(j) nnz(touched==proof.nodes(j).id),pending);
-        [fewest,k]=min(calls); if fewest>=2, proof.status="unknown_pricing_retryable"; break; end
-        j=pending(k); node=proof.nodes(j); b=node.pending; q=blocks{b}.model;
-        q.obj=model.obj(blocks{b}.col)-A(:,blocks{b}.col).'*c.pi;
-        [found,where]=ismember(node.columns,blocks{b}.col);
-        for k=find(found)
-            q.lb(where(k))=max(q.lb(where(k)),node.lower(k)/base.units(node.columns(k)));
-            q.ub(where(k))=min(q.ub(where(k)),node.upper(k)/base.units(node.columns(k)));
-        end
-        known=partition.points{b}./base.units(blocks{b}.col);
-        good=all(known>=q.lb-1e-10 & known<=q.ub+1e-10,1); q.start=[];
-        if any(good), known=known(:,good); [~,k]=min(q.obj.'*known); q.start=known(:,k); end
-        [lower,~,status]=decomposition_price(q,min(cfg.economic_branch_price_time_s,seconds-toc(started)),ctx);
-        record.solve_calls=record.solve_calls+1; touched(end+1)=node.id; %#ok<AGROW>
-        if status=="INFEASIBLE"
-            proof.nodes(j)=[];
-        elseif isfinite(lower)
-            node.block_lower(b)=max(node.block_lower(b),lower);
-            constant=c.rhs.'*c.pi;
-            margin=decomposition_margin(constant)+sum(arrayfun(@decomposition_margin,node.block_lower));
-            node.bound=max(node.bound,ceil(constant+sum(node.block_lower)-margin-1e-5));
-            node.pending=0; node.status=status; proof.nodes(j)=node;
-        end
-    else
-        if numel(proof.nodes)>=cfg.economic_branch_max_nodes, proof.status="node_limit"; break; end
-        [~,k]=min([proof.nodes(ready).bound]); j=ready(k); node=proof.nodes(j);
-        available=find(~ismember(proof.candidates.columns,node.columns),1);
-        if isempty(available), proof.status="candidate_partition_exhausted"; break; end
-        column=proof.candidates.columns(available); value_=proof.candidates.values(available);
-        b=find(cellfun(@(block) ismember(column,block.col),blocks),1);
-        child=repmat(node,1,2);
-        for k=1:2
-            child(k).id=proof.next_id; proof.next_id=proof.next_id+1;
-            child(k).columns(end+1)=column;
-            child(k).lower(end+1)=base.physical_problem.lb(column);
-            child(k).upper(end+1)=base.physical_problem.ub(column);
-            if k==1, child(k).upper(end)=floor(value_); else, child(k).lower(end)=ceil(value_); end
-            child(k).pending=b; child(k).status="unpriced";
-        end
-        proof.nodes(j)=[]; proof.nodes=[proof.nodes,child];
-    end
-    if ~isempty(proof.nodes)
-        proof.global_lower=branch_cover_lower(proof.nodes,proof.baseline,economic.K_upper);
-        checkpoint(proof);
-    end
-end
-record.global_bound=proof.global_lower; record.count_lower=proof.global_lower;
-record.solver_status=proof.status; record.elapsed_s=toc(started);
-fprintf('[O1] 分支定价认证：保留%d节点，完整覆盖下界=%g；状态=%s。\n', ...
-    numel(proof.nodes),proof.global_lower,proof.status);
-end
-
 function p=bounded_local_problem(p,base,start,event_hours,ael_hours,T)
 free=base.indices.O1_HB_change(event_hours); free=free(:);
 hours=variable_hours(base,T);
@@ -1975,903 +2263,12 @@ for name = fieldnames(base.indices).'
 end
 end
 
-function allowed=decomposition_can_run(d,economic,cfg)
-allowed=true;
-if ~isfield(d,'park') || isempty(fieldnames(d.park)) || value(d,'algorithm_version',0)~=6, return; end
-p=d.park;
-allowed=economic.K_lower~=p.K_lower || economic.K_upper~=p.K_upper || ...
-    economic.cost_cap_usd~=p.cap_usd || ...
-    value(cfg,'economic_block_max_time_s',60)>p.price_max_s || ...
-    cfg.economic_block_round_time_s>1.5*p.round_time_s || ...
-    max(cfg.economic_block_lengths_h)>p.max_length_h;
-end
-
-function floor=decomposition_floor(economic)
-% Use a global count certificate for a cost cap containing the current cap.
-% Kfea, local restrictions and the RMP objective are not such certificates.
-floor=0; proof=value(economic,'rejected_evidence',struct());
-candidate=value(proof,'count_lower',NaN);
-if value(proof,'source',"")=="loose_cap_global_count_bound" && ...
-        value(proof,'cost_cap_usd',-Inf)>=economic.cost_cap_usd && ...
-        isfinite(candidate) && candidate>=0 && candidate==round(candidate) && candidate<=economic.K_lower
-    floor=candidate;
-end
-end
-
-function count=decomposition_completed(d)
-history=value(d,'history',[]); count=0;
-if isstruct(history) && isfield(history,'complete'), count=nnz([history.complete]); end
-end
-
-function [frozen,d,resumed]=decomposition_context(d,economic,base,~,cut_count)
-% A completed frozen dual certificate remains valid after the current
-% economic feasible domain shrinks. Never change its rhs during pricing.
-if nargin<5, cut_count=value(base,'cut_count',0); end
-floor=decomposition_floor(economic); sweep=value(d,'sweep',struct());
-required={'next_block','cap_usd','K_upper','ranges','cut_count','units','grid_exact'};
-resumed=all(isfield(sweep,required));
-if resumed
-    resumed=sweep.next_block>0 && sweep.cap_usd>=economic.cost_cap_usd && ...
-        sweep.K_upper>=economic.K_upper && value(sweep,'count_floor',0)<=floor && ...
-        isequal(sweep.ranges,d.ranges) && sweep.cut_count<=cut_count && ...
-        isequal(sweep.units,base.units) && sweep.grid_exact==base.grid_exact && ...
-        decomposition_floor_valid(sweep) && branch_context_valid(sweep,base);
-    if resumed && sweep.cut_count>0 && isfield(sweep,'cut_prefix')
-        cuts=value(base,'cut_prefix',[]);
-        resumed=numel(cuts)>=sweep.cut_count && isequal(sweep.cut_prefix,cuts(1:sweep.cut_count));
-    end
-end
-if resumed
-    if ~isfield(sweep,'count_floor'), sweep.count_floor=0; end
-    if ~isfield(sweep,'cut_prefix') && isfield(base,'cut_prefix')
-        sweep.cut_prefix=base.cut_prefix(1:sweep.cut_count);
-    end
-    d.sweep=sweep;
-    frozen=struct('cap_usd',sweep.cap_usd,'K_upper',sweep.K_upper, ...
-        'count_floor',sweep.count_floor,'cut_count',sweep.cut_count);
-else
-    frozen=struct('cap_usd',economic.cost_cap_usd,'K_upper',economic.K_upper, ...
-        'count_floor',floor,'cut_count',cut_count);
-    % Keep the economic dual center when the external integer floor improves.
-    d.sweep=struct();
-end
-frozen.ranges=d.ranges; frozen.units=base.units; frozen.grid_exact=base.grid_exact;
-end
-
-function valid=decomposition_floor_valid(sweep)
-floor=value(sweep,'count_floor',0); proof=value(sweep,'floor_evidence',struct());
-valid=floor==0;
-if floor>0 && isfinite(floor) && floor==round(floor)
-    count=value(proof,'count_lower',NaN);
-    valid=value(proof,'source',"")=="loose_cap_global_count_bound" && ...
-        value(proof,'cost_cap_usd',-Inf)>=sweep.cap_usd && ...
-        isfinite(count) && count==round(count) && count>=floor;
-end
-end
-
-function [base,state,record] = strengthen_blocks(base,state,economic,ctx,seconds,~,checkpoint)
-% Complete temporal DW relaxation. RMP objective is an UPPER bound on DW,
-% never a lower certificate for Keco. All linking rows stay in the master.
-started=tic; cfg=ctx.config; original=base.physical_problem;
-record=empty_point(economic.K_upper); record.count_lower=0;
-record.witnesses=repmat(empty_point(0),0,1); record.solve_calls=0;
-record.proof_model="complete_temporal_DW"; record.integer_count=numel(original.intcon);
-record.global_bound=-Inf; record.count_upper=Inf;
-d=value(state,'decomposition',struct());
-if ~isfield(d,'version') || d.version~=2
-    first=min(cfg.economic_block_lengths_h); starts=(1:first:ctx.T).';
-    d=struct('version',2,'ranges',[starts,min(ctx.T,starts+first-1)], ...
-        'points',{{}},'point_columns',{{}},'best_lower',-Inf,'bound_cap_usd',Inf, ...
-        'master_upper',Inf,'center',[],'center_ids',[],'sweep',struct(), ...
-        'history',[],'certificate',struct(),'stalled_sweeps',0,'price_time',[], ...
-        'repair_hours',[],'stop_reason',"initialized");
-end
-% Algorithm work state is disposable; previously certified bounds and cuts are not.
-settings=[value(base,'cut_policy',2),value(base,'cut_margin',1e-5),value(base,'cut_relative_margin',1e-9)];
-if value(d,'algorithm_version',0)~=6 || ~isequal(value(d,'cut_settings',[]),settings)
-    old_certificate=value(d,'certificate',struct()); d.algorithm_version=6;
-    d.cut_settings=settings;
-    d.price_time=repmat(cfg.economic_block_time_s,numel(d.price_time),1);
-    d.sweep=struct(); d.stalled_sweeps=0; d.portfolio={};
-    d.center=[]; d.center_ids=[]; d.needs_dual_seed=true;
-    if isfield(old_certificate,'pi')
-        d.center=decomposition_economic_pi(old_certificate.pi,old_certificate.link_ids);
-        d.center_ids=old_certificate.link_ids;
-        d.needs_dual_seed=decomposition_floor_degenerate(d.center,d.center_ids);
-    end
-    d.certificate=struct(); d.best_lower=decomposition_floor(economic);
-    d.level_step=4; d.dual_sweeps_since_merge=0;
-    d.merge_limit=min(384,max(cfg.economic_block_lengths_h)); d.park=struct();
-    if isfield(d,'partition_trial'), d=rmfield(d,'partition_trial'); end
-end
-if isfield(d,'park') && isempty(fieldnames(d.park)), d=rmfield(d,'park'); end
-if economic.cost_cap_usd>d.bound_cap_usd
-    d.stalled_sweeps=0; d.dual_sweeps_since_merge=0;
-    if isfield(d,'partition_trial'), d=rmfield(d,'partition_trial'); end
-    d.best_lower=-Inf; d.certificate=struct(); % A relaxed cap cannot inherit this bound.
-end
-d.bound_cap_usd=economic.cost_cap_usd;
-% Frozen looser-domain bounds also hold for this current smaller cost domain.
-d.active_K_upper=economic.K_upper;
-d.stop_reason="time_budget";
-elapsed_before=value(d,'total_elapsed_s',0);
-seed=solution_vector(base.indices,economic.satisfied_evidence.solution,numel(base.cost_f));
-if isempty(seed), seed=original.x0(:); end
-seeds=decomposition_seeds(state,base,seed);
-last_progress=tic; added_cuts=0; full_sweeps=0;
-while toc(started)<seconds && record.solve_calls<value(cfg,'economic_decomposition_solve_limit',Inf)
-    previous_best=d.best_lower;
-    base.cut_prefix=state.block_cuts;
-    d=decomposition_pick_trial(d,economic,base);
-    [frozen,d,partial]=decomposition_context(d,economic,base,cfg,numel(state.block_cuts));
-    cut_count=frozen.cut_count;
-    working=apply_block_cuts(base,state.block_cuts(1:cut_count));
-    p=working.problem; p.f=base.count_f;
-    p.bineq(base.update_row)=min(ctx.T,frozen.K_upper)*base.update_coefficient;
-    extra=base.cost_f.'; extra_rhs=frozen.cap_usd-base.offset; global_ids=-1;
-    mi=size(original.Aineq,1); me=size(original.Aeq,1);
-    if frozen.count_floor>0
-        extra=[base.cost_f.';-base.count_f.'];
-        extra_rhs=[frozen.cap_usd-base.offset;-frozen.count_floor]; global_ids=[-1;-2];
-    end
-    p.Aineq=[p.Aineq;extra]; p.bineq=[p.bineq;extra_rhs];
-    row_ids=[(1:mi).';mi+me+(1:cut_count).';global_ids;mi+(1:me).'];
-    [model,row_scale]=scaled_model(p,base.units); model.vtype(p.intcon)='I';
-    if base.grid_exact, model.vtype(base.indices.u_purchase(:))='C'; end
-    [blocks,link,ids,d]=decomposition_partition(model,base,d,seeds,cut_count,ctx.T,ctx,row_scale,row_ids);
-    B=numel(blocks); A=model.A(link,:); rhs=model.rhs(link); sense=model.sense(link);
-    d.coverage_rows=numel(link)+sum(cellfun(@(b) numel(b.rows),blocks));
-    d.total_rows=size(model.A,1); d.coverage_variables=sum(cellfun(@(b) numel(b.col),blocks));
-    assert(d.coverage_rows==d.total_rows && d.coverage_variables==numel(model.obj), ...
-        'O1:incomplete_decomposition','Complete row and variable coverage is mandatory.');
-    [master,cost,which]=decomposition_master(blocks,A,base.units);
-    if ~partial
-        d.active_count_floor=frozen.count_floor;
-        master_problem=struct('Aineq',master(sense=='<',:),'bineq',rhs(sense=='<'), ...
-            'Aeq',[master(sense=='=',:);sparse(which,1:numel(cost),1,B,numel(cost))], ...
-            'beq',[rhs(sense=='=');ones(B,1)],'f',cost,'lb',zeros(numel(cost),1), ...
-            'ub',Inf(numel(cost),1),'intcon',[],'x0',[]);
-        master_problem.x0=decomposition_master_seed(blocks,seeds,master_problem);
-        [centered,translation]=center_master_problem(master_problem,which);
-        rm=relaxation(centered,ones(numel(cost),1), ...
-            min(cfg.economic_block_lp_time_s,max(0.01,seconds-toc(started))),ctx,"master");
-        rm=restore_master_result(rm,master_problem,translation);
-        d.master_report=rm; d.master_report.x=[]; d.master_report.dual=[];
-        d.master_upper=Inf;
-        pi=[]; method="master_dual";
-        if ~isempty(rm.dual)
-            m_i=sum(sense=='<'); m_e=sum(sense=='='); pi=zeros(numel(rhs),1);
-            pi(sense=='<')=rm.dual(1:m_i); pi(sense=='=')=rm.dual(m_i+(1:m_e));
-        elseif ~isempty(d.center)
-            [found,where]=ismember(ids,d.center_ids); pi=zeros(numel(ids),1);
-            pi(found)=d.center(where(found)); method="cached_economic_dual";
-        end
-        if isempty(pi) || ~isfinite(d.best_lower) || value(d,'needs_dual_seed',false)
-            root=relaxation(p,base.units,min(cfg.economic_block_lp_time_s, ...
-                max(0,seconds-toc(started))),ctx);
-            if ~isempty(root.dual)
-                d.best_lower=max(d.best_lower,root.bound-decomposition_margin(root.bound));
-                if isempty(pi) || value(d,'needs_dual_seed',false)
-                    pi=decomposition_economic_pi(root.dual(link).*row_scale(link),ids); method="economic_LP_dual";
-                    d.center=pi; d.center_ids=ids; d.needs_dual_seed=false;
-                end
-            elseif isempty(pi)
-                d.stop_reason="LP_without_valid_dual"; break;
-            end
-        end
-        pi=decomposition_economic_pi(pi,ids);
-        if ~isempty(rm.x)
-            d.master_upper=cost.'*rm.x+decomposition_margin(cost.'*rm.x);
-            d.repair_hours=decomposition_repair(blocks,which,rm.x,seed,base,ctx.T);
-            d.fractional=decomposition_fractional(blocks,which,rm.x,base);
-            if full_sweeps>0 || ~isempty(d.history) || decomposition_floor_degenerate(pi,ids)
-                center=pi;
-                if ~isempty(d.center)
-                    [found,where]=ismember(ids,d.center_ids);
-                    center(found)=d.center(where(found));
-                end
-                center=decomposition_economic_pi(center,ids);
-                pi=center; method="economic_center";
-                [trial,ok]=decomposition_level(master,cost,which,rhs,sense,center, ...
-                    d.best_lower,d.master_upper,seconds-toc(started),ctx,value(d,'level_step',2),ids);
-                if ok, pi=trial; method="level"; end
-            end
-        end
-        fprintf('[O1] RMP：算法=%g，状态=%s，原残差=%.3g，缩放残差=%.3g，DW上界=%.6f，乘子=%s，经济乘子幅度=%.3g，下界行乘子=%.3g，说明=%s。\n', ...
-            rm.algorithm,rm.status,rm.original_residual,rm.scaled_residual,d.master_upper,method, ...
-            max([0;abs(pi(ids~=-2))]),max([0;abs(pi(ids==-2))]),rm.reason);
-        pi=double(sense=='=') .* pi + double(sense=='<') .* min(0,pi);
-        pi=decomposition_economic_pi(pi,ids);
-        if decomposition_floor_degenerate(pi,ids)
-            d.stop_reason="economic_dual_without_informative_multiplier"; break;
-        end
-        if any(~isfinite(pi)), d.stop_reason="nonfinite_dual"; break; end
-        d.sweep=struct('next_block',1,'pi',pi,'rhs',rhs,'link_ids',ids, ...
-            'lower',-Inf(B,1),'upper',Inf(B,1),'status',strings(B,1), ...
-            'cap_usd',frozen.cap_usd,'K_upper',frozen.K_upper,'count_floor',frozen.count_floor, ...
-            'ranges',d.ranges,'cut_count',cut_count,'method',method);
-        d.sweep.units=base.units; d.sweep.grid_exact=base.grid_exact;
-        d.sweep.cut_policy=value(base,'cut_policy',2); d.sweep.cut_disabled=value(base,'cut_disabled',[]);
-        d.sweep.cut_margin=value(base,'cut_margin',1e-5);
-        d.sweep.cut_relative_margin=value(base,'cut_relative_margin',1e-9);
-        d.sweep.cut_prefix=state.block_cuts(1:cut_count);
-        d.sweep.floor_evidence=value(economic,'rejected_evidence',struct());
-        d.sweep.previous_lower=previous_best;
-        d.sweep.predicted_gain=min(value(d,'level_step',4),0.5*max(0,d.master_upper-d.best_lower));
-        % Every cached local integer column gives an upper estimate of this
-        % dual trial. This estimate can discard an unpromising multiplier,
-        % but is never published as a Keco lower bound.
-        for b=1:B
-            objective=model.obj(blocks{b}.col)-A(:,blocks{b}.col).'*pi;
-            d.sweep.upper(b)=min(objective.'*(d.points{b}./base.units(blocks{b}.col)));
-        end
-        d.price_time=repmat(cfg.economic_block_time_s,B,1);
-        d.refine_time=zeros(B,1);
-    else
-        d.price_time=repmat(cfg.economic_block_time_s,B,1);
-        d.refine_time=value(d.sweep,'refine_time',zeros(B,1));
-        assert(isequal(ids,d.sweep.link_ids) && isequal(rhs,d.sweep.rhs), ...
-            'O1:changed_partial_master','A resumed pricing sweep must use the identical master.');
-        fprintf('[O1] 续算冻结扫描：第%d/%d块，成本帽%.3f，K上限%g，下界行%g；当前Keco=[%g,%g]。\n', ...
-            d.sweep.next_block,B,frozen.cap_usd,frozen.K_upper,frozen.count_floor,economic.K_lower,economic.K_upper);
-    end
-    rejected=false;
-    for b=d.sweep.next_block:B
-        if toc(started)>=seconds || record.solve_calls>=value(cfg,'economic_decomposition_solve_limit',Inf), break; end
-        q=blocks{b}.model; q.obj=model.obj(blocks{b}.col)-A(:,blocks{b}.col).'*d.sweep.pi;
-        known=d.points{b}./base.units(blocks{b}.col);
-        [~,best]=min(q.obj.'*known); q.start=known(:,best);
-        price_started=tic;
-        [lower,x,status]=decomposition_price(q, ...
-            min(d.price_time(b),seconds-toc(started)),ctx);
-        record.solve_calls=record.solve_calls+1;
-        d.sweep.lower(b)=lower; d.sweep.status(b)=status;
-        if ~isempty(x)
-            [valid,candidate]=decomposition_column(q,x.*base.units(blocks{b}.col), ...
-                base.units(blocks{b}.col),blocks{b}.row_scale,ctx);
-            if valid
-                distance=max(abs(d.points{b}-candidate)./max(1,abs(candidate)),[],1);
-                if all(distance>1e-7), d.points{b}(:,end+1)=candidate; end
-            end
-        end
-        known=d.points{b}./base.units(blocks{b}.col);
-        d.sweep.upper(b)=min(q.obj.'*known);
-        if isfinite(lower)
-            coefficients=q.obj./base.units(blocks{b}.col);
-            scale=max(1,max(abs(coefficients)));
-            cut=struct('columns',blocks{b}.col.','coefficients',sparse(coefficients.'/scale), ...
-                'lower_bound',lower/scale,'start_hour',blocks{b}.start_hour, ...
-                'length_h',blocks{b}.length_h,'solver_status',status,'elapsed_s',toc(price_started));
-            [state.block_cuts,added]=decomposition_add_cut(state.block_cuts,cut,cfg.economic_block_max_cuts,base);
-            added_cuts=added_cuts+added;
-        end
-        d.sweep.next_block=b+1;
-        if ismember(d.sweep.method,["level","economic_center"]) && decomposition_unpromising(d)
-            rejected=true; break;
-        end
-        if mod(b,max(1,cfg.economic_block_batch))==0 || toc(last_progress)>30
-            state.decomposition=d;
-            state.decomposition.total_elapsed_s=elapsed_before+toc(started); checkpoint(state);
-            fprintf('[O1] 完整分解：定价%d/%d块，完整覆盖证书=%d，已用%.1f s。\n', ...
-                b,B,isfield(d.certificate,'complete'),toc(started)); last_progress=tic;
-        end
-    end
-    if rejected
-        upper=decomposition_trial_upper(d.sweep);
-        d=decomposition_step(d,NaN,Inf,true);
-        fprintf('[O1] 放弃无提升乘子：该乘子真实对偶值<=%.6f，已证下界%.6f；保留新列，不发布下界。\n',upper,d.best_lower);
-        d.sweep=struct(); state.decomposition=d;
-        state.decomposition.total_elapsed_s=elapsed_before+toc(started); checkpoint(state);
-        if d.stalled_sweeps>=value(cfg,'economic_decomposition_stall_sweeps',3) && ...
-                d.dual_sweeps_since_merge>=value(cfg,'economic_decomposition_min_dual_sweeps',4)
-            [d,merged]=decomposition_merge(d,cfg);
-            if ~merged, d.stop_reason="dual_stalled_with_open_DW_gap"; break; end
-        end
-        continue;
-    end
-    if d.sweep.next_block<=B, d.stop_reason="incomplete_pricing_sweep"; break; end
-    center_before=d.center; center_ids_before=d.center_ids;
-    [d,lower,oracle_gap]=decomposition_certificate(d,rhs,ids,economic);
-    state.decomposition=d;
-    state.decomposition.total_elapsed_s=elapsed_before+toc(started);
-    checkpoint(state); % Publish the complete sweep before retries.
-    % Refine the worst oracles at the SAME multipliers before changing the dual.
-    target=value(cfg,'economic_decomposition_oracle_tolerance',0.05);
-    if economic.K_upper-economic.K_lower>cfg.economic_final_interval
-        target=max(target,0.25*value(d.sweep,'predicted_gain',0.5));
-    end
-    d.oracle_target=target;
-    if numel(value(d,'refine_time',[]))~=B, d.refine_time=zeros(B,1); end
-    [~,difficult_order]=sort(d.sweep.upper-d.sweep.lower,'descend');
-    for b=difficult_order(1:min(cfg.economic_block_refine_count,B)).'
-        if oracle_gap<=target || decomposition_unpromising(d) || ceil(d.best_lower-1e-5)>=economic.K_upper || ...
-                toc(started)>=seconds || ...
-                record.solve_calls>=value(cfg,'economic_decomposition_solve_limit',Inf)
-            break;
-        end
-        next_budget=min(value(cfg,'economic_block_max_time_s',60), ...
-            max(4*cfg.economic_block_time_s,2*d.refine_time(b)));
-        if next_budget<=d.price_time(b), continue; end
-        q=blocks{b}.model; q.obj=model.obj(blocks{b}.col)-A(:,blocks{b}.col).'*d.sweep.pi;
-        known=d.points{b}./base.units(blocks{b}.col); [~,best]=min(q.obj.'*known);
-        q.start=known(:,best); price_started=tic;
-        [extra,x,status]=decomposition_price(q,min(next_budget,seconds-toc(started)),ctx);
-        record.solve_calls=record.solve_calls+1; d.refine_time(b)=next_budget;
-        d.sweep.lower(b)=max(d.sweep.lower(b),extra); d.sweep.status(b)=status;
-        valid=false;
-        if ~isempty(x)
-            [valid,candidate]=decomposition_column(q,x.*base.units(blocks{b}.col), ...
-                base.units(blocks{b}.col),blocks{b}.row_scale,ctx);
-        end
-        if valid
-            distance=max(abs(d.points{b}-candidate)./max(1,abs(candidate)),[],1);
-            if all(distance>1e-7), d.points{b}(:,end+1)=candidate; end
-        end
-        d.sweep.upper(b)=min(q.obj.'*(d.points{b}./base.units(blocks{b}.col)));
-        if isfinite(d.sweep.lower(b))
-            coefficients=q.obj./base.units(blocks{b}.col); scale=max(1,max(abs(coefficients)));
-            cut=struct('columns',blocks{b}.col.','coefficients',sparse(coefficients.'/scale), ...
-                'lower_bound',d.sweep.lower(b)/scale,'start_hour',blocks{b}.start_hour, ...
-                'length_h',blocks{b}.length_h,'solver_status',status,'elapsed_s',toc(price_started));
-            [state.block_cuts,added]=decomposition_add_cut(state.block_cuts,cut,cfg.economic_block_max_cuts,base);
-            added_cuts=added_cuts+added;
-        end
-        [d,lower,oracle_gap]=decomposition_certificate(d,rhs,ids,economic);
-        state.decomposition=d;
-        state.decomposition.total_elapsed_s=elapsed_before+toc(started); checkpoint(state);
-        fprintf('[O1] 同乘子困难块%d复核：时限%.1f s，剩余定价误差<=%.6g。\n',b,next_budget,oracle_gap);
-    end
-    d.boundary_scores=decomposition_boundary_scores(blocks,d,model,A,rhs,base.units);
-    entry=struct('lower',lower,'best_lower',d.best_lower,'master_upper',d.master_upper, ...
-        'oracle_gap',oracle_gap,'blocks',B,'lengths_h',d.ranges(:,2)-d.ranges(:,1)+1, ...
-        'columns',sum(cellfun(@(x) size(x,2),d.points)), ...
-        'elapsed_s',elapsed_before+toc(started), ...
-        'cap_usd',d.sweep.cap_usd,'complete',isfinite(lower),'method',d.sweep.method);
-    d.history=[d.history;entry]; full_sweeps=full_sweeps+1;
-    if isfield(d,'partition_trial')
-        d.partition_trial.completed_sweeps=d.partition_trial.completed_sweeps+1;
-        d.partition_trial.lower_gain=d.best_lower-d.partition_trial.lower_before;
-        fprintf('[O1] 合并试验：%d -> %d块，完成%d轮，下界提升%.6f，DW差距%.6f。\n', ...
-            d.partition_trial.blocks_before,size(d.ranges,1),d.partition_trial.completed_sweeps, ...
-            d.partition_trial.lower_gain,d.master_upper-d.best_lower);
-    end
-    d=decomposition_step(d,lower,oracle_gap,false);
-    if ~d.last_trial.serious && ~isempty(center_before)
-        d.center=center_before; d.center_ids=center_ids_before;
-    end
-    potential_upper=decomposition_trial_upper(d.sweep);
-    d=decomposition_keep_trial(d);
-    d.sweep=struct();
-    if isfinite(lower)
-        fprintf('[O1] DW=[%.6f,%.6f]，整数下界=%g，定价误差<=%.6g；%d块、%d列。\n', ...
-            d.best_lower,d.master_upper,ceil(d.best_lower-1e-5),oracle_gap,B,entry.columns);
-    end
-    if oracle_gap>target && potential_upper>d.best_lower+0.05
-        d.stop_reason="refine_selected_pricing_blocks";
-    elseif economic.K_upper-ceil(d.best_lower-1e-5)>cfg.economic_final_interval && ...
-            (d.master_upper-d.best_lower<=value(cfg,'economic_decomposition_tolerance',0.2) || ...
-            (d.stalled_sweeps>=value(cfg,'economic_decomposition_stall_sweeps',3) && ...
-            value(d,'dual_sweeps_since_merge',0)>=value(cfg,'economic_decomposition_min_dual_sweeps',4)))
-        [d,merged]=decomposition_merge(d,cfg);
-        if merged, d.stop_reason="merged_adjacent_blocks"; ...
-        elseif d.master_upper-d.best_lower<=value(cfg,'economic_decomposition_tolerance',0.2)
-            d.stop_reason="maximum_partition_strength";
-        else
-            d.stop_reason="dual_stalled_with_open_DW_gap";
-        end
-    end
-    if isfield(d,'partition_trial') && d.partition_trial.lower_gain<=1e-6 && ...
-            oracle_gap<=target && d.partition_trial.completed_sweeps>= ...
-            value(cfg,'economic_decomposition_min_dual_sweeps',4)
-        d.stop_reason="partition_trial_without_bound_gain";
-    end
-    state.decomposition=d;
-    state.decomposition.total_elapsed_s=elapsed_before+toc(started); checkpoint(state);
-    if ismember(d.stop_reason,["maximum_partition_strength","dual_stalled_with_open_DW_gap", ...
-            "partition_trial_without_bound_gain"]), break; end
-    if ceil(d.best_lower-1e-5)>=economic.K_upper
-        d.stop_reason="certified_count_boundary"; break;
-    elseif d.master_upper-d.best_lower<=value(cfg,'economic_decomposition_tolerance',0.2)
-        d.stop_reason="certified_DW_tolerance"; break;
-    end
-end
-if ismember(d.stop_reason,["maximum_partition_strength","dual_stalled_with_open_DW_gap", ...
-        "partition_trial_without_bound_gain"])
-    d.park=struct('K_lower',economic.K_lower,'K_upper',economic.K_upper, ...
-        'cap_usd',economic.cost_cap_usd,'price_max_s',value(cfg,'economic_block_max_time_s',60), ...
-        'round_time_s',cfg.economic_block_round_time_s,'max_length_h',max(cfg.economic_block_lengths_h));
-elseif isfield(d,'park')
-    d=rmfield(d,'park');
-end
-base=apply_block_cuts(base,state.block_cuts); state.decomposition=d;
-state.decomposition.total_elapsed_s=elapsed_before+toc(started);
-record.global_bound=d.best_lower; record.count_lower=max(0,ceil(d.best_lower-1e-5));
-if ~isfinite(record.count_lower), record.count_lower=0; end
-record.solver_status=d.stop_reason; record.elapsed_s=toc(started);
-state.block_elapsed_s=state.block_elapsed_s+record.elapsed_s;
-fprintf('[O1] 完整分解结束：新增割%d条，全年下界=%g，状态=%s；部分定价仅保存进度。\n', ...
-    added_cuts,record.count_lower,d.stop_reason);
-end
-
-function seeds=decomposition_seeds(state,base,seed)
-seeds=seed(:);
-for points={state.points,state.caps}
-    for j=1:numel(points{1})
-        point=points{1}(j);
-        if ~point.has_incumbent, continue; end
-        x=solution_vector(base.indices,point.solution,numel(base.cost_f));
-        if ~isempty(x) && matrix_violation(base.physical_problem,x)<=1e-6
-            seeds(:,end+1)=x; %#ok<AGROW>
-        end
-    end
-end
-seeds=unique(seeds.','rows','stable').';
-end
-
-function [d,lower,oracle_gap]=decomposition_certificate(d,rhs,ids,~)
-% Only ONE multiplier vector and ALL finite block lower bounds certify this sum.
-lower=-Inf; oracle_gap=Inf;
-if isfield(d.sweep,'next_block') && d.sweep.next_block<=numel(d.sweep.lower), return; end
-if any(~isfinite(d.sweep.lower)), return; end
-if ~decomposition_floor_valid(d.sweep), return; end
-margin=decomposition_margin(rhs.'*d.sweep.pi)+sum(arrayfun(@decomposition_margin,d.sweep.lower));
-lower=rhs.'*d.sweep.pi+sum(d.sweep.lower)-margin;
-oracle_gap=sum(max(0,d.sweep.upper-d.sweep.lower));
-if ~isfinite(lower), return; end
-if lower>d.master_upper+1e-4
-    error('O1:invalid_DW_bounds','DW lower certificate exceeds the restricted master upper bound.');
-end
-certificate=struct('complete',true,'pi',d.sweep.pi,'rhs',rhs,'link_ids',ids, ...
-    'block_lower',d.sweep.lower,'block_upper',d.sweep.upper,'block_status',d.sweep.status, ...
-    'ranges',d.ranges,'cut_count',d.sweep.cut_count,'cap_usd',d.sweep.cap_usd, ...
-    'K_upper',d.sweep.K_upper,'count_floor',value(d.sweep,'count_floor',0), ...
-    'floor_evidence',value(d.sweep,'floor_evidence',struct()), ...
-    'margin',margin,'lower',lower,'master_upper',d.master_upper,'oracle_gap',oracle_gap, ...
-    'method',d.sweep.method,'units',d.sweep.units,'grid_exact',d.sweep.grid_exact, ...
-    'cut_policy',d.sweep.cut_policy,'cut_disabled',d.sweep.cut_disabled, ...
-    'cut_margin',d.sweep.cut_margin,'cut_relative_margin',d.sweep.cut_relative_margin);
-if ~isfield(d.certificate,'lower') || lower>d.certificate.lower
-    d.certificate=certificate; d.center=d.sweep.pi; d.center_ids=ids;
-end
-d.best_lower=max(d.best_lower,lower);
-end
-
-function d=decomposition_keep_trial(d)
-counter=value(d,'trial_counter',0)+1; d.trial_counter=counter;
-trial=d.sweep; trial.refine_time=d.refine_time; trial.master_upper=d.master_upper;
-trial.last_counter=counter; trial.retries=value(trial,'retries',0);
-if isfield(trial,'cut_prefix'), trial=rmfield(trial,'cut_prefix'); end
-portfolio=value(d,'portfolio',{});
-same=cellfun(@(p) isequal(p.pi,trial.pi) && isequal(p.rhs,trial.rhs),portfolio);
-portfolio(same)=[]; portfolio{end+1}=trial;
-score=cellfun(@decomposition_trial_upper,portfolio);
-[~,order]=sort(score,'descend'); d.portfolio=portfolio(order(1:min(3,numel(order))));
-end
-
-function d=decomposition_pick_trial(d,economic,base)
-if isfield(d.sweep,'next_block'), return; end
-portfolio=value(d,'portfolio',{}); selected=0; best=0;
-for j=1:numel(portfolio)
-    p=portfolio{j}; potential=decomposition_trial_upper(p)-d.best_lower;
-    compatible=p.cap_usd>=economic.cost_cap_usd && p.K_upper>=economic.K_upper && ...
-        isequal(p.ranges,d.ranges) && p.cut_count<=numel(base.cut_prefix) && ...
-        branch_context_valid(p,base);
-    if compatible && p.retries<2 && value(d,'trial_counter',0)>p.last_counter && ...
-            potential>max(1,best) && sum(max(0,p.upper-p.lower))>0.1
-        selected=j; best=potential;
-    end
-end
-if selected==0, return; end
-p=portfolio{selected}; p.retries=p.retries+1;
-d.sweep=p; d.master_upper=p.master_upper; d.portfolio{selected}=p;
-fprintf('[O1] 恢复历史经济乘子：认证下界%.6f，同乘子潜力上界%.6f，复核%d/2；后者不是Keco上界。\n', ...
-    p.rhs.'*p.pi+sum(p.lower),decomposition_trial_upper(p),p.retries);
-end
-
-function upper=decomposition_trial_upper(sweep)
-terms=[sweep.rhs.'*sweep.pi;sweep.upper(:)];
-upper=sum(terms)+sum(arrayfun(@decomposition_margin,terms));
-end
-
-function yes=decomposition_unpromising(d)
-upper=decomposition_trial_upper(d.sweep);
-% A tiny continuous gain can still cross an integer boundary. Never discard
-% a trial whose upper estimate leaves that certification opportunity open.
-yes=isfinite(d.best_lower) && upper<=d.best_lower+0.05 && ...
-    upper<=ceil(d.best_lower-1e-5)+1e-5;
-end
-
-function d=decomposition_step(d,lower,oracle_gap,early)
-predicted=value(d.sweep,'predicted_gain',value(d,'level_step',4));
-previous=value(d.sweep,'previous_lower',d.best_lower);
-gain=lower-previous;
-serious=~early && isfinite(lower) && gain>=max(0.05,0.25*predicted) && ...
-    oracle_gap<=max(1e-4,0.1*predicted);
-d.last_trial=struct('predicted_gain',predicted,'actual_gain',gain, ...
-    'oracle_gap',oracle_gap,'serious',serious,'early_rejection',early);
-d.dual_sweeps_since_merge=value(d,'dual_sweeps_since_merge',0)+1;
-d.stalled_sweeps=(value(d,'stalled_sweeps',0)+1)*(early || isnan(gain) || gain<=0.2);
-if serious
-    d.level_step=min(32,2*value(d,'level_step',4));
-else
-    d.level_step=max(0.5,0.5*value(d,'level_step',4));
-end
-fprintf('[O1] 对偶试验：预测提升%.6g，实际提升%.6g，oracle误差%.6g，成功步=%d，下一level步长%.3g。\n', ...
-    predicted,gain,oracle_gap,serious,d.level_step);
-end
-
-function scores=decomposition_boundary_scores(blocks,d,model,A,rhs,units)
-scores=zeros(max(0,size(d.ranges,1)-1),1); x=zeros(numel(model.obj),1);
-for b=1:numel(blocks)
-    col=blocks{b}.col; X=d.points{b}./units(col);
-    q=model.obj(col)-A(:,col).'*d.sweep.pi; [~,best]=min(q.'*X); x(col)=X(:,best);
-end
-weighted=abs(A*x-rhs).*abs(d.sweep.pi); counts=full(sum(spones(A),2));
-for b=1:numel(scores)
-    left=full(sum(spones(A(:,blocks{b}.col)),2));
-    right=full(sum(spones(A(:,blocks{b+1}.col)),2));
-    rows=left>0 & right>0 & left+right==counts;
-    scores(b)=sum(weighted(rows));
-end
-% Keep cyclic rows in the master, and include their pressure in end-window priorities.
-if numel(blocks)>1 && ~isempty(scores)
-    first=full(sum(spones(A(:,blocks{1}.col)),2));
-    last=full(sum(spones(A(:,blocks{size(d.ranges,1)}.col)),2));
-    cyclic=first>0 & last>0 & first+last==counts;
-    pressure=sum(weighted(cyclic)); scores(1)=scores(1)+pressure/2; scores(end)=scores(end)+pressure/2;
-end
-end
-
-function [blocks,link,ids,d]=decomposition_partition(model,base,d,seeds,cut_count,T,ctx,row_scale,row_ids)
-if nargin<7, ctx=[]; end
-if nargin<8, row_scale=ones(size(model.rhs)); end
-hours=variable_hours(base,T); owner=zeros(numel(hours),1);
-for b=1:size(d.ranges,1)
-    owner(hours>=d.ranges(b,1) & hours<=d.ranges(b,2))=b;
-end
-owner(hours==T+1)=size(d.ranges,1);
-owner(owner==0)=size(d.ranges,1)+1;
-[~,~,owner]=unique(owner); B=max(owner); blocks=cell(B,1);
-original_rows=size(base.physical_problem.Aineq,1)+size(base.physical_problem.Aeq,1);
-mi=size(base.physical_problem.Aineq,1); me=size(base.physical_problem.Aeq,1);
-if nargin<9, row_ids=[(1:mi).';original_rows+(1:cut_count).';-1;mi+(1:me).']; end
-assert(numel(row_ids)==size(model.A,1),'O1:invalid_row_ids','Every model row needs a stable identifier.');
-% Valid cuts wholly inside a block belong to its pricing problem. Global
-% cost/count rows and cross-block (including cyclic) rows remain in the master.
-local=row_ids>0; local(row_ids==base.update_row)=false;
-counts=full(sum(spones(model.A),2)); assigned=false(size(counts));
-old_points=d.points; old_columns=d.point_columns; d.points=cell(B,1); d.point_columns=cell(B,1);
-for b=1:B
-    col=find(owner==b);
-    rows=find(local & counts>0 & full(sum(spones(model.A(:,col)),2))==counts);
-    assert(~any(assigned(rows))); assigned(rows)=true;
-    q=struct('A',model.A(rows,col),'rhs',model.rhs(rows),'sense',model.sense(rows), ...
-        'lb',model.lb(col),'ub',model.ub(col),'vtype',model.vtype(col),'modelsense','min');
-    points=seeds(col,:);
-    match=find(cellfun(@(c) isequal(c,col),old_columns),1);
-    if ~isempty(match), points=[points,old_points{match}]; end %#ok<AGROW>
-    if isempty(match) && ~isempty(old_columns)
-        children=find(cellfun(@(c) all(ismember(c,col)),old_columns));
-        if ~isempty(children) && numel(unique(vertcat(old_columns{children})))==numel(col)
-            % Preserve old columns that remain feasible with the new internal boundary rows.
-            for k=1:min(8,max(cellfun(@(x) size(x,2),old_points(children))))
-                combined=zeros(numel(col),1);
-                for child=children(:).'
-                    [~,positions]=ismember(old_columns{child},col);
-                    combined(positions)=old_points{child}(:,min(k,size(old_points{child},2)));
-                end
-                points(:,end+1)=combined; %#ok<AGROW>
-            end
-        end
-    end
-    units=base.units(col); good=false(1,size(points,2));
-    for k=1:size(points,2)
-        [valid,points(:,k)]=decomposition_column(q,points(:,k),units,row_scale(rows),ctx);
-        good(k)=valid;
-    end
-    % Cached columns can violate a newly internalized cut. Preserve up to two
-    % useful integer patterns by repairing only their continuous variables.
-    if ~isempty(ctx) && any(~good)
-        [~,order]=sort(model.obj(col).'* (points./units)); repaired=0;
-        for k=order
-            if good(k), continue; end
-            repair=q; ii=find(q.vtype~='C'); y=points(:,k)./units;
-            if any(~isfinite(y)), continue; end
-            repair.lb(ii)=round(y(ii)); repair.ub(ii)=repair.lb(ii);
-            repair.vtype(:)='C'; repair.obj=model.obj(col);
-            [y,~]=continuous_solve(repair,min(1,value(ctx.config,'economic_event_lp_time_s',10)),ctx,struct());
-            if ~isempty(y)
-                [good(k),points(:,k)]=decomposition_column(q,y.*units,units,row_scale(rows),ctx);
-            end
-            repaired=repaired+1; if repaired>=2, break; end
-        end
-    end
-    points=unique(points(:,good).','rows','stable').';
-    if isempty(points), error('O1:no_decomposition_seed','No valid local column in block %d.',b); end
-    d.points{b}=points; d.point_columns{b}=col;
-    h=hours(col); h=h(h>0 & h<=T); start_hour=0; length_h=0;
-    if ~isempty(h), start_hour=min(h); length_h=max(h)-start_hour+1; end
-    blocks{b}=struct('col',col,'rows',rows,'model',q,'points',points,'objective',model.obj(col), ...
-        'start_hour',start_hour,'length_h',length_h,'row_scale',row_scale(rows));
-end
-link=find(~assigned); ids=row_ids(link);
-end
-
-function [valid,x]=decomposition_column(q,x,units,row_scale,ctx)
-valid=false; x=x(:);
-if any(~isfinite(x)), return; end
-y=x./units; ii=find(q.vtype~='C');
-if max([0;abs(y(ii)-round(y(ii)))])>1e-6, return; end
-y(ii)=round(y(ii)); x=y.*units;
-if decomposition_violation(q,y)>1e-9, return; end
-res=(q.A*y-q.rhs).*row_scale;
-original=max([0;res(q.sense=='<');abs(res(q.sense=='=')); ...
-    (q.lb-y).*units;(y-q.ub).*units]);
-tolerance=1e-6;
-if ~isempty(ctx), tolerance=ctx.model.options.ConstraintTolerance; end
-valid=original<=tolerance;
-end
-
-function [A,cost,which]=decomposition_master(blocks,link_A,units)
-N=sum(cellfun(@(b) size(b.points,2),blocks)); columns_by_block=cell(numel(blocks),1);
-cost=zeros(N,1); which=zeros(N,1); first=1;
-for b=1:numel(blocks)
-    block=blocks{b}; X=block.points./units(block.col); columns=first:first+size(X,2)-1;
-    columns_by_block{b}=sparse(link_A(:,block.col)*X);
-    cost(columns)=(block.objective.'*X).';
-    which(columns)=b; first=first+size(X,2);
-end
-A=horzcat(columns_by_block{:});
-end
-
-function [centered,shift]=center_master_problem(p,which)
-% Convexity rows stay unchanged: subtract a baseline column within each block.
-B=max(which); N=numel(which); H=sparse(which,1:N,1,B,N);
-first=zeros(B,1); for b=1:B, first(b)=find(which==b,1); end
-mi=size(p.Aineq,1); me=size(p.Aeq,1)-B;
-bi=p.Aineq(:,first); be=p.Aeq(1:me,first); cost=p.f(first);
-centered=p;
-centered.Aineq=p.Aineq-bi*H; centered.bineq=p.bineq-bi*ones(B,1);
-centered.Aeq=[p.Aeq(1:me,:)-be*H;p.Aeq(me+1:end,:)];
-centered.beq=[p.beq(1:me)-be*ones(B,1);p.beq(me+1:end)];
-centered.f=p.f-H.'*cost;
-shift=struct('ineq',bi,'eq',be,'cost',cost,'constant',sum(cost),'blocks',B,'mi',mi,'me',me);
-end
-
-function result=restore_master_result(result,p,shift)
-if isfinite(result.bound), result.bound=result.bound+shift.constant; end
-if ~isempty(result.dual)
-    pi=result.dual(1:shift.mi); tau=result.dual(shift.mi+(1:shift.me));
-    last=numel(result.dual)-shift.blocks+(1:shift.blocks);
-    result.dual(last)=result.dual(last)+shift.cost-shift.ineq.'*pi-shift.eq.'*tau;
-    violation=max([0;p.Aineq.'*result.dual(1:shift.mi)+ ...
-        p.Aeq.'*result.dual(shift.mi+1:end)-p.f]);
-    if violation>1e-6
-        result.dual=[]; result.dual_valid=false; result.bound=-Inf;
-        result.reason="centered_dual_original_check_failed";
-    end
-end
-if ~isempty(result.x)
-    result.original_residual=matrix_violation(p,result.x);
-    if result.original_residual>1e-6
-        result.x=[]; result.primal_valid=false; result.dual=[]; result.dual_valid=false;
-        result.bound=-Inf; result.reason="centered_primal_original_check_failed";
-    end
-end
-if isempty(result.x) && ~isempty(p.x0) && matrix_violation(p,p.x0)<=1e-6
-    result.x=p.x0; result.primal_valid=true;
-    result.original_residual=matrix_violation(p,p.x0); result.reason="validated_annual_seed_fallback";
-end
-end
-
-function pi=decomposition_economic_pi(pi,ids)
-if isempty(pi), return; end
-pi(ids==-2)=0; % External integer floor is retained as proof, excluded from search.
-end
-
-function yes=decomposition_floor_degenerate(pi,ids)
-if isempty(pi), yes=true; return; end
-economic=pi(ids~=-2);
-yes=max([0;abs(economic(:))])<=1e-8;
-end
-
-function weights=decomposition_master_seed(blocks,seeds,p)
-% A verified annual seed supplies a feasible DW upper bound if LP solving fails.
-weights=[]; best=Inf; sizes=cellfun(@(b) size(b.points,2),blocks); first=[0;cumsum(sizes(:))];
-for k=1:size(seeds,2)
-    candidate=zeros(numel(p.f),1); found=true;
-    for b=1:numel(blocks)
-        col=blocks{b}.col;
-        distance=max(abs(blocks{b}.points-seeds(col,k))./max(1,abs(seeds(col,k))),[],1);
-        match=find(distance<=1e-10,1);
-        if isempty(match), found=false; break; end
-        candidate(first(b)+match)=1;
-    end
-    if found && matrix_violation(p,candidate)<=1e-6 && p.f.'*candidate<best
-        weights=candidate; best=p.f.'*candidate;
-    end
-end
-end
-
-function [lower,x,status]=decomposition_price(model,seconds,ctx)
-scale=max(1,max(abs(model.obj))); objective=model.obj; model.obj=objective/scale;
-p=struct('f',model.obj,'Aineq',model.A(model.sense=='<',:),'bineq',model.rhs(model.sense=='<'), ...
-    'Aeq',model.A(model.sense=='=',:),'beq',model.rhs(model.sense=='='), ...
-    'lb',model.lb,'ub',model.ub,'intcon',find(model.vtype~='C'),'x0',model.start);
-task=struct('kind',"block_bound",'focus',3,'attempt',1,'cap',Inf,'time_limit',max(0.01,seconds));
-if strcmp(ctx.config.economics_solver,'gurobi'), raw=gurobi_solve(p,ones(numel(model.obj),1),task,0,ctx); ...
-else, raw=matlab_solve(p,task,0,ctx); end
-lower=raw.bound*scale; lower=lower-decomposition_margin(lower);
-x=raw.x; status=raw.status;
-if ~isfinite(lower)
-    % A short oracle may stop before a finite MIP bound exists. The LP of
-    % the SAME frozen objective is still a valid lower bound for this block.
-    relaxed=relaxation(p,ones(numel(model.obj),1),min(2,max(0.01,seconds)),ctx);
-    if isfinite(relaxed.bound)
-        lower=relaxed.bound*scale; lower=lower-decomposition_margin(lower);
-        status=status+"_LP_LOWER"; % An LP point is never added as an integer column.
-    end
-end
-end
-
-function [cuts,added]=decomposition_add_cut(cuts,cut,maximum,base)
-added=0;
-if ~any(cut.coefficients) || ~isfinite(cut.lower_bound), return; end
-if nargin>=4 && ~isempty(value(base,'cut_witnesses',[]))
-    violation=max(cut.lower_bound-full(cut.coefficients)*base.cut_witnesses(cut.columns,:));
-    if violation>cut_numeric_margin(cut,base), return; end
-end
-for j=1:numel(cuts)
-    if isequal(cut.columns,cuts(j).columns) && isequal(cut.coefficients,cuts(j).coefficients)
-        if cut.lower_bound<=cuts(j).lower_bound+1e-9, return; end
-        % Append a stronger duplicate: a partial sweep retains its frozen row prefix.
-    end
-end
-if numel(cuts)<maximum, cuts(end+1,1)=cut; added=1; end
-end
-
-function hours=decomposition_repair(blocks,which,weights,seed,base,T)
-score=zeros(T,1); hour=variable_hours(base,T); integers=base.physical_problem.intcon;
-if base.grid_exact, integers=setdiff(integers,base.indices.u_purchase(:)); end
-for b=1:numel(blocks)
-    col=blocks{b}.col; x=blocks{b}.points*weights(which==b);
-    local=find(ismember(col,integers) & hour(col)>0 & hour(col)<=T);
-    score=score+accumarray(hour(col(local)),abs(x(local)-seed(col(local)))+ ...
-        abs(x(local)-round(x(local))),[T,1]);
-end
-[~,order]=sort(score,'descend'); hours=order(score(order)>1e-7);
-end
-
-function [pi,ok]=decomposition_level(A,cost,which,rhs,sense,center,lower,upper,seconds,ctx,step,ids)
-pi=center; ok=false;
-if nargin<11, step=2; end
-if ~strcmp(ctx.config.economics_solver,'gurobi') || ~isfinite(lower) || ~isfinite(upper) || seconds<=0, return; end
-R=numel(rhs); B=max(which); N=numel(cost); scale=max(1,abs(center));
-D=spdiags(scale,0,R,R); level=lower+min(step,0.5*max(0,upper-lower));
-model=struct('A',[A.'*D,sparse(1:N,which,1,N,B);-rhs.'*D,-ones(1,B)], ...
-    'rhs',[cost;-level],'sense',repmat('<',N+1,1), ...
-    'lb',-Inf(R+B,1),'ub',Inf(R+B,1),'obj',[-center./scale;zeros(B,1)], ...
-    'Q',spdiags([0.5*ones(R,1);zeros(B,1)],0,R+B,R+B),'modelsense','min');
-model.ub(find(sense=='<'))=0;
-if nargin>=12
-    floor=find(ids==-2); model.lb(floor)=0; model.ub(floor)=0;
-end
-row_scale=max(1,full(max(abs(model.A),[],2)));
-model.A=spdiags(1./row_scale,0,N+1,N+1)*model.A; model.rhs=model.rhs./row_scale;
-params=struct('OutputFlag',0,'Threads',ctx.config.gurobi_threads,'TimeLimit',min(20,seconds), ...
-    'Method',2,'FeasibilityTol',1e-9,'OptimalityTol',1e-9,'BarConvTol',1e-9);
-raw=gurobi(model,params);
-if isfield(raw,'x') && all(isfinite(raw.x)) && decomposition_violation(model,raw.x)<=1e-6
-    pi=raw.x(1:R).*scale; ok=true;
-else
-    fprintf('[O1] level投影未通过检查：状态=%s；保留本轮有效乘子并完整定价。\n',string(raw.status));
-end
-end
-
-function [d,merged]=decomposition_merge(d,cfg)
-merged=false; ranges=d.ranges; lengths=ranges(:,2)-ranges(:,1)+1;
-maximum=value(d,'merge_limit',max(cfg.economic_block_lengths_h));
-eligible=find(lengths(1:end-1)+lengths(2:end)<=maximum);
-if isempty(eligible) && maximum<max(cfg.economic_block_lengths_h)
-    maximum=min(max(cfg.economic_block_lengths_h),2*maximum); d.merge_limit=maximum;
-    eligible=find(lengths(1:end-1)+lengths(2:end)<=maximum);
-    fprintf('[O1] 分块加强试验：允许相邻块合并至%d h，每次最多两组。\n',maximum);
-end
-if isempty(eligible), return; end
-score=zeros(size(eligible));
-for j=1:numel(eligible)
-    boundary=ranges(eligible(j),2);
-    score(j)=sum(abs(d.repair_hours-boundary)<=min(lengths(eligible(j)),24));
-    coupling=value(d,'boundary_scores',[]);
-    if numel(coupling)>=eligible(j), score(j)=score(j)+coupling(eligible(j)); end
-end
-[~,order]=sort(score,'descend'); used=false(size(lengths)); remove=false(size(lengths));
-for j=order.'
-    b=eligible(j); if used(b) || used(b+1), continue; end
-    ranges(b,2)=ranges(b+1,2); remove(b+1)=true; used([b,b+1])=true; merged=true;
-    if sum(remove)>=min(2,max(1,ceil(numel(lengths)/8))), break; end
-end
-d.ranges=ranges(~remove,:); d.sweep=struct(); d.master_upper=Inf; d.price_time=[];
-d.partition_trial=struct('blocks_before',numel(lengths),'lower_before',d.best_lower, ...
-    'completed_sweeps',0,'lower_gain',0);
-d.stalled_sweeps=0; d.dual_sweeps_since_merge=0; d.level_step=4;
-fprintf('[O1] 相邻块自适应合并：%d -> %d块，最大长度%d h；保留历史有效割及下界。\n', ...
-    numel(lengths),size(d.ranges,1),max(d.ranges(:,2)-d.ranges(:,1)+1));
-end
-
 function residual=decomposition_violation(model,x)
 res=model.A*x-model.rhs;
 residual=max([0;res(model.sense=='<');abs(res(model.sense=='='));model.lb-x]);
 if isfield(model,'ub'), residual=max([residual;x-model.ub]); end
 if isfield(model,'vtype')
     ii=model.vtype~='C'; residual=max([residual;abs(x(ii)-round(x(ii)))]);
-end
-end
-
-function margin=decomposition_margin(bound)
-margin=1e-6+1e-9*abs(bound);
-end
-
-function result = relaxation(p,units,seconds,ctx,purpose)
-if nargin<5, purpose="root"; end
-result = struct('x',[],'dual',[],'bound',-Inf,'status',"TIME_LIMIT", ...
-    'primal_valid',false,'dual_valid',false,'algorithm',NaN, ...
-    'original_residual',Inf,'scaled_residual',Inf,'reason',"no_valid_solution");
-if seconds <= 0, return; end
-[model,row_scale] = scaled_model(p,units);
-if strcmp(ctx.config.economics_solver,'gurobi')
-    started=tic; methods=2;
-    if purpose=="master", methods=[1,0]; end
-    for method=methods
-        remaining=seconds-toc(started); if remaining<=0, break; end
-        params = struct('TimeLimit',remaining,'OutputFlag',0,'Method',method, ...
-            'Threads',ctx.config.gurobi_threads,'FeasibilityTol',solver_tolerance(ctx), ...
-            'OptimalityTol',solver_tolerance(ctx));
-        if method==2, params.Crossover=0; end
-        raw=gurobi(model,params); result.status=string(raw.status); result.algorithm=method;
-        current_primal_valid=false;
-        if isfield(raw,'x') && all(isfinite(raw.x))
-            x=raw.x(:).*units; residual=matrix_violation(p,x);
-            result.original_residual=residual; result.scaled_residual=scaled_violation(model,raw.x(:));
-            if purpose~="master" || residual<=1e-6
-                result.x=x; result.primal_valid=true; result.reason="validated_primal";
-                current_primal_valid=true;
-            else
-                result.reason="original_residual_rejected";
-            end
-        end
-        if result.status=="OPTIMAL" && isfield(raw,'pi') && all(isfinite(raw.pi)) && ...
-                (purpose~="master" || current_primal_valid)
-            result.dual=raw.pi(:)./row_scale; result.bound=raw.objval;
-            result.dual_valid=true; result.reason="validated_primal_and_dual"; break;
-        end
-    end
-else
-    options = optimoptions('linprog','Display','none','MaxTime',seconds, ...
-        'ConstraintTolerance',solver_tolerance(ctx),'OptimalityTolerance',solver_tolerance(ctx));
-    [x,obj,flag,~,dual] = linprog(p.f,p.Aineq,p.bineq,p.Aeq,p.beq,p.lb,p.ub,options);
-    if ~isempty(x) && all(isfinite(x))
-        result.original_residual=matrix_violation(p,x);
-        result.scaled_residual=scaled_violation(model,x./units);
-        if purpose~="master" || result.original_residual<=1e-6
-            result.x=x; result.primal_valid=true; result.reason="validated_primal";
-        end
-    end
-    if flag>0 && result.primal_valid
-        result.bound=obj; result.status="OPTIMAL"; result.dual_valid=true;
-        result.dual=-[dual.ineqlin;dual.eqlin]; result.reason="validated_primal_and_dual";
-    end
-end
-if purpose=="master" && isempty(result.x) && ~isempty(p.x0) && ...
-        all(isfinite(p.x0)) && matrix_violation(p,p.x0)<=1e-6
-    result.x=p.x0(:); result.primal_valid=true; result.reason="validated_annual_seed_fallback";
-    result.original_residual=matrix_violation(p,result.x);
-    result.scaled_residual=scaled_violation(model,result.x./units);
-end
-if result.primal_valid
-    result.original_residual=matrix_violation(p,result.x);
-    result.scaled_residual=scaled_violation(model,result.x./units);
-    if result.reason=="original_residual_rejected", result.reason="retained_primal_after_failed_repair"; end
 end
 end
 
@@ -2940,7 +2337,7 @@ if task.kind == "fixed_cost" || task.kind == "plateau_refit"
 elseif task.kind == "loose_count"
     parameters.MIPGapAbs = 0.49;
     % 不再使用“5%进度”停止：计数下界必须是模型最优（整数）证书。
-    parameters.BestBdStop = count_bound_target(task)-1+1e-6;
+    parameters.BestBdStop = task.K-1+1e-6;
 elseif task.kind == "strict_count"
     parameters.MIPGapAbs = 0.49;
     parameters.BestObjStop = task.K_lower+1e-6;
@@ -3028,15 +2425,6 @@ result = struct('x',x,'bound',bound,'status',status);
             stop=values.fval*cost_scale+offset<=task.sat-money_margin(task.sat);
         end
     end
-end
-
-function target = count_bound_target(task)
-if value(task,'concentrated',false)
-    target = task.K;
-    return
-end
-% 计数下界必须来自整数最优证书；不再使用“本轮5%进展”这类非收敛门槛。
-target = task.K;
 end
 
 function [start,candidate] = prepare_start(p,start,base,seconds,cap,ctx)
@@ -3197,4 +2585,176 @@ attempts = reshape([points.attempts],[],1);
 elapsed_s = reshape([points.elapsed_s],[],1);
 source = reshape([points.source],[],1);
 table_out = table(K,cost_lower_usd,cost_upper_usd,status,attempts,elapsed_s,source);
+end
+
+function proof=certified_partition_kernel(model,hour,z,pi,options,run)
+%CERTIFIED_PARTITION_KERNEL Whole-model units throughout; no external price map.
+% model is a continuous, finite-box minimization of the original count.
+% Every local row is kept whole. Only z remains integer in local outer domains.
+t=tic; n=numel(model.obj); m=numel(model.rhs); T=numel(z);
+assert(~isfield(model,'objcon')||model.objcon==0,'partition:constant','count constant must be zero');
+assert(all(isfinite(model.lb))&&all(isfinite(model.ub))&&numel(pi)==m);
+assert(all(model.lb<=model.ub)&&numel(hour)==n&&all(model.lb(z)==0&model.ub(z)==1));
+pi=pi(:); s=model.sense(:); pi(s=='<')=min(0,pi(s=='<')); pi(s=='>')=max(0,pi(s=='>'));
+assert(all(isfinite(pi))); pattern=spones(model.A);
+if isfield(options,'resume')
+    assert(isequal(pi,options.resume.pi),'partition:resume_price','resume dual changed');
+end
+box=max(abs(model.lb(:)),abs(model.ub(:)));
+g=model.obj(:)-model.A'*pi; full_raw=model.rhs(:)'*pi+sum(min(g.*model.lb(:),g.*model.ub(:)));
+proof=struct('version',1,'best',-Inf,'levels',{{}},'pi',pi,'full_raw',full_raw, ...
+    'solver_s',0,'calls',0,'replayed',0,'elapsed_s',0,'status','partial');
+if isfield(options,'resume')
+    proof.levels=options.resume.levels;
+    proof.best=options.resume.best; % Keep later-level certificates during earlier-level restart.
+end
+prior=[]; previous_part=[]; previous_q=[]; previous_l=[];
+for li=1:numel(options.levels)
+    H=options.levels(li); K=ceil(T/H); own=zeros(n,1);
+    if ~isempty(previous_part)&&mod(H,previous_part.H)~=0
+        previous_part=[];  % Independent valid level; non-nested blocks cannot merge.
+    end
+    h=hour(:); valid=isfinite(h)&h>=1&h<=T+1&h==round(h);
+    own(valid)=floor((min(h(valid),T)-1)/H)+1;
+    extra=find(~valid); own(extra)=K+(1:numel(extra))'; K=K+numel(extra);
+    groups=sparse(1:n,own,1,n,K); p=pattern*groups; p=spones(p);
+    degree=full(sum(p,2)); cross=degree~=1;
+    owner_row=full(p*(1:K)')./max(1,degree); owner_row(cross)=0;
+    cols=cell(K,1); rows=cell(K,1);
+    for j=1:K, cols{j}=find(own==j); rows{j}=find(~cross&owner_row==j); end
+    assert(sum(cellfun(@numel,cols))==n&&sum(cellfun(@numel,rows))+nnz(cross)==m);
+    q=model.obj(:)-model.A(cross,:)'*pi(cross);
+    bp=model.rhs(cross).*pi(cross); B=sum(bp); guardB=1e-6+1e-9*(1+sum(abs(bp)));
+    lp=zeros(K,1); lp_raw=zeros(K,1); ell=zeros(K,1); seed=-Inf(K,1);
+    for j=1:K
+        cj=cols{j}; ij=rows{j}; localbp=model.rhs(ij).*pi(ij);
+        gj=q(cj)-model.A(ij,cj)'*pi(ij);
+        raw=sum(localbp)+sum(min(gj.*model.lb(cj),gj.*model.ub(cj)));
+        guard=1e-6+1e-9*(1+abs(raw)+sum(abs(localbp))+sum(abs(gj).*box(cj)));
+        lp(j)=raw-guard; lp_raw(j)=raw;
+        if ~isempty(previous_part)
+            assert(all(cross<=previous_part.cross),'partition:merge','cross sets are not nested');
+            kids=unique(previous_part.own(cj)); oldcols=vertcat(previous_part.cols{kids});
+            assert(isequal(sort(oldcols),cj),'partition:merge','parent does not cover whole children');
+            newly_local=ij(previous_part.cross(ij));
+            delta=q(cj)-previous_q(cj)-model.A(newly_local,cj)'*pi(newly_local);
+            bterm=model.rhs(newly_local).*pi(newly_local);
+            correction=sum(min(delta.*model.lb(cj),delta.*model.ub(cj)));
+            mg=1e-6+1e-9*(1+sum(abs(bterm))+sum(abs(delta).*box(cj)));
+            seed(j)=sum(previous_l(kids))+sum(bterm)+correction-mg;
+        end
+    end
+    assert(abs(B+sum(lp_raw)-full_raw)<1e-6,'partition:identity','full dual identity failed');
+    ell=max(lp,seed); records=cell(K,1); next=1;
+    if isfield(options,'resume')&&numel(options.resume.levels)>=li
+        prior=options.resume.levels{li};
+        assert(prior.H==H&&numel(prior.l)==K&&isequal(prior.cross,find(cross)));
+        ell=max(ell,prior.l); records=prior.records; next=prior.next;
+    end
+    level_file=fullfile(run,'checkpoints',sprintf('H%d_level_map.mat',H));
+    save(level_file,'own','cross','cols','rows','B','guardB','q','lp','seed','-v7.3');
+    C=struct('H',H,'B',B,'guardB',guardB,'lp',lp,'seed',seed,'l',ell, ...
+        'records',{records},'next',next,'cross',find(cross),'certificate',B-guardB+sum(ell));
+    proof.levels{li}=C; proof.best=max(proof.best,C.certificate); proof.elapsed_s=toc(t);
+    partition_write_checkpoint(run,proof);
+    for j=next:K
+        if toc(t)>=options.budget_s-5, break; end
+        cj=cols{j}; ij=rows{j}; inz=ismember(cj,z);
+        if ~any(inz)
+            records{j}=struct('bound',struct('safe',ell(j),'status','continuous_box_floor'), ...
+                'model_file','','raw_file','','solver_s',0);
+            continue
+        end
+        local=struct('A',model.A(ij,cj),'rhs',model.rhs(ij),'sense',s(ij), ...
+            'obj',q(cj),'lb',model.lb(cj),'ub',model.ub(cj), ...
+            'vtype',repmat('C',numel(cj),1),'modelsense','min');
+        local.vtype(inz)='B';
+        if isfield(options,'start')&&numel(options.start)==n
+            local.start=options.start(cj);
+        end
+        gp=struct('TimeLimit',min(options.times(li),options.budget_s-toc(t)-3), ...
+            'Threads',options.threads,'OutputFlag',1,'MIPGap',0,'MIPGapAbs',0, ...
+            'FeasibilityTol',1e-9,'IntFeasTol',1e-9,'OptimalityTol',1e-9,'Seed',20261017);
+        prefix=sprintf('H%d_b%03d',H,j);
+        mf=fullfile(run,'checkpoints',[prefix '_model.mat']);
+        rf=fullfile(run,'checkpoints',[prefix '_raw.mat']);
+        replay=false; attempt=0;
+        while isfile(mf)||isfile(rf)
+            if isfile(mf)&&isfile(rf)
+                try
+                    oldm=load(mf,'local','cj','ij'); oldr=load(rf,'r','elapsed','err');
+                    same=isequal(oldm.cj,cj)&&isequal(oldm.ij,ij);
+                    for name={'A','rhs','sense','obj','lb','ub','vtype','modelsense'}
+                        same=same&&isequal(oldm.local.(name{1}),local.(name{1}));
+                    end
+                    if same&&isfield(oldr.r,'status')
+                        r=oldr.r; err=oldr.err; replay=true; break;
+                    end
+                catch
+                    % Incomplete evidence remains untouched; use a fresh attempt.
+                end
+            end
+            attempt=attempt+1; label=sprintf('%s_a%03d',prefix,attempt);
+            mf=fullfile(run,'checkpoints',[label '_model.mat']);
+            rf=fullfile(run,'checkpoints',[label '_raw.mat']);
+        end
+        elapsed=0;
+        if replay
+            proof.replayed=proof.replayed+1;
+        else
+            save(mf,'local','gp','cj','ij','level_file','-v7.3');
+            ts=tic; err=''; r=struct('status','MATLAB_ERROR');
+            try, r=gurobi(local,gp); catch me, err=me.message; end
+            elapsed=toc(ts); save(rf,'r','elapsed','err','-v7.3');
+            proof.solver_s=proof.solver_s+elapsed; proof.calls=proof.calls+1;
+        end
+        bd=partition_mip_bound(local,r);
+        if isfinite(bd.safe), ell(j)=max(ell(j),bd.safe); end
+        records{j}=struct('bound',bd,'model_file',mf,'raw_file',rf,'solver_s',elapsed);
+        C=struct('H',H,'B',B,'guardB',guardB,'lp',lp,'seed',seed,'l',ell, ...
+            'records',{records},'next',j+1,'cross',find(cross), ...
+            'certificate',B-guardB+sum(ell));
+        proof.levels{li}=C; proof.best=max(proof.best,C.certificate); proof.elapsed_s=toc(t);
+        partition_write_checkpoint(run,proof);
+        if j==1||mod(j,10)==0||j==K
+            fprintf('PARTITION H=%d b=%d/%d L=%.12g best=%.12g K=%g seconds=%.2f\n', ...
+                H,j,K,C.certificate,proof.best,ceil(proof.best-1e-5),toc(t));
+        end
+    end
+    C=struct('H',H,'B',B,'guardB',guardB,'lp',lp,'seed',seed,'l',ell, ...
+        'records',{records},'next',j,'cross',find(cross),'certificate',B-guardB+sum(ell));
+    % next denotes the first unsolved block, including an untouched level.
+    called=cellfun(@(x)~isempty(x),records); last=find(called,1,'last');
+    if isempty(last), C.next=1; else, C.next=last+1; end
+    proof.levels{li}=C; proof.best=max(proof.best,C.certificate);
+    previous_part=struct('H',H,'own',own,'cols',{cols},'cross',cross);
+    previous_q=q; previous_l=ell;
+    if toc(t)>=options.budget_s-5, break; end
+end
+proof.elapsed_s=toc(t); proof.K_lower=ceil(proof.best-1e-5);
+if li==numel(options.levels)&&C.next>K, proof.status='complete'; end
+partition_write_checkpoint(run,proof);
+end
+
+function partition_write_checkpoint(run,proof)
+file=fullfile(run,'checkpoints','partition_progress.mat');
+tmp=fullfile(run,'checkpoints','partition_progress.tmp.mat');
+save(tmp,'proof','-v7.3'); movefile(tmp,file,'f');
+end
+
+function B=partition_mip_bound(model,r)
+trusted={'OPTIMAL','TIME_LIMIT','NODE_LIMIT','ITERATION_LIMIT','SOLUTION_LIMIT', ...
+    'WORK_LIMIT','MEM_LIMIT','INTERRUPTED','SUBOPTIMAL','USER_OBJ_LIMIT'};
+B=struct('safe',-Inf,'raw',-Inf,'guard',NaN,'status',r.status);
+if ~any(strcmp(upper(r.status),trusted)), return; end
+values=[];
+for name={'objboundc','objbound'}
+    if isfield(r,name{1})&&isscalar(r.(name{1}))&&isfinite(r.(name{1}))
+        values(end+1)=r.(name{1}); %#ok<AGROW>
+    end
+end
+if isempty(values), return; end
+raw=min(values); guard=1e-6+1e-9*(1+abs(raw)+ ...
+    sum(abs(model.obj(:)).*max(abs(model.lb(:)),abs(model.ub(:)))));
+B.raw=raw; B.guard=guard; B.safe=raw-guard;
 end
