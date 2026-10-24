@@ -8,7 +8,14 @@ if ~exist('continue_economic_search', 'var') || isempty(continue_economic_search
     continue_economic_search = false;
 end
 validateattributes(continue_economic_search, {'logical','numeric'}, {'scalar','binary'});
-clearvars -except study_year continue_economic_search;
+% 是否启用缓存：true=读取并写入src/cache下已有证据，可跨轮次续算；
+% false=不读也不写任何缓存，全部从头重算（不会覆盖src/cache里的既有成果）。
+if ~exist('use_cache', 'var') || isempty(use_cache)
+    use_cache = true;
+end
+validateattributes(use_cache, {'logical','numeric'}, {'scalar','binary'});
+use_cache = logical(use_cache);
+clearvars -except study_year continue_economic_search use_cache;
 clc;
 
 source_dir = fileparts(mfilename('fullpath'));
@@ -138,7 +145,7 @@ o1_config.max_time_s = 1200;
 o1_config.cost_relative_gap = 1e-3;
 o1_config.change_epsilon = 0.01;
 o1_config.enable_window_cuts = false;
-o1_config.use_cache = true;
+o1_config.use_cache = use_cache;
 o1_config.display = 'iter';
 if ~continue_economic_search
     % 完整一轮包含根LP及全部局部块；结果来自实际证书和当前矩阵核验的调度。
@@ -160,6 +167,11 @@ end
 fprintf('[main] 运行模式：继续区间搜索=%d；分区=%s h，局部时限=%g/%g s。\n', ...
     continue_economic_search,mat2str(o1_config.economic_block_lengths_h), ...
     o1_config.economic_block_time_s,o1_config.economic_block_max_time_s);
+if use_cache
+    fprintf('[main] 缓存：启用，读取并写入 %s。\n', cache_directory);
+else
+    fprintf('[main] 缓存：未启用，不读不写缓存，全部从头重算。\n');
+end
 O1_results = baseline(params, renewable_data, ...
     @(model) O1(model, o1_config));
 Kref = O1_results.Kref;

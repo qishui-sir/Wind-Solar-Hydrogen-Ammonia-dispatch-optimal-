@@ -1,0 +1,55 @@
+{
+  "passed_structure_checks": true,
+  "created_at_local": "2026-10-24",
+  "chapter_count": 5,
+  "sheets": [
+    {
+      "sheet": "01 论文总览",
+      "topics": 68,
+      "depth": 4,
+      "main_branches": 8
+    },
+    {
+      "sheet": "02 五章写作详纲",
+      "topics": 250,
+      "depth": 5,
+      "main_branches": 5
+    },
+    {
+      "sheet": "03 公式证据、图表与补证路线",
+      "topics": 200,
+      "depth": 5,
+      "main_branches": 8
+    }
+  ],
+  "total_topics": 518,
+  "xml_topics": 518,
+  "status_topics": {
+    "plain": 447,
+    "pending": 32,
+    "boundary": 22,
+    "existing": 17
+  },
+  "xmind_sha256": "5c8526b9af6491f00a874a5fb8cbc9fd0b46e8521df3df0af7a189ff86bc9475",
+  "source_sha256": "901ce53d3daad60af2d54002612eb9afbef63199a6e449c0421a4e0d6ddb8929",
+  "outline_sha256": "075ba6dc2cd96472360910dcbe2652ab2dd3ce1911287e071915a98c120c4d3e",
+  "plugin": {
+    "cloud_created": false,
+    "guide_error": "Unknown tool",
+    "whoami_error": "Unknown tool"
+  },
+  "native_open_checked": false,
+  "solver_calls": 0,
+  "format_sources": [
+    "https://github.com/xmindltd/xmind-sdk-js/blob/master/src/common/model.ts",
+    "https://github.com/xmindltd/xmind-viewer/blob/master/src/xmindLoader.ts"
+  ],
+  "five_chapter_revision_checks": {
+    "passed": true,
+    "chapter_count": 5,
+    "result_subsections": 10,
+    "old_seven_chapter_map_preserved": true,
+    "source_and_embedded_snapshot_match": true,
+    "stale_chapter_six_seven_topics": 0
+  }
+}
