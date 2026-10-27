@@ -49,6 +49,7 @@ end
 upper_primal_schedule=value(state,'primal_schedule',struct());
 upper_event_schedule=value(state,'event_schedule',struct());
 state = prepare_search_state(state, cfg);
+state = revalidate_cached_witnesses(state,base,ctx);
 if partition_enabled
     % A better validated cached primal can tighten fail before context reuse is decided.
     reference = merge_reference(reference, state.reference, ctx, base);
@@ -100,7 +101,7 @@ if ~partition_enabled
     reference = merge_reference(reference, state.reference, ctx, base);
 end
 state = import_cost_cache(state, ctx, base);
-state = register_reference_point(state, reference, ctx, base);
+[state,reference] = register_reference_point(state, reference, ctx, base);
 [state, economic] = certify(state, reference, feasibility, ctx);
 initial_width = economic.K_upper-economic.K_lower;
 state.structural_report = struct('initial_width',initial_width,'current_width',initial_width, ...
@@ -1046,7 +1047,7 @@ outputs = struct('reference',reference,'boundaries',economic,'state',state, ...
         band_after = reference.objective_upper-reference.objective_lower;
         % 参考带由参考MILP的可达对偶界决定；收窄不足10%视为停滞，不再占用决定性预算。
         state.reference_stalled_this_run = ~(band_after < 0.9*band_before);
-        state = register_reference_point(state,reference,ctx,base);
+        [state,reference] = register_reference_point(state,reference,ctx,base);
         ctx.services.save_reference(reference,ctx);
         finish_task();
         fprintf(['[O1] 参考成本收紧为[%.3f,%.3f] USD，带宽%.3f -> %.3f USD' ...
@@ -1481,9 +1482,17 @@ reference.cost_components = ctx.services.evaluate_cost_components(reference.solu
 reference.operation_metrics = ctx.services.evaluate_operation_metrics(reference.solution,ctx);
 end
 
-function state = register_reference_point(state,reference,ctx,base)
+function [state,reference] = register_reference_point(state,reference,ctx,base)
 [x,solution,cost,count,residual] = validate_solution(reference.solution,base,ctx,ctx.T);
 if isempty(x), error('O1:invalid_reference','参考解未通过原矩阵核验。'); end
+reference.solution = solution;
+reference.count_upper = count;
+reference.objective_upper = cost;
+reference.system_cost_upper = cost;
+reference.absolute_gap = cost-reference.objective_lower;
+reference.relative_gap = max(0,reference.absolute_gap)/max(1,abs(cost));
+reference.cost_components = ctx.services.evaluate_cost_components(solution,ctx);
+reference.operation_metrics = ctx.services.evaluate_operation_metrics(solution,ctx);
 point = empty_point(count);
 point.solution = solution;
 point.has_incumbent = true;
@@ -2567,7 +2576,14 @@ end
 function [x,solution,cost,count,residual] = validate_solution(solution,base,ctx,K)
 x = []; cost = Inf; count = Inf; residual = Inf;
 if ~isstruct(solution) || isempty(fieldnames(solution)), return; end
+original=solution;
 solution = ctx.services.add_change_indicators(solution,ctx);
+[solution,platform_ok] = restore_constant_platforms(solution,base,ctx);
+if ~platform_ok && all(isfield(original,{'HB_load','O1_HB_setpoint','O1_HB_change'}))
+    % Preserve genuine sub-tolerance updates if the original binary mode is valid.
+    [solution,platform_ok] = restore_constant_platforms(original,base,ctx);
+end
+if ~platform_ok, return; end
 candidate = solution_vector(base.indices,solution,numel(base.cost_f));
 if isempty(candidate) || any(~isfinite(candidate)), return; end
 p = value(base,'physical_problem',base.problem);
@@ -2580,6 +2596,99 @@ if count > K, return; end
 cost = evaluate(ctx.system_cost_usd,solution);
 if ~isfinite(cost), return; end
 x = candidate;
+end
+
+function [solution,ok] = restore_constant_platforms(solution,base,ctx)
+% Reject accumulated row-tolerance drift; only s/z are restored, never dispatch.
+ok=false; T=ctx.T;
+h=solution.HB_load(:); s=solution.O1_HB_setpoint(:); z=solution.O1_HB_change(:);
+if numel(h)~=T || numel(s)~=T || numel(z)~=T || any(~isfinite([h;s;z])), return; end
+binary=round(z);
+if max(abs(z-binary))>1e-6 || any(binary~=0 & binary~=1), return; end
+z=binary;
+p=value(base,'physical_problem',base.problem);
+columns=base.indices.O1_HB_setpoint(:);
+half=ctx.config.change_epsilon/2;
+tolerance=1e-12*max(1,max(abs(h)));
+cuts=find(z==1);
+if isempty(cuts)
+    order=(1:T).'; ends=T;
+else
+    order=mod(cuts(1)+(0:T-1).',T)+1;
+    ends=find(z(order)==1);
+end
+first=1;
+for last=ends(:).'
+    hours=order(first:last);
+    lower=max([h(hours)-half;p.lb(columns(hours))]);
+    upper=min([h(hours)+half;p.ub(columns(hours))]);
+    if lower>upper+2*tolerance, return; end
+    if lower<=upper
+        restored=min(upper,max(lower,s(hours(1))));
+    else
+        restored=(lower+upper)/2;
+    end
+    s(hours)=restored;
+    first=last+1;
+end
+delta=[s(2:end);s(1)]-s;
+z=double(delta~=0); % Exact equality inside each restored cyclic platform.
+if max(abs(h-s))>half+tolerance || ...
+        any(s<p.lb(columns)-tolerance | s>p.ub(columns)+tolerance) || ...
+        max(abs(delta)-(ctx.HB_ramp+ctx.config.change_epsilon)*z)>2*tolerance
+    return
+end
+solution.O1_HB_setpoint=s;
+solution.O1_HB_change=z;
+ok=true;
+end
+
+function state = revalidate_cached_witnesses(state,base,ctx)
+% Recheck all cached uppers; keep every independent lower-bound certificate.
+checked=0; rejected=0;
+for collection={'points','caps'}
+    name=collection{1}; records=value(state,name,[]);
+    for i=1:numel(records)
+        if ~value(records(i),'has_incumbent',false), continue; end
+        checked=checked+1; K=ctx.T;
+        if strcmp(name,'points'), K=records(i).K; end
+        [x,solution,cost,count,residual]=validate_solution( ...
+            value(records(i),'solution',struct()),base,ctx,K);
+        cap=value(records(i),'cost_cap_usd',Inf);
+        valid=~isempty(x) && (~isfinite(cap) || cost<=cap+money_margin(cap));
+        records(i).has_incumbent=valid;
+        if valid
+            records(i).solution=solution;
+            records(i).cost_upper_usd=cost;
+            records(i).count_upper=count;
+        else
+            records(i).solution=struct();
+            records(i).cost_upper_usd=Inf;
+            records(i).count_upper=Inf;
+            rejected=rejected+1;
+        end
+        if isfield(records,'matrix_violation'), records(i).matrix_violation=residual; end
+    end
+    if isfield(state,name), state.(name)=records; end
+end
+reference=value(state,'reference',struct());
+if value(reference,'has_incumbent',false)
+    checked=checked+1;
+    [x,solution,cost,count]=validate_solution(value(reference,'solution',struct()),base,ctx,ctx.T);
+    reference.has_incumbent=~isempty(x);
+    if isempty(x)
+        reference.solution=struct(); reference.objective_upper=Inf;
+        reference.system_cost_upper=Inf; rejected=rejected+1;
+    else
+        reference.solution=solution; reference.objective_upper=cost;
+        reference.system_cost_upper=cost; reference.count_upper=count;
+    end
+    state.reference=reference;
+end
+state.witness_validation=struct('version',1,'checked',checked,'rejected',rejected);
+if checked>0
+    fprintf('[O1] 原域平台重核：%d个旧见证，拒绝%d个；独立下界证据保留。\n',checked,rejected);
+end
 end
 
 function residual = matrix_violation(p,x)

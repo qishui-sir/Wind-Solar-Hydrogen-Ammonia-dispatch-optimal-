@@ -9,7 +9,7 @@ if ~exist('continue_economic_search', 'var') || isempty(continue_economic_search
 end
 validateattributes(continue_economic_search, {'logical','numeric'}, {'scalar','binary'});
 % 是否启用缓存：true=读取并写入src/cache下已有证据，可跨轮次续算；
-% false=不读也不写任何缓存，全部从头重算（不会覆盖src/cache里的既有成果）。
+% false=不复用/回写旧缓存状态；分区模型、raw和检查点仍保存到本轮独立证据目录。
 if ~exist('use_cache', 'var') || isempty(use_cache)
     use_cache = true;
 end
@@ -22,10 +22,9 @@ source_dir = fileparts(mfilename('fullpath'));
 project_dir = fileparts(source_dir);
 params_dir = fullfile(source_dir, 'params');
 results_dir = fullfile(source_dir, 'results');
-class_dir = fullfile(source_dir, 'class');
 algorithm_dir = fullfile(source_dir, 'algorithm');
 o1_dir = fullfile(algorithm_dir, 'O1');
-addpath(source_dir, params_dir, results_dir, class_dir, ...
+addpath(source_dir, params_dir, results_dir, ...
     algorithm_dir, o1_dir);
 
 data_cfg = struct();
@@ -40,8 +39,6 @@ fprintf('[main] study year=%d, modeled hours=%d.\n', ...
 params = my_system('s2');
 params.AEL.common.startup = true;
 params.solver.relative_gap = 0.02;
-
-ael_output = qi_ael_model(2000, 0, params.AEL.detail); 
 
 fprintf('[main] AEL startup electricity=%d (%.2f load fraction/h), no extra charge\n', ...
     params.AEL.common.startup, params.AEL.common.startup_elec);
@@ -118,7 +115,8 @@ o1_config.economic_points_per_round = 1;
 o1_config.economic_final_interval = 20;
 o1_config.economic_cut_margin = 1e-5;
 o1_config.economic_annual_cut_limit = 0;
-% 购售电净额抵消经矩阵条件检查；证明阶段保留AEL台数和启停整数。
+% 购售电净额抵消经矩阵条件检查；full用于决定性原整数模型。
+% 分区下界另按固定根LP价格保留局部HB更新整数，放松其余整数。
 o1_config.economic_grid_simplify = true;
 o1_config.economic_proof_mode = 'full';
 % 完整有限盒分块证书独立推进下界；旧DW/分支定价和派生割保持关闭。
@@ -170,7 +168,7 @@ fprintf('[main] 运行模式：继续区间搜索=%d；分区=%s h，局部时�
 if use_cache
     fprintf('[main] 缓存：启用，读取并写入 %s。\n', cache_directory);
 else
-    fprintf('[main] 缓存：未启用，不读不写缓存，全部从头重算。\n');
+    fprintf('[main] 缓存：不复用旧状态；本轮分区审计证据仍保存到独立目录。\n');
 end
 O1_results = baseline(params, renewable_data, ...
     @(model) O1(model, o1_config));
