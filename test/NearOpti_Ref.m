@@ -60,6 +60,14 @@ if ~(cfg.stop_after_decision && best.valid && best.count <= cfg.threshold_K)
         extra.BestBdStop = cfg.threshold_K + 100 * cfg.integer_bound_guard;
     end
     run = solve_model(m, f, 0, best.x, cfg.solve_time_s, cfg, extra, false, '极窄近优最少更新');
+    % 主求解返回后立即保留原始结果；后续验收或导表异常不应吞掉整轮结果。
+    result.status = "solver_returned_pending_validation";
+    result.solver_status = run.status;
+    result.raw_solver = run.raw;
+    result.solver_native_x = run.x;
+    result.solver_indices = m.indices;
+    result.elapsed_s = toc(clock);
+    assignin('base', 'NearOpti_Ref_result', result);
     if ~isempty(run.x)
         candidate = check_point(vector_solution(run.x, m.indices), m, ctx, cfg);
         if candidate.valid && candidate.cost <= B0 && (~best.valid || candidate.count < best.count)
@@ -75,7 +83,6 @@ if best.valid
     assert(lower <= best.count, '计数下界超过当前验证见证，停止使用矛盾证据。');
     result.count_upper = best.count;
     result.solution = best.solution;
-    result.dispatch = dispatch_table(best.solution, ctx);
     result.cost_usd = best.cost;
     result.max_original_residual = best.residual;
 end
@@ -101,6 +108,7 @@ else
 end
 fprintf('近优带最低更新次数区间=[%g, %g]，状态=%s，总耗时=%.1f s。\n', ...
     result.count_lower, result.count_upper, char(result.solver_status), result.elapsed_s);
+result = publish_result(result, ctx, 'NearOpti_Ref_result');
 fprintf('查看NearOpti_Ref_result；本次没有写入任何报告、缓存或调度文件。\n');
 end
 
@@ -434,17 +442,46 @@ m.p.Aineq = [m.p.Aineq; m.cost_f.'];
 m.p.bineq = [m.p.bineq(:); cap - m.cost_offset];
 end
 
+function result = publish_result(result, ctx, variable_name)
+% 先发布完整数值结论和已验收解，再构建显示表；导表失败单独标记。
+assignin('base', variable_name, result);
+result.dispatch_status = "no_validated_solution";
+if ~isempty(fieldnames(result.solution))
+    try
+        result.dispatch = dispatch_table(result.solution, ctx);
+        result.dispatch_status = "complete";
+    catch exception
+        result.dispatch = table();
+        result.dispatch_status = "failed";
+        result.dispatch_error = string(exception.message);
+        warning('Experiment:DispatchExportFailed', ...
+            '数值结果已保留在%s，调度表未生成：%s', variable_name, exception.message);
+    end
+end
+assignin('base', variable_name, result);
+end
+
 function table_out = dispatch_table(solution, ctx)
 table_out = table();
 if isempty(fieldnames(solution)), return; end
 T = ctx.T;
-table_out = table(ctx.data.time(:), solution.HB_load(:), solution.O1_HB_setpoint(:), ...
-    solution.O1_HB_change(:), solution.p_purchase(:) / 1000, ...
-    solution.p_sell(:) / 1000, solution.p_curt(:) / 1000, solution.P_AEL(:) / 1000, ...
-    ctx.params.AEL.common.startup_elec * ctx.params.AEL.common.module_power * solution.SU_AEL(:) / 1000, ...
-    solution.storage_H2(1:T), solution.storage_H2(2:T+1), solution.n_ael(:), ...
-    'VariableNames', {'Time', 'HB_load', 'HB_setpoint', 'Update_after_hour', ...
+% varindex恢复的变量可能是行向量，库存必须先统一为列再切片。
+inventory = solution.storage_H2(:);
+assert(numel(inventory) == T + 1, 'Experiment:InventoryLength', ...
+    '储氢状态应有T+1=%d个元素，实际为%d个。', T + 1, numel(inventory));
+names = {'Time', 'HB_load', 'HB_setpoint', 'Update_after_hour', ...
     'Purchase_MW', 'Sales_MW', 'Curtail_MW', 'AEL_MW', 'AEL_start_MW', ...
-    'H2_start_kg', 'H2_end_kg', 'AEL_online_modules'});
+    'H2_start_kg', 'H2_end_kg', 'AEL_online_modules'};
+columns = {ctx.data.time, solution.HB_load, solution.O1_HB_setpoint, ...
+    solution.O1_HB_change, solution.p_purchase / 1000, ...
+    solution.p_sell / 1000, solution.p_curt / 1000, solution.P_AEL / 1000, ...
+    ctx.params.AEL.common.startup_elec * ctx.params.AEL.common.module_power * solution.SU_AEL / 1000, ...
+    inventory(1:T), inventory(2:T+1), solution.n_ael};
+for j = 1:numel(columns)
+    columns{j} = columns{j}(:);
+    assert(numel(columns{j}) == T, 'Experiment:DispatchColumnLength', ...
+        '调度表列%s应有T=%d行，实际为%d行。', names{j}, T, numel(columns{j}));
+end
+table_out = table(columns{:}, 'VariableNames', names);
 end
 
