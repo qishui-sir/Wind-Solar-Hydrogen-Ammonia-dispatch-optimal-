@@ -2,12 +2,17 @@ function out = Calculate_K(K, solve_time_s, opts)
 %CALCULATE_K 固定更新预算K的年度最小成本求解，并登记进主程序经济阈值缓存。
 %   CALCULATE_K(K)              默认求解时长3600 s。
 %   CALCULATE_K(K,solve_time_s) 指定求解时长（秒），例如 CALCULATE_K(700,3600)。
-%   CALCULATE_K(...,opts)       仅供调试：覆盖 stall_time_s / cache_file 等字段。
+%   CALCULATE_K(...,opts)       仅供调试：覆盖 cache_file / mip_gap_abs_usd 等字段。
 %
 % 求解对象是原年度模型的 F(K)=min C(x) s.t. N(x)<=K：目标为年度净系统成本，
 % 唯一新增约束是更新预算。经济容许损失delta不是本函数的输入——它只决定main
 % 读取该点后如何判定经济合格，由main自身配置决定，与本求解无关。
-% 连续 stall_time_s 没有改进即停止，并采用当前已核验的可行解作为该K的经济解。
+%
+% 单点独立求解：不做停滞提前停止，Gurobi在同一棵搜索树上持续改进，给定时间越长
+% [cost_lower,cost_upper]只会收窄。obj.seed_mode控制起点：
+%   'cache'（默认）只取满足本K预算的缓存解作为初始上界，不改变下界，也不限制后续
+%          改进；实测冷启动900 s仍找不到任何可行解，故实际使用必须给一个可行起点。
+%   'none'  完全冷启动，只适合有充裕机时或需要验证独立性的场合。
 % 只有同时通过原年度矩阵、原整数集合、平台语义与成本重算的解才写入缓存；
 % 缓存签名不一致时拒绝改写，绝不覆盖现有证据。
 arguments
@@ -25,7 +30,7 @@ out = run_fixed_budget(cfg, mfilename('fullpath'));
 end
 
 function out = run_fixed_budget(cfg, entry_file)
-%RUN_FIXED_BUDGET 建模、分片求解、原域核验并写入缓存。
+%RUN_FIXED_BUDGET 建模、单次长时限求解、原域核验并写入缓存。
 old_path = path;
 path_cleanup = onCleanup(@() path(old_path));
 clock = tic;
@@ -33,21 +38,29 @@ ctx = build_context(cfg, entry_file);
 validateattributes(cfg.K, {'numeric'}, ...
     {'scalar', 'integer', 'nonnegative', '<=', ctx.T});
 out = struct('status', "not_started", 'K', cfg.K, ...
-    'cost_lower_usd', -Inf, 'cost_upper_usd', Inf, 'count', Inf, ...
+    'cost_lower_usd', -Inf, 'cost_upper_usd', Inf, 'gap_usd', Inf, ...
+    'count', Inf, ...
     'reference_cost_usd', NaN, 'overrun_usd', NaN, 'overrun_usd_t', NaN, ...
-    'solution', struct(), 'solver_status', "NOT_RUN", 'slices', 0, ...
-    'stalled', false, 'elapsed_s', 0, 'cache_file', ctx.cache_file, ...
-    'cache_written', false);
+    'solution', struct(), 'solver_status', "NOT_RUN", ...
+    'elapsed_s', 0, 'cache_file', ctx.cache_file, 'cache_written', false);
 fprintf(['\n[Calculate_K] 年份=%d，时段=%d，跟踪总带宽=%.4f，更新预算K=%d；' ...
-    '时限=%.0f s，停滞阈值=%.0f s。\n'], ...
-    cfg.year, ctx.T, cfg.tracking_width, cfg.K, ...
-    cfg.total_time_s, cfg.stall_time_s);
+    '单点求解时限=%.0f s，冷启动且不继承其它K的解。\n'], ...
+    cfg.year, ctx.T, cfg.tracking_width, cfg.K, cfg.total_time_s);
 m = with_count_budget(ctx.full, cfg.K);
-[seed, seed_cost] = pick_seed(ctx, m, cfg);
-[run, info] = solve_with_stall(m, cfg, seed, seed_cost, ...
+seed = [];
+if strcmpi(cfg.seed_mode, 'cache')
+    [seed, seed_point] = pick_seed(ctx, m, cfg);
+    if ~isempty(seed)
+        fprintf(['[Calculate_K] 初始上界取自缓存可行解：成本=%.6f USD，更新=%g次；' ...
+            '它只是上界起点，不限制求解器继续改进。\n'], ...
+            seed_point.cost, seed_point.count);
+    else
+        fprintf('[Calculate_K] 缓存中没有满足K的可行解，本次冷启动。\n');
+    end
+end
+run = solve_model(m, m.cost_f, m.cost_offset, seed, cfg.total_time_s, cfg, ...
+    struct('MIPGapAbs', cfg.mip_gap_abs_usd), false, ...
     sprintf('K=%d最小成本', cfg.K));
-out.slices = info.slices;
-out.stalled = info.stalled;
 out.solver_status = run.status;
 out.elapsed_s = toc(clock);
 if run.status == "INFEASIBLE"
@@ -82,16 +95,24 @@ out.residual = candidate.residual;
 assert(out.cost_lower_usd <= out.cost_upper_usd + cfg.money_guard_usd, ...
     'Calculate_K:inconsistent_bounds', ...
     '成本下界超过已核验上界，停止使用该数值证据。');
+out.gap_usd = out.cost_upper_usd - out.cost_lower_usd;
 if isfinite(ctx.cached.reference_left)
     % 与参考下界的差额就是该点在前沿上的横坐标；不依赖任何经济预算假设。
     out.reference_cost_usd = ctx.cached.reference_left;
     out.overrun_usd = out.cost_upper_usd - ctx.cached.reference_left;
     out.overrun_usd_t = out.overrun_usd / cfg.target_t;
 end
-fprintf(['[Calculate_K] 求解状态=%s（%d片，停滞=%d）；成本区间=[%.6f, %.6f] USD；' ...
+fprintf(['[Calculate_K] 求解状态=%s；成本区间=[%.6f, %.6f] USD；' ...
     '实际更新=%g次；原矩阵残差=%.3g。\n'], char(out.solver_status), ...
-    out.slices, out.stalled, out.cost_lower_usd, out.cost_upper_usd, ...
-    out.count, out.residual);
+    out.cost_lower_usd, out.cost_upper_usd, out.count, out.residual);
+fprintf('[Calculate_K] 成本区间宽度=%.3f USD（占上界%.4g%%）。\n', ...
+    out.gap_usd, 100 * out.gap_usd / max(1, abs(out.cost_upper_usd)));
+if out.gap_usd > cfg.solved_gap_usd
+    % 上界与下界相差过大时，cost_upper只是弱上界，不能当作F(K)的近似值。
+    fprintf(['[Calculate_K] 提示：该点尚未收敛（宽度>%.0f USD），' ...
+        'cost_upper是弱上界；前沿作图应把[下界,上界]整段画出。\n'], ...
+        cfg.solved_gap_usd);
+end
 out.status = "fixed_k_cost_point";
 out.elapsed_s = toc(clock);
 if cfg.write_cache
@@ -107,8 +128,9 @@ function cfg = default_config()
 %DEFAULT_CONFIG 求解与登记参数；交互调用时只改K与求解时长即可。
 cfg = struct( ...
     'year', 2022, 'target_t', 80000, 'tracking_width', 0.01, ...
-    'K', 600, 'total_time_s', 3600, 'stall_time_s', 60, ...
-    'improve_guard_usd', 1, ...
+    'K', 600, 'total_time_s', 3600, 'mip_gap_abs_usd', 1, ...
+    'solved_gap_usd', 1000, 'seed_mode', 'cache', ...
+    'gurobi_params', struct(), ...
     'threads', 4, 'gurobi_matlab_directory', '', ...
     'money_guard_usd', 0.01, 'integer_tolerance', 1e-6, ...
     'constraint_tolerance', 1e-5, 'write_cache', true, 'cache_file', '');
@@ -190,7 +212,8 @@ end
 ctx.cost_signature = signature;
 ctx.cost_signature.objective_definition = ...
     "system_cost_without_ammonia_revenue_v1";
-ctx.cached = read_cache_header(ctx.cache_file, ctx.cost_signature);
+ctx.cached = read_cache_header(ctx.cache_file, ctx.cost_signature, ...
+    strcmpi(cfg.seed_mode, 'cache'));
 end
 
 function ensure_gurobi(configured_dir)
@@ -258,6 +281,12 @@ options = struct('TimeLimit', seconds, 'Threads', cfg.threads, 'Seed', 0, ...
     'NumericFocus', 2, 'DualReductions', 0, 'StartTimeLimit', 30, ...
     'OutputFlag', 1, 'LogToConsole', 1, 'DisplayInterval', 30, ...
     'LogFile', '', 'ResultFile', '', 'SolFiles', '', 'NodefileStart', Inf);
+if isfield(cfg, 'gurobi_params') && isstruct(cfg.gurobi_params)
+    % 允许在不改代码的前提下试 Cuts / Heuristics / MIPFocus 等调参。
+    for name = fieldnames(cfg.gurobi_params).'
+        options.(name{1}) = cfg.gurobi_params.(name{1});
+    end
+end
 for name = fieldnames(extra).'
     options.(name{1}) = extra.(name{1});
 end
@@ -270,104 +299,10 @@ if isfield(raw, 'x') && numel(raw.x) == numel(m.units) && all(isfinite(raw.x))
 end
 end
 
-function [run, info] = solve_with_stall(m, cfg, seed, seed_cost, label)
-%SOLVE_WITH_STALL 分片求解；连续stall_time_s无改进即采用当前可行解。
-clock = tic;
-run = struct('raw', struct(), 'status', "NOT_RUN", 'x', []);
-best = run;
-last = run;
-prev_cost = seed_cost;
-prev_bound = -Inf;
-last_gain = 0;
-elapsed = 0;
-info = struct('slices', 0, 'stalled', false, 'reason', "");
-terminal = false;
-while elapsed < cfg.total_time_s
-    slice = min(cfg.stall_time_s, cfg.total_time_s - elapsed);
-    if slice <= 1, break; end
-    info.slices = info.slices + 1;
-    r = solve_model(m, m.cost_f, m.cost_offset, seed, slice, cfg, ...
-        struct('MIPGapAbs', 0), false, ...
-        sprintf('%s第%d片', label, info.slices));
-    elapsed = toc(clock);
-    last = r;
-    if r.status == "INFEASIBLE"
-        run = r;
-        terminal = true;
-        info.reason = "infeasible";
-        break
-    end
-    if ~isempty(r.x)
-        best = r;
-        seed = r.x;
-    end
-    cost = objective_of(r);
-    bound = global_lower(r, cfg.money_guard_usd);
-    if cost < prev_cost - cfg.improve_guard_usd || ...
-            bound > prev_bound + cfg.money_guard_usd
-        last_gain = elapsed;
-        prev_cost = min(prev_cost, cost);
-        prev_bound = max(prev_bound, bound);
-    end
-    if r.status == "OPTIMAL"
-        info.reason = "optimal";
-        break
-    end
-    if elapsed - last_gain >= cfg.stall_time_s - 1
-        info.stalled = true;
-        info.reason = "stalled";
-        break
-    end
-end
-if ~terminal
-    if ~isempty(best.x)
-        run = best;
-    elseif ~isempty(fieldnames(last.raw))
-        % 无可行解时保留最后一片的原始状态，不把求解器状态伪装成未运行。
-        run = last;
-    end
-end
-if info.reason == ""
-    info.reason = "time_budget";
-end
-info.slices = info.slices;
-fprintf('[Calculate_K] 分片结束：%s，共%d片，%.1f s。\n', ...
-    info.reason, info.slices, elapsed);
-end
-
-function value = objective_of(run)
-%OBJECTIVE_OF 只读取求解器返回的目标值；没有可行点时返回Inf。
-value = Inf;
-if isfield(run.raw, 'objval') && isfinite(run.raw.objval)
-    value = run.raw.objval;
-end
-end
-
-function [seed, cost] = pick_seed(ctx, m, cfg)
-%PICK_SEED 从缓存候选里挑一个在本模型下合法且成本最低的初始化点。
-seed = [];
-cost = Inf;
-best = empty_point(cfg.K);
-best.cost = Inf;
-best.valid = false;
-for i = 1:numel(ctx.cached.solutions)
-    candidate = check_point(ctx.cached.solutions{i}, m, ctx, cfg);
-    if candidate.valid && candidate.cost < cost
-        best = candidate;
-        cost = candidate.cost;
-    end
-end
-if best.valid
-    seed = best.x;
-    fprintf('[Calculate_K] 热启动：缓存候选成本=%.6f USD，更新=%g次。\n', ...
-        cost, best.count);
-end
-end
-
-function cached = read_cache_header(file, signature)
-%READ_CACHE_HEADER 只读缓存候选解；签名不符时不给候选，也不改文件。
+function cached = read_cache_header(file, signature, want_solutions)
+%READ_CACHE_HEADER 读缓存的参考成本与点数；需要热启动时才附带可行解。
 cached = struct('exists', isfile(file), 'signature_matches', false, ...
-    'solutions', {{}}, 'point_count', 0, ...
+    'point_count', 0, 'solutions', {{}}, ...
     'reference_left', NaN, 'reference_right', NaN, 'K_upper', NaN);
 if ~cached.exists, return; end
 try
@@ -379,23 +314,27 @@ end
 cached.signature_matches = isfield(loaded, 'signature') && ...
     isequaln(loaded.signature, signature);
 if ~cached.signature_matches
-    fprintf('[Calculate_K] 缓存签名与当前模型不一致，本次不继承候选、不写入。\n');
+    fprintf('[Calculate_K] 缓存签名与当前模型不一致，本次不写入。\n');
     return
 end
 if ~isfield(loaded, 'state'), return; end
 state = loaded.state;
 if isfield(state, 'points')
     cached.point_count = numel(state.points);
-    for j = 1:numel(state.points)
-        if isfield(state.points(j), 'has_incumbent') && ...
-                state.points(j).has_incumbent && ...
-                isfield(state.points(j), 'solution')
-            cached.solutions{end+1} = state.points(j).solution;
+    if want_solutions
+        for j = 1:numel(state.points)
+            if isfield(state.points(j), 'has_incumbent') && ...
+                    state.points(j).has_incumbent && ...
+                    isfield(state.points(j), 'solution')
+                cached.solutions{end+1} = state.points(j).solution;
+            end
         end
     end
 end
-if isfield(state, 'reference') && isfield(state.reference, 'solution')
-    cached.solutions{end+1} = state.reference.solution;
+if isfield(state, 'reference')
+    if want_solutions && isfield(state.reference, 'solution')
+        cached.solutions{end+1} = state.reference.solution;
+    end
     if isfield(state.reference, 'objective_lower')
         cached.reference_left = state.reference.objective_lower;
     end
@@ -406,6 +345,19 @@ end
 if isfield(state, 'Keco_upper'), cached.K_upper = state.Keco_upper; end
 fprintf('[Calculate_K] 缓存可读：%d个成本点，参考成本=[%.6f, %.6f] USD。\n', ...
     cached.point_count, cached.reference_left, cached.reference_right);
+end
+
+function [seed, seed_point] = pick_seed(ctx, m, cfg)
+%PICK_SEED 从缓存里挑一个满足本K预算且成本最低的可行解，仅作初始上界。
+seed = [];
+seed_point = struct('cost', NaN, 'count', NaN);
+for i = 1:numel(ctx.cached.solutions)
+    candidate = check_point(ctx.cached.solutions{i}, m, ctx, cfg);
+    if candidate.valid && (isnan(seed_point.cost) || candidate.cost < seed_point.cost)
+        seed = candidate.x;
+        seed_point = struct('cost', candidate.cost, 'count', candidate.count);
+    end
+end
 end
 
 function point = check_point(solution, m, ctx, cfg)
