@@ -9,10 +9,10 @@ function out = Calculate_K(K, solve_time_s, opts)
 % 读取该点后如何判定经济合格，由main自身配置决定，与本求解无关。
 %
 % 单点独立求解：不做停滞提前停止，Gurobi在同一棵搜索树上持续改进，给定时间越长
-% [cost_lower,cost_upper]只会收窄。obj.seed_mode控制起点：
-%   'cache'（默认）只取满足本K预算的缓存解作为初始上界，不改变下界，也不限制后续
-%          改进；实测冷启动900 s仍找不到任何可行解，故实际使用必须给一个可行起点。
-%   'none'  完全冷启动，只适合有充裕机时或需要验证独立性的场合。
+% [cost_lower,cost_upper]只会收窄。所有点统一用缓存解热启动：只取满足本K预算的
+% 缓存解作为初始上界，不改变下界，也不限制后续改进。实测冷启动900 s仍找不到任何
+% 可行解，且冷启动点的成本口径与热启动点相差近两个数量级，因此本工具不提供冷启动，
+% 以保证前沿上各点出自同一上界口径。
 % 只有同时通过原年度矩阵、原整数集合、平台语义与成本重算的解才写入缓存；
 % 缓存签名不一致时拒绝改写，绝不覆盖现有证据。
 arguments
@@ -47,16 +47,15 @@ fprintf(['\n[Calculate_K] 年份=%d，时段=%d，跟踪总带宽=%.4f，更新�
     '单点求解时限=%.0f s，冷启动且不继承其它K的解。\n'], ...
     cfg.year, ctx.T, cfg.tracking_width, cfg.K, cfg.total_time_s);
 m = with_count_budget(ctx.full, cfg.K);
-seed = [];
-if strcmpi(cfg.seed_mode, 'cache')
-    [seed, seed_point] = pick_seed(ctx, m, cfg);
-    if ~isempty(seed)
-        fprintf(['[Calculate_K] 初始上界取自缓存可行解：成本=%.6f USD，更新=%g次；' ...
-            '它只是上界起点，不限制求解器继续改进。\n'], ...
-            seed_point.cost, seed_point.count);
-    else
-        fprintf('[Calculate_K] 缓存中没有满足K的可行解，本次冷启动。\n');
-    end
+% 统一热启动：所有 K 点用同一个口径（缓存中满足本预算且成本最低的已核验解）作初始上界，
+% 不做冷启动，避免各点因起点不同导致成本口径不一致。
+[seed, seed_point] = pick_seed(ctx, m, cfg);
+if ~isempty(seed)
+    fprintf(['[Calculate_K] 初始上界取自缓存可行解：成本=%.6f USD，更新=%g次；' ...
+        '它只是上界起点，不限制求解器继续改进。\n'], ...
+        seed_point.cost, seed_point.count);
+else
+    fprintf('[Calculate_K] 缓存中没有满足K的可行解；本次将冷启动，结果仅作参考。\n');
 end
 run = solve_model(m, m.cost_f, m.cost_offset, seed, cfg.total_time_s, cfg, ...
     struct('MIPGapAbs', cfg.mip_gap_abs_usd), false, ...
@@ -79,6 +78,14 @@ end
 candidate = check_point(struct(), m, ctx, cfg);
 if ~isempty(run.x)
     candidate = check_point(vector_solution(run.x, m.indices), m, ctx, cfg);
+end
+if ~candidate.valid && ~isempty(seed)
+    % 求解器返回的解未通过核验时回落到已经核验过的初始解，避免整点被丢弃。
+    candidate = check_point(vector_solution(seed, m.indices), m, ctx, cfg);
+    if candidate.valid
+        fprintf('[Calculate_K] 返回解未通过核验，回落为热启动解（%g次）。\n', ...
+            candidate.count);
+    end
 end
 if ~candidate.valid
     out.status = "solver_returned_no_valid_witness";
@@ -129,7 +136,7 @@ function cfg = default_config()
 cfg = struct( ...
     'year', 2022, 'target_t', 80000, 'tracking_width', 0.01, ...
     'K', 600, 'total_time_s', 3600, 'mip_gap_abs_usd', 1, ...
-    'solved_gap_usd', 1000, 'seed_mode', 'cache', ...
+    'solved_gap_usd', 1000, ...
     'gurobi_params', struct(), ...
     'threads', 4, 'gurobi_matlab_directory', '', ...
     'money_guard_usd', 0.01, 'integer_tolerance', 1e-6, ...
@@ -213,7 +220,7 @@ ctx.cost_signature = signature;
 ctx.cost_signature.objective_definition = ...
     "system_cost_without_ammonia_revenue_v1";
 ctx.cached = read_cache_header(ctx.cache_file, ctx.cost_signature, ...
-    strcmpi(cfg.seed_mode, 'cache'));
+    true);
 end
 
 function ensure_gurobi(configured_dir)
