@@ -123,12 +123,16 @@ o1_config.economic_proof_mode = 'full';
 o1_config.economic_structural_search = true;
 o1_config.economic_branch_enable = false;
 o1_config.economic_lower_policy_version = 4;
+% 分区层级与局部整数块时限。300 s/块 与 test/11_2 的独立复算一致，
+% 同一存储价格下把计数下界从 407.647 提高到 413.581（Keco>=414）。
+% 注意：旧检查点按 3 s/6 s 生成，改时限后需清除 src/cache/O1_partition21_v1
+% 下对应目录，否则内核会重放旧对偶界而得不到更高下界。
 o1_config.economic_block_lengths_h = [96,192];
-o1_config.economic_block_lp_time_s = 180;
-o1_config.economic_block_time_s = 3;
-o1_config.economic_block_max_time_s = 6;
-o1_config.economic_block_budget_s = 900;
-o1_config.economic_block_round_time_s = 900;
+o1_config.economic_block_lp_time_s = 300;
+o1_config.economic_block_time_s = 300;
+o1_config.economic_block_max_time_s = 300;
+o1_config.economic_block_budget_s = 5400;
+o1_config.economic_block_round_time_s = 5400;
 o1_config.economic_max_attempts = 24;
 o1_config.economic_max_solves_per_run = 4096;
 % 单轮运行预算；跨轮次续算同时加时，进度全部持久化。
