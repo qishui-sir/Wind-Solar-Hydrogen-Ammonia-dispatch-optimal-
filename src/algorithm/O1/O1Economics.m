@@ -102,6 +102,49 @@ if ~partition_enabled
 end
 state = import_cost_cache(state, ctx, base);
 [state,reference] = register_reference_point(state, reference, ctx, base);
+if partition_enabled && cfg.use_cache
+    % 11_9 的 eta=0.03 + 48/96/192 自适应 + 目标割证书。证书在源帽
+    % 31,787,636.626430 USD 下证明 Keco>=416；当前 fail 帽不宽于源帽时
+    % 同一证书仍合法。这里只把已验证的整数下界并入 feasibility，主模型、
+    % 成本帽和分块证据都不改。
+    eta_cap = reference.objective_upper + ...
+        cfg.economic_delta_usd_t*cfg.nh3_target_t;
+    eta_source = value(value(state,'partition21',struct()),'work_dir','');
+    prior_lower = value(state,'Keco_lower',NaN);
+    try
+        [eta_lower, eta_info] = O1EtaCertificate(cfg, eta_cap, eta_source, ...
+            @partition21_hash);
+    catch eta_exception
+        % A malformed optional certificate must not stop the main search.
+        eta_lower = -Inf;
+        eta_info = struct('validated', false, ...
+            'reason', "eta certificate exception: " + ...
+            string(eta_exception.message));
+    end
+    if isfinite(eta_lower) && eta_lower > feasibility.K_lower
+        feasibility.K_lower = eta_lower;
+        feasibility.K_lower_source = "eta_certificate_global_count";
+        state.eta_certificate = eta_info;
+        eta_sig = char(eta_info.source_context_signature);
+        if numel(eta_sig) > 12, eta_sig = eta_sig(1:12); end
+        fprintf(['[O1] 11_9 eta 证书：Keco>=%g（cert=%.9f，base=%.9f，' ...
+            'cap=%.6f，source=%s）。\n'], eta_lower, eta_info.cert, ...
+            eta_info.base_cert, eta_info.source_cap_usd, eta_sig);
+        if isfinite(prior_lower) && eta_lower > prior_lower + 1e-9
+            fprintf('[O1] 11_9 eta 证书将缓存下界 %g 提高到 %g（+%g）。\n', ...
+                prior_lower, eta_lower, eta_lower - prior_lower);
+        end
+    elseif isfinite(eta_lower)
+        state.eta_certificate = eta_info;
+        fprintf('[O1] 11_9 eta 证书：Keco>=%g（未超过当前下界%g）。\n', ...
+            eta_lower, feasibility.K_lower);
+    else
+        state.eta_certificate = struct();
+        if isfield(eta_info,'reason') && strlength(string(eta_info.reason)) > 0
+            fprintf('[O1] 11_9 eta 证书未采用：%s\n', eta_info.reason);
+        end
+    end
+end
 [state, economic] = certify(state, reference, feasibility, ctx);
 initial_width = economic.K_upper-economic.K_lower;
 state.structural_report = struct('initial_width',initial_width,'current_width',initial_width, ...
@@ -1509,9 +1552,14 @@ sat = reference.objective_lower+delta*ctx.config.nh3_target_t;
 fail = reference.objective_upper+delta*ctx.config.nh3_target_t;
 lower = feasibility.K_lower;
 upper = Inf;
+lower_source = "cached_physical_lower_bound";
+if isfield(feasibility,'K_lower_source') && ...
+        strlength(string(feasibility.K_lower_source)) > 0
+    lower_source = string(feasibility.K_lower_source);
+end
 accepted = struct('source',"none",'K',Inf,'cost_upper_usd',Inf, ...
     'threshold_usd',sat,'has_solution',false,'solution',struct());
-rejected = struct('source',"cached_physical_lower_bound", ...
+rejected = struct('source',lower_source, ...
     'excluded_K_max',lower-1,'cost_lower_usd',NaN,'threshold_usd',fail, ...
     'count_lower',lower,'cost_cap_usd',Inf);
 for i = 1:numel(state.points)
