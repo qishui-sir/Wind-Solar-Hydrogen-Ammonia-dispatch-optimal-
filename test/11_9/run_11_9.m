@@ -1,4 +1,4 @@
-﻿function run_11_9
+function run_11_9
 %RUN_11_9  Adaptive three-level block-counting certificate for the Keco lower bound.
 %
 %   Valid claim:  Keco >= ceil(cert - 1e-5),
@@ -22,7 +22,7 @@
 %   a few prices, which is still a valid lower bound for the ORIGINAL problem.
 
 cfg = struct('H',[48 96 192], 'limit',[20 120 600], 'threads',4, 'seed',20261017, ...
-    'solve',false, 'eta_prod',0.03, ...
+    'solve',false, 'eta_prod',0.03, 'allint',true, ...
     'files',{{'level48.mat','level96.mat','level192.mat'}}, ...
     'out','certificate_11_9.mat');
 
@@ -52,15 +52,15 @@ pattern = spones(model.A);
 valid = isfinite(hour) & hour>=1 & hour<=T+1 & hour==round(hour);
 fprintf('Stored certificate: best=%.6f  K_lower=%d\n', S.proof.best, S.proof.K_lower);
 
-if ~cfg.solve && isfile(fullfile(here,cfg.out))
-    D = load(fullfile(here,cfg.out)); out = D.out;
-    verify(model,pi,pattern,out);
+if ~cfg.solve && isfile(fullfile(here,'cache',cfg.out))
+    D = load(fullfile(here,'cache',cfg.out)); out = D.out;
+    verify(model,pi,pattern,out,hour,z,valid);
     return
 end
 
 L = cell(1,3);
 for k = 1:3
-    f = fullfile(here,cfg.files{k});
+    f = fullfile(here,'cache',cfg.files{k});
     if ~cfg.solve && isfile(f)
         L{k} = load(f);
         if isfield(L{k},'eta_prod')
@@ -70,8 +70,10 @@ for k = 1:3
         end
     else
         fprintf('Solving level H=%d (%.0f s/block) ...\n',cfg.H(k),cfg.limit(k));
-        L{k} = solve_level(model,pi,hour,z,cfg.H(k),cfg.limit(k),cfg.seed,cfg.threads,valid,pattern);
-        save(f,'-struct','L','-v7.3');
+        Lk = solve_level(model,pi,hour,z,cfg.H(k),cfg.limit(k),cfg.seed,cfg.threads,valid,pattern, ...
+            C.meta.original_intcon(:), cfg.allint && cfg.H(k)==192);
+        save(f,'-struct','Lk','-v7.3');
+        L{k} = Lk;
     end
 end
 out = assemble3(model,pi,hour,z,valid,pattern,L{1},L{2},L{3});
@@ -82,11 +84,11 @@ fprintf('Adaptive   : cert=%.9f ceil=%d  (192-split %d/46, 96-split %d/92)\n', .
     out.cert, ceil(out.cert-1e-5), nnz(out.choice192), nnz(out.choice48));
 fprintf('Gain over H=192: %.6f ; gain over stored K_lower: %d\n', ...
     out.cert-out.cert192, ceil(out.cert-1e-5)-S.proof.K_lower);
-save(fullfile(here,cfg.out),'out','-v7.3');
+save(fullfile(here,'cache',cfg.out),'out','-v7.3');
 end
 
 % ======================================================================
-function L = solve_level(model,pi,hour,z,H,limit,seed,threads,valid,pattern)
+function L = solve_level(model,pi,hour,z,H,limit,seed,threads,valid,pattern,intcon,allint)
 [part,lp] = partition_meta(model,pi,hour,z,H,valid,pattern);
 K = part.K; ell = lp; lpx = lp; st = cell(K,1); tt = zeros(K,1);
 fprintf('level H=%d: K=%d blocks, limit=%.0fs\n',H,K,limit);
@@ -99,7 +101,12 @@ for j = 1:K
         'FeasibilityTol',1e-9,'OptimalityTol',1e-9);
     r = gurobi(local,gp);
     if strcmpi(r.status,'OPTIMAL'), lpx(j) = r.objval; end
-    local.vtype(ismember(cj,z)) = 'B';
+    if allint
+        il = ismember(cj,intcon); isbin = model.lb(cj)==0 & model.ub(cj)==1;
+        local.vtype(il&isbin) = 'B'; local.vtype(il&~isbin) = 'I';
+    else
+        local.vtype(ismember(cj,z)) = 'B';
+    end
     gp = struct('TimeLimit',limit,'Threads',threads,'OutputFlag',0,'MIPGap',0, ...
         'MIPGapAbs',0,'FeasibilityTol',1e-9,'IntFeasTol',1e-9, ...
         'OptimalityTol',1e-9,'Seed',seed);
@@ -193,21 +200,52 @@ out = struct('cert',cert,'cert48',cert48,'cert96',cert96,'cert192',cert192, ...
 end
 
 % ======================================================================
-function verify(model,pi,pattern,out)
+function verify(model,pi,pattern,out,hour,z,valid)
 n = numel(model.obj);
+% ---- base certificate (eta=0.03, 48/96/192 adaptive) ----
 groups = sparse(1:n,out.own,1,n,out.K);
 p = spones(pattern*groups); cross = full(sum(p,2))~=1;
 bp = model.rhs.*pi; B = sum(bp(cross));
 guard = 1e-6+1e-9*(1+sum(abs(bp(cross))));
-cert = B - guard + sum(out.loc);
-fprintf('Level H=48 : cert=%.9f ceil=%d\n', out.cert48, ceil(out.cert48-1e-5));
-fprintf('Level H=96 : cert=%.9f ceil=%d\n', out.cert96, ceil(out.cert96-1e-5));
-fprintf('Level H=192: cert=%.9f ceil=%d\n', out.cert192, ceil(out.cert192-1e-5));
-fprintf('Adaptive   : cert=%.9f ceil=%d  (192-split %d/46, 96-split %d/92)\n', ...
-    cert, ceil(cert-1e-5), nnz(out.choice192), nnz(out.choice48));
-assert(abs(B-out.B) <= 1e-6*max(1,abs(B)),'recomputed B mismatch');
-assert(abs(cert-out.cert) <= 1e-9,'recomputed cert mismatch');
-assert(cert >= max([out.cert48,out.cert96,out.cert192])-1e-6,'cert weaker than a level');
+cert_base = B - guard + sum(out.loc);
+fprintf('Base 48/96/192: %.9f / %.9f / %.9f ; adaptive=%.9f ceil=%d\n', ...
+    out.cert48, out.cert96, out.cert192, cert_base, ceil(cert_base-1e-5));
+assert(abs(B-out.B) <= 1e-6*max(1,abs(B)),'base B mismatch');
+assert(abs(cert_base-out.base_cert) <= 1e-9,'base cert mismatch');
+assert(cert_base >= max([out.cert48,out.cert96,out.cert192])-1e-6,'base weaker than a level');
+assert(out.cut_k <= ceil(cert_base-1e-5),'cut target exceeds proved bound');
+% ---- objective-cut certificate ----
+k = out.cut_k;
+A2 = [model.A; sparse(1,z,1,1,n)];
+rhs2 = [model.rhs; k];
+sense2 = [model.sense(:); '>'];
+model2 = model; model2.A = A2; model2.rhs = rhs2; model2.sense = sense2;
+pi_cut = out.pi_cut(:);
+pi_cut(sense2=='<') = min(0,pi_cut(sense2=='<'));
+pi_cut(sense2=='>') = max(0,pi_cut(sense2=='>'));
+assert(pi_cut(end) >= -1e-12,'cut dual sign');
+pattern2 = spones(A2);
+[part,lpbox] = partition_meta(model2,pi_cut,hour,z,96,valid,pattern2);
+K = part.K; lpx = lpbox; ell = lpbox;
+for j = 1:K
+    cj = part.cols{j}; ij = part.rows{j};
+    local = struct('A',A2(ij,cj),'rhs',rhs2(ij),'sense',sense2(ij), ...
+        'obj',part.q(cj),'lb',model.lb(cj),'ub',model.ub(cj), ...
+        'vtype',repmat('C',numel(cj),1),'modelsense','min');
+    gp = struct('TimeLimit',10,'Threads',4,'OutputFlag',0, ...
+        'FeasibilityTol',1e-9,'OptimalityTol',1e-9);
+    r = gurobi(local,gp);
+    if strcmpi(r.status,'OPTIMAL'), lpx(j) = r.objval; end
+    local.vtype(ismember(cj,z)) = 'B';
+    gp = struct('TimeLimit',120,'Threads',4,'OutputFlag',0,'MIPGap',0,'MIPGapAbs',0, ...
+        'FeasibilityTol',1e-9,'IntFeasTol',1e-9,'OptimalityTol',1e-9,'Seed',20261017);
+    r = gurobi(local,gp); b = safe_bound(local,r);
+    if isfinite(b), ell(j) = max(ell(j),b); end
+end
+L = part.B - part.guardB + sum(max(lpx,ell));
+fprintf('Objective-cut: k=%d mu=%.6f  cert=%.9f ceil=%d\n', k, pi_cut(end), L, ceil(L-1e-5));
+assert(abs(L-out.cert) <= 1e-9,'objective-cut cert mismatch');
+assert(L >= k-1e-5,'cut certificate below its own target');
 end
 
 % ======================================================================
